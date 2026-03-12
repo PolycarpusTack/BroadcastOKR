@@ -90,13 +90,13 @@ export function GoalsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Filters + Create */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter goals by channel" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selectStyle}>
           <option value="all">All Channels</option>
           {CHANNELS.map((ch, i) => (
             <option key={i} value={String(i)}>{ch.icon} {ch.name}</option>
           ))}
         </select>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter goals by status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={selectStyle}>
           <option value="all">All Statuses</option>
           <option value="on_track">On Track</option>
           <option value="at_risk">At Risk</option>

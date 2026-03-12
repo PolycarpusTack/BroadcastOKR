@@ -25,6 +25,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
 
   return (
     <aside
+      aria-label="Main navigation"
       style={{
         width: open ? 240 : 64,
         background: theme.bgSidebar,
@@ -35,11 +36,24 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
         flexShrink: 0,
       }}
     >
-      <div
-        style={{ padding: open ? '20px 20px 16px' : '20px 12px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+      <button
         onClick={onToggle}
+        aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
+        aria-expanded={open}
+        style={{
+          padding: open ? '20px 20px 16px' : '20px 12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          cursor: 'pointer',
+          background: 'none',
+          border: 'none',
+          textAlign: 'left',
+          width: '100%',
+        }}
       >
         <div
+          aria-hidden="true"
           style={{
             width: 36,
             height: 36,
@@ -60,9 +74,9 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
             <div style={{ fontSize: 10, color: theme.sidebarText, fontWeight: 500 }}>Operations Goals</div>
           </div>
         )}
-      </div>
+      </button>
 
-      <nav style={{ flex: 1, padding: '8px' }}>
+      <nav role="navigation" aria-label="Page navigation" style={{ flex: 1, padding: '8px' }}>
         {NAV.map((n) => {
           const active = location.pathname === n.path;
           return (
@@ -70,6 +84,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
               key={n.path}
               onClick={() => navigate(n.path)}
               aria-label={!open ? n.label : undefined}
+              aria-current={active ? 'page' : undefined}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -88,7 +103,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
                 transition: 'all .15s',
               }}
             >
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span>
+              <span aria-hidden="true" style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span>
               {open && n.label}
             </button>
           );
@@ -106,6 +121,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
           </div>
           <button
             onClick={onOpenLog}
+            aria-label={`Open activity log, ${actLogCount} entries`}
             style={{
               marginTop: 10,
               width: '100%',

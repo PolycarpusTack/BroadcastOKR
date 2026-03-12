@@ -14,15 +14,17 @@ interface HeaderProps {
   taskCount: number;
   perms: RolePermissions;
   onCreateTask: () => void;
+  onMobileMenu?: () => void;
 }
 
-export function Header({ theme, taskCount, perms, onCreateTask }: HeaderProps) {
+export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const page = PAGE_INFO[location.pathname] || PAGE_INFO['/dashboard'];
 
   return (
     <header
+      role="banner"
       style={{
         padding: '16px 28px',
         background: theme.headerBg,
@@ -34,17 +36,29 @@ export function Header({ theme, taskCount, perms, onCreateTask }: HeaderProps) {
         transition: 'background .3s',
       }}
     >
-      <div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: theme.text, margin: 0, letterSpacing: '-.02em' }}>
-          {page.icon} {page.label}
-        </h1>
-        <p style={{ fontSize: 12, color: theme.textFaint, margin: 0, marginTop: 2 }}>{page.desc}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {onMobileMenu && (
+          <button
+            className="mobile-menu-btn"
+            onClick={onMobileMenu}
+            aria-label="Open navigation menu"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: theme.text, padding: 4, display: 'none' }}
+          >
+            {'\u2630'}
+          </button>
+        )}
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: theme.text, margin: 0, letterSpacing: '-.02em' }}>
+            <span aria-hidden="true">{page.icon} </span>{page.label}
+          </h1>
+          <p style={{ fontSize: 12, color: theme.textFaint, margin: 0, marginTop: 2 }}>{page.desc}</p>
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ padding: '4px 10px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.border}`, fontSize: 11, color: theme.textMuted }}>
           Q1 2026
         </span>
-        <span style={{ padding: '4px 10px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.border}`, fontSize: 11, color: theme.textMuted }}>
+        <span aria-label={`${taskCount} tasks total`} style={{ padding: '4px 10px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.border}`, fontSize: 11, color: theme.textMuted }}>
           {taskCount} tasks
         </span>
         {perms.canCreate && (
@@ -53,6 +67,7 @@ export function Header({ theme, taskCount, perms, onCreateTask }: HeaderProps) {
               navigate('/tasks');
               onCreateTask();
             }}
+            aria-label="Create new task"
             style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
           >
             + Task

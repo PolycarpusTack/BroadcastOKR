@@ -29,7 +29,7 @@ export function ActivityLog({ log, open, onClose, theme }: ActivityLogProps) {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${theme.borderLight}` }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0 }}>{'\u{1F4CB}'} Activity Log</h3>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: theme.textFaint }}>{'\u2715'}</button>
+        <button onClick={onClose} aria-label="Close activity log" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: theme.textFaint }}>{'\u2715'}</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
         {log.length === 0 ? (

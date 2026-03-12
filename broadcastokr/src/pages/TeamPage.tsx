@@ -74,7 +74,7 @@ export function TeamPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: 8, marginBottom: 12 }}>
                   {[
                     { label: 'Tasks', value: userTasks.length, color: '#4f46e5' },
                     { label: 'Active', value: inProgress, color: '#f59e0b' },

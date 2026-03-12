@@ -91,19 +91,19 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
             </button>
           ))}
         </div>
-        <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter by channel" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selectStyle}>
           <option value="all">All Channels</option>
           {CHANNELS.map((ch, i) => (
             <option key={i} value={String(i)}>{ch.icon} {ch.name}</option>
           ))}
         </select>
-        <select value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter by priority" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={selectStyle}>
           <option value="all">All Priorities</option>
           {Object.entries(PRIORITIES).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
           ))}
         </select>
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter by task type" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={selectStyle}>
           <option value="all">All Types</option>
           {TASK_TYPES.map((t) => (
             <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
@@ -122,7 +122,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
 
       {/* Kanban View */}
       {view === 'kanban' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STATUS_FLOW.length}, 1fr)`, gap: 14, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STATUS_FLOW.length}, minmax(200px, 1fr))`, gap: 14, alignItems: 'start', overflowX: 'auto', paddingBottom: 8 }}>
           {STATUS_FLOW.map((status) => {
             const colTasks = filtered.filter((t) => t.status === status);
             return (
@@ -143,7 +143,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
         </div>
       ) : (
         /* List View */
-        <div style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 14, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${theme.borderLight}` }}>

@@ -7,6 +7,29 @@
     overflow: hidden;
     transition: background 0.3s;
   }
+  :focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+  }
+}
+
+/* Skip to content link */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 9999;
+  padding: 8px 16px;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  transition: top 0.2s;
+}
+.skip-link:focus {
+  top: 0;
 }
 
 @keyframes urgPulse {
@@ -29,7 +52,24 @@
   to { transform: translateX(0); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 .toast-enter { animation: toastIn 0.3s ease forwards; }
 .toast-exit { animation: toastOut 0.3s ease forwards; }
 .animate-slide-in-right { animation: slideInRight 0.25s ease; }
 .animate-urg-pulse { animation: urgPulse 2s infinite; }
+.animate-fade-in { animation: fadeIn 0.2s ease; }
+
+/* Responsive: hide sidebar on small screens */
+@media (max-width: 768px) {
+  .sidebar-desktop { display: none !important; }
+  .sidebar-mobile-overlay { display: block !important; }
+  .main-content { padding: 16px !important; }
+}
+@media (min-width: 769px) {
+  .sidebar-mobile-overlay { display: none !important; }
+  .mobile-menu-btn { display: none !important; }
+}

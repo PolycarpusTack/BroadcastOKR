@@ -22,6 +22,10 @@ export function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
   return (
     <div
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Task: ${task.title}, ${pri.label} priority, assigned to ${user.name}`}
       style={{
         background: theme.bgCard,
         border: `1px solid ${theme.borderLight}`,

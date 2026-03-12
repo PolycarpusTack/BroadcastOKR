@@ -10,7 +10,7 @@ interface ProgressBarProps {
 
 export function ProgressBar({ value, height = 6, color, theme }: ProgressBarProps) {
   return (
-    <div style={{ height, borderRadius: height / 2, background: theme.border, overflow: 'hidden', width: '100%' }}>
+    <div role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100} style={{ height, borderRadius: height / 2, background: theme.border, overflow: 'hidden', width: '100%' }}>
       <div
         style={{
           width: `${Math.min(value * 100, 100)}%`,
