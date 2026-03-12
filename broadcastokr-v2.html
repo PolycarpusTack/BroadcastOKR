@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+  <title>BroadcastOKR · Operations Goals &amp; Team Management</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans','Segoe UI',system-ui,sans-serif;background:#f1f5f9;margin:0;overflow:hidden;transition:background 0.3s}
+    body.dark{background:#0b0f1a}
+    #root{height:100vh;width:100vw}
+    @keyframes urgPulse{0%,100%{opacity:1}50%{opacity:.6}}
+    @keyframes toastIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+    @keyframes toastOut{from{transform:translateX(0);opacity:1}to{transform:translateX(120%);opacity:0}}
+    @keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    .toast-enter{animation:toastIn .3s ease forwards}
+    .toast-exit{animation:toastOut .3s ease forwards}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+<script type="text/babel">
+// ═══════════════════════════════════════════════════════════════
+//  BroadcastOKR v2 — Operations Goals & Team Management
+//  Bugs fixed · Toast · Activity Log · Goal Create · Stress Test
+// ═══════════════════════════════════════════════════════════════
+
+const THEMES={
+  light:{bg:"#f1f5f9",bgCard:"#fff",bgCardHover:"#f8fafc",bgSidebar:"#0f172a",bgSidebarActive:"#1e293b",bgInput:"#fff",bgMuted:"#f8fafc",border:"#e2e8f0",borderLight:"#f1f5f9",borderInput:"#e2e8f0",text:"#0f172a",textSecondary:"#334155",textMuted:"#64748b",textFaint:"#94a3b8",sidebarText:"#94a3b8",sidebarTextActive:"#fff",overlay:"rgba(0,0,0,.45)",headerBg:"#fff",compliantBg:"#f0fdf4",compliantBorder:"#bbf7d0",atRiskBg:"#fffbeb",atRiskBorder:"#fde68a"},
+  dark:{bg:"#0b0f1a",bgCard:"#151b2e",bgCardHover:"#1a2240",bgSidebar:"#080c16",bgSidebarActive:"#151b2e",bgInput:"#1a2240",bgMuted:"#1a2240",border:"#1e293b",borderLight:"#1a2240",borderInput:"#2d3a5c",text:"#e2e8f0",textSecondary:"#cbd5e1",textMuted:"#94a3b8",textFaint:"#64748b",sidebarText:"#64748b",sidebarTextActive:"#e2e8f0",overlay:"rgba(0,0,0,.7)",headerBg:"#111827",compliantBg:"#052e16",compliantBorder:"#166534",atRiskBg:"#451a03",atRiskBorder:"#92400e"}
+};
+const ROLE_PERMS={
+  owner:{canCreate:true,canEdit:true,canDelete:true,canAssign:true,canCheckIn:true,canChangeStatus:true,canViewReports:true,label:"Owner"},
+  manager:{canCreate:true,canEdit:true,canDelete:false,canAssign:true,canCheckIn:true,canChangeStatus:true,canViewReports:true,label:"Manager"},
+  member:{canCreate:false,canEdit:false,canDelete:false,canAssign:false,canCheckIn:true,canChangeStatus:true,canViewReports:false,label:"Member"}
+};
+const USERS=[
+  {id:0,name:"Yannick De Smet",role:"owner",av:"YD",color:"#4f46e5",dept:"Operations",title:"Head of Broadcast Operations"},
+  {id:1,name:"Lien Verstraete",role:"manager",av:"LV",color:"#059669",dept:"Scheduling",title:"Senior Scheduler"},
+  {id:2,name:"Pieter Claes",role:"member",av:"PC",color:"#d97706",dept:"Playout / MCR",title:"Playout Operator"},
+  {id:3,name:"Sophie De Ridder",role:"member",av:"SR",color:"#db2777",dept:"Traffic & Compliance",title:"Traffic Coordinator"},
+  {id:4,name:"Niels Janssen",role:"manager",av:"NJ",color:"#7c3aed",dept:"Content & Rights",title:"Rights Manager"},
+  {id:5,name:"Ava Mertens",role:"member",av:"AM",color:"#0891b2",dept:"EPG & Metadata",title:"EPG Coordinator"}
+];
+const TEAMS=[
+  {name:"Scheduling",members:[1],color:"#059669",icon:"\u{1F4C5}"},
+  {name:"Playout / MCR",members:[2],color:"#d97706",icon:"\u{1F3AC}"},
+  {name:"Traffic & Compliance",members:[3],color:"#db2777",icon:"\u2696\uFE0F"},
+  {name:"Content & Rights",members:[4],color:"#7c3aed",icon:"\u{1F4DC}"},
+  {name:"EPG & Metadata",members:[5],color:"#0891b2",icon:"\u{1F4E1}"}
+];
+const CHANNELS=[
+  {name:"VRT 1",color:"#1d4ed8",type:"Linear",icon:"\u{1F4FA}"},
+  {name:"VRT Canvas",color:"#7c3aed",type:"Linear",icon:"\u{1F3A8}"},
+  {name:"VRT MAX",color:"#dc2626",type:"SVOD / Catch-up",icon:"\u25B6\uFE0F"},
+  {name:"VRT NWS FAST",color:"#ea580c",type:"FAST",icon:"\u26A1"}
+];
+const TASK_TYPES=[
+  {key:"schedule_change",label:"Schedule Change",color:"#3b82f6",icon:"\u{1F4C5}"},
+  {key:"rights_clearance",label:"Rights Clearance",color:"#8b5cf6",icon:"\u{1F4DC}"},
+  {key:"epg_delivery",label:"EPG Delivery",color:"#06b6d4",icon:"\u{1F4E1}"},
+  {key:"playout_prep",label:"Playout Prep",color:"#f59e0b",icon:"\u{1F3AC}"},
+  {key:"compliance_check",label:"Compliance Check",color:"#ef4444",icon:"\u2696\uFE0F"},
+  {key:"content_qc",label:"Content QC",color:"#10b981",icon:"\u2705"},
+  {key:"promo",label:"Promo",color:"#ec4899",icon:"\u{1F4E3}"}
+];
+const SF=["backlog","todo","in_progress","review","done"];
+const SL={backlog:"Backlog",todo:"To Do",in_progress:"In Progress",review:"In Review",done:"Done"};
+const SC={backlog:"#94a3b8",todo:"#3b82f6",in_progress:"#f59e0b",review:"#8b5cf6",done:"#10b981"};
+const PR={critical:{label:"Critical",color:"#dc2626",icon:"\u{1F534}"},high:{label:"High",color:"#f97316",icon:"\u{1F7E0}"},medium:{label:"Medium",color:"#eab308",icon:"\u{1F7E1}"},low:{label:"Low",color:"#22c55e",icon:"\u{1F7E2}"}};
+
+const initKPIs=()=>[
+  {name:"Playout Uptime",unit:"%",direction:"hi",target:99.95,current:99.91,trend:[99.82,99.88,99.90,99.87,99.93,99.91]},
+  {name:"EPG Accuracy",unit:"%",direction:"hi",target:98,current:94.2,trend:[88,89.5,91,92,93.5,94.2]},
+  {name:"Rights Clearance Lead",unit:"h",direction:"lo",target:48,current:68,trend:[120,108,96,84,72,68]},
+  {name:"EU Works Quota",unit:"%",direction:"hi",target:30,current:33,trend:[28,29,30,31,32,33]},
+  {name:"Schedule Lock Rate",unit:"%",direction:"hi",target:90,current:62,trend:[40,44,48,52,58,62]},
+  {name:"Ad Fill Rate",unit:"%",direction:"hi",target:95,current:91,trend:[85,87,88,89,90,91]}
+];
+const initGoals=()=>[
+  {id:"g1",title:"Achieve 99.95% playout uptime across all linear channels",status:"on_track",progress:.72,owner:2,channel:0,period:"Q1 2026",keyResults:[
+    {title:"Zero unplanned off-air incidents > 30s",start:5,target:0,current:1,progress:.80,status:"on_track"},
+    {title:"Failover test success rate \u2265 99%",start:90,target:99,current:97,progress:.78,status:"on_track"},
+    {title:"Mean time to recovery < 45 seconds",start:120,target:45,current:52,progress:.91,status:"on_track"}
+  ]},
+  {id:"g2",title:"Deliver EPG data with \u2265 98% accuracy to all aggregators",status:"at_risk",progress:.55,owner:5,channel:2,period:"Q1 2026",keyResults:[
+    {title:"Synopsis completeness \u2265 98%",start:80,target:98,current:91,progress:.61,status:"at_risk"},
+    {title:"EPG delivery deadline misses < 1",start:5,target:0,current:2,progress:.60,status:"at_risk"},
+    {title:"Automated validation coverage \u2265 100%",start:0,target:100,current:45,progress:.45,status:"at_risk"}
+  ]},
+  {id:"g3",title:"Launch VRT NWS FAST channel by April 1",status:"behind",progress:.35,owner:0,channel:3,period:"Q2 2026",keyResults:[
+    {title:"Content pipeline delivering 18h/day",start:0,target:18,current:6,progress:.33,status:"behind"},
+    {title:"FAST playout integration tested and signed off",start:0,target:100,current:40,progress:.4,status:"behind"},
+    {title:"EPG feed live on 3 aggregator platforms",start:0,target:3,current:1,progress:.33,status:"behind"}
+  ]},
+  {id:"g4",title:"Meet AVMSD European works quota (30%) for all channels",status:"on_track",progress:.78,owner:3,channel:2,period:"Annual 2026",keyResults:[
+    {title:"VRT 1 European works share \u2265 35%",start:28,target:35,current:33,progress:.71,status:"on_track"},
+    {title:"VRT MAX catalogue European works \u2265 32%",start:25,target:32,current:31,progress:.86,status:"on_track"}
+  ]}
+];
+const initTasks=()=>[
+  {id:"t1",title:"Clear rights for 'Undercover' S03 \u2014 VRT 1 prime-time",status:"in_progress",priority:"critical",assignee:4,channel:0,due:"2026-02-18",taskType:"rights_clearance",subtasks:[{text:"Verify license window",done:true},{text:"Check holdback vs VRT MAX",done:false},{text:"Confirm music rights",done:false}]},
+  {id:"t2",title:"EPG delivery for Week 9 \u2014 all channels",status:"todo",priority:"high",assignee:5,channel:2,due:"2026-02-19",taskType:"epg_delivery",subtasks:[{text:"Validate synopsis completeness",done:false},{text:"Check thumbnail aspect ratios",done:false}]},
+  {id:"t3",title:"Schedule change: move 'Thuis' repeat to 14:30",status:"review",priority:"medium",assignee:1,channel:0,due:"2026-02-17",taskType:"schedule_change",subtasks:[{text:"Check downstream EPG impact",done:true},{text:"Verify no rights conflict",done:true},{text:"Update promo schedule",done:false}]},
+  {id:"t4",title:"Playout prep for live sports \u2014 Club Brugge vs Anderlecht",status:"in_progress",priority:"critical",assignee:2,channel:0,due:"2026-02-15",taskType:"playout_prep",subtasks:[{text:"Confirm live feed routing",done:true},{text:"Test failover path",done:true},{text:"Prepare overrun buffer",done:false}]},
+  {id:"t5",title:"AVMSD Q1 compliance snapshot",status:"backlog",priority:"high",assignee:3,channel:2,due:"2026-03-01",taskType:"compliance_check",subtasks:[{text:"Calculate EU works % per channel",done:false},{text:"Verify independent production quota",done:false}]},
+  {id:"t6",title:"QC check: new acquisition batch (12 titles)",status:"todo",priority:"medium",assignee:2,channel:2,due:"2026-02-21",taskType:"content_qc",subtasks:[{text:"Audio loudness (EBU R128)",done:false},{text:"Subtitle sync verification",done:false}]},
+  {id:"t7",title:"FAST channel loop schedule \u2014 Week 9",status:"in_progress",priority:"high",assignee:1,channel:3,due:"2026-02-17",taskType:"schedule_change",subtasks:[{text:"Fill 18h content grid",done:true},{text:"No repeat within 4h window",done:false},{text:"SSAI marker placement",done:false}]},
+  {id:"t8",title:"Promo campaign: 'Spring Schedule' launch",status:"backlog",priority:"low",assignee:5,channel:0,due:"2026-03-10",taskType:"promo",subtasks:[]}
+];
+
+// ─── Helpers ──────────────────────────────────────────────────
+const daysUntil=(d)=>Math.ceil((new Date(d)-new Date())/864e5);
+const urgBadge=(days,dark)=>{
+  if(days<0) return{text:Math.abs(days)+"d overdue",bg:"#dc2626",fg:"#fff",pulse:true};
+  if(days===0) return{text:"TODAY",bg:"#ef4444",fg:"#fff",pulse:true};
+  if(days===1) return{text:"Tomorrow",bg:"#f97316",fg:"#fff",pulse:false};
+  if(days<=3) return{text:days+"d",bg:"#f59e0b",fg:"#fff",pulse:false};
+  if(days<=7) return{text:days+"d",bg:dark?"#854d0e":"#fbbf24",fg:dark?"#fbbf24":"#1c1917",pulse:false};
+  return{text:days+"d",bg:dark?"#334155":"#e2e8f0",fg:dark?"#94a3b8":"#64748b",pulse:false};
+};
+const stI=(s)=>({on_track:"\u{1F7E2}",at_risk:"\u{1F7E1}",behind:"\u{1F534}",done:"\u2705"}[s]||"\u26AA");
+const pC=(p)=>p>=.7?"#10b981":p>=.4?"#f59e0b":"#ef4444";
+const kpS=(k)=>{const r=k.direction==="hi"?k.current/k.target:k.target/k.current;return r>=.98?{l:"On Target",c:"#10b981"}:r>=.9?{l:"Near",c:"#f59e0b"}:{l:"Off",c:"#ef4444"};};
+let _tc=9,_gc=5;
+const iSt=(th)=>({width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid "+th.borderInput,fontSize:13,background:th.bgInput,color:th.text,outline:"none",boxSizing:"border-box"});
+const sSt=(th)=>({...iSt(th),cursor:"pointer"});
+const now=()=>new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+
+// ─── Stress test generator ────────────────────────────────────
+const STRESS_TITLES=["Verify catch-up rights for weekend film","EPG feed QA for FAST channel","Schedule promo interstitials","Loudness compliance check batch","Subtitle QC for acquired drama","Traffic log reconciliation","Playout failover drill","Rights renewal: sports package","EPG thumbnail audit","FAST loop freshness check","Ad break timing verification","Programme metadata enrichment","Compliance report preparation","Channel rebrand asset check","Live event backup routing test","VOD catalogue rights sweep","Regional opt-out verification","Music cue sheet generation","As-run log discrepancy review","Content watermark verification","Emergency schedule contingency","Simulcast sync validation","Archive migration QC batch","Parental rating audit","Caption file format conversion","Broadcast clock template update","Commercial break structure review","Signal monitoring alert review","Redundancy path verification","Content delivery SLA check"];
+const randEl=(a)=>a[Math.floor(Math.random()*a.length)];
+const randInt=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const genStressTasks=(n)=>{
+  const out=[];
+  for(let i=0;i<n;i++){
+    const d=new Date();d.setDate(d.getDate()+randInt(-3,30));
+    out.push({id:"ts"+(_tc++),title:STRESS_TITLES[i%STRESS_TITLES.length]+(i>=STRESS_TITLES.length?" #"+Math.ceil(i/STRESS_TITLES.length):""),status:randEl(SF),priority:randEl(["critical","high","medium","low"]),assignee:randInt(0,5),channel:randInt(0,3),due:d.toISOString().slice(0,10),taskType:randEl(TASK_TYPES).key,subtasks:Array.from({length:randInt(0,4)},(_,j)=>({text:"Subtask "+(j+1),done:Math.random()>.5}))});
+  }
+  return out;
+};
+
+// ─── Shared Components ────────────────────────────────────────
+const Spark=({data,color,w=80,h=28})=>{const mn=Math.min(...data),mx=Math.max(...data),rn=mx-mn||1;const pts=data.map((v,i)=>(i/(data.length-1))*w+","+(h-((v-mn)/rn)*(h-4)-2)).join(" ");return <svg width={w} height={h} viewBox={"0 0 "+w+" "+h} style={{display:"block"}}><polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx={w} cy={h-((data[data.length-1]-mn)/rn)*(h-4)-2} r="3" fill={color}/></svg>;};
+const PBar=({value,height=6,color,th})=><div style={{height,borderRadius:height/2,background:th.border,overflow:"hidden",width:"100%"}}><div style={{width:Math.min(value*100,100)+"%",height:"100%",borderRadius:height/2,background:color||pC(value),transition:"width .5s ease"}}/></div>;
+const Av=({user,size=32})=><div style={{width:size,height:size,borderRadius:"50%",background:user.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*.38,fontWeight:700,flexShrink:0}}>{user.av}</div>;
+const ChB=({ch})=><span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:600,background:ch.color+"18",color:ch.color,whiteSpace:"nowrap"}}>{ch.icon} {ch.name}</span>;
+const UB=({days,dark})=>{const u=urgBadge(days,dark);return <span style={{padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,background:u.bg,color:u.fg,animation:u.pulse?"urgPulse 2s infinite":"none"}}>{u.text}</span>;};
+
+const Modal=({open,onClose,title,children,width=560,th})=>{
+  if(!open) return null;
+  return <div onClick={onClose} style={{position:"fixed",inset:0,background:th.overlay,zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(4px)"}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:th.bgCard,borderRadius:16,width:"100%",maxWidth:width,maxHeight:"85vh",overflow:"auto",boxShadow:"0 25px 50px -12px rgba(0,0,0,.35)",border:"1px solid "+th.border}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"20px 24px 12px",borderBottom:"1px solid "+th.borderLight}}>
+        <h3 style={{fontSize:18,fontWeight:700,color:th.text,margin:0}}>{title}</h3>
+        <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:th.textFaint,padding:4}}>{"\u2715"}</button>
+      </div>
+      <div style={{padding:"16px 24px 24px"}}>{children}</div>
+    </div>
+  </div>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  TOAST SYSTEM
+// ═══════════════════════════════════════════════════════════════
+const ToastContainer=({toasts})=>{
+  return <div style={{position:"fixed",top:16,right:16,zIndex:2000,display:"flex",flexDirection:"column",gap:8,pointerEvents:"none"}}>
+    {toasts.map(t=><div key={t.id} className={t.exiting?"toast-exit":"toast-enter"} style={{background:t.bg||"#10b981",color:"#fff",padding:"10px 16px",borderRadius:10,fontSize:13,fontWeight:600,boxShadow:"0 8px 24px rgba(0,0,0,.2)",display:"flex",alignItems:"center",gap:8,pointerEvents:"auto",maxWidth:360}}>
+      <span style={{fontSize:16}}>{t.icon||"\u2705"}</span>{t.text}
+    </div>)}
+  </div>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  ACTIVITY LOG
+// ═══════════════════════════════════════════════════════════════
+const ActivityLog=({log,open,onClose,th})=>{
+  if(!open) return null;
+  return <div style={{position:"fixed",top:0,right:0,bottom:0,width:360,background:th.bgCard,borderLeft:"1px solid "+th.border,zIndex:950,display:"flex",flexDirection:"column",animation:"slideInRight .25s ease",boxShadow:"-8px 0 30px rgba(0,0,0,.1)"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:"1px solid "+th.borderLight}}>
+      <h3 style={{fontSize:15,fontWeight:700,color:th.text,margin:0}}>{"\u{1F4CB}"} Activity Log</h3>
+      <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:th.textFaint}}>{"\u2715"}</button>
+    </div>
+    <div style={{flex:1,overflow:"auto",padding:"12px 20px"}}>
+      {log.length===0?<div style={{color:th.textFaint,fontSize:13,textAlign:"center",padding:40}}>No activity yet</div>:
+      log.map((entry,i)=><div key={i} style={{padding:"10px 0",borderBottom:"1px solid "+th.borderLight,display:"flex",gap:10}}>
+        <div style={{width:8,height:8,borderRadius:"50%",background:entry.color||"#4f46e5",marginTop:5,flexShrink:0}}/>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:12,fontWeight:600,color:th.text}}>{entry.text}</div>
+          <div style={{fontSize:11,color:th.textFaint,marginTop:2,display:"flex",gap:8}}>
+            <span>{entry.user}</span><span>{entry.time}</span>
+          </div>
+        </div>
+      </div>)}
+    </div>
+  </div>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  CREATE TASK MODAL
+// ═══════════════════════════════════════════════════════════════
+const CreateTaskModal=({open,onClose,onCreate,th,currentUser})=>{
+  const[f,sF]=React.useState({title:"",taskType:"schedule_change",priority:"medium",channel:0,assignee:currentUser.id,due:"",stText:"",subtasks:[]});
+  const set=(k,v)=>sF(p=>({...p,[k]:v}));
+  React.useEffect(()=>{if(open)sF(p=>({...p,assignee:currentUser.id}));},[open,currentUser.id]);
+  const addSub=()=>{if(!f.stText.trim())return;set("subtasks",[...f.subtasks,{text:f.stText.trim(),done:false}]);set("stText","");};
+  const submit=()=>{if(!f.title.trim()||!f.due)return;onCreate({id:"t"+(_tc++),title:f.title.trim(),status:"backlog",priority:f.priority,assignee:f.assignee,channel:f.channel,due:f.due,taskType:f.taskType,subtasks:f.subtasks});sF({title:"",taskType:"schedule_change",priority:"medium",channel:0,assignee:currentUser.id,due:"",stText:"",subtasks:[]});onClose();};
+  const ok=f.title.trim()&&f.due;
+  return <Modal open={open} onClose={onClose} title={"\u2705 Create Task"} width={520} th={th}>
+    <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Task Title</label><input value={f.title} onChange={e=>set("title",e.target.value)} placeholder="e.g. Clear rights for Undercover S03" style={iSt(th)}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Type</label><select value={f.taskType} onChange={e=>set("taskType",e.target.value)} style={sSt(th)}>{TASK_TYPES.map(t=><option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}</select></div>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Priority</label><select value={f.priority} onChange={e=>set("priority",e.target.value)} style={sSt(th)}>{Object.entries(PR).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}</select></div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Channel</label><select value={f.channel} onChange={e=>set("channel",parseInt(e.target.value))} style={sSt(th)}>{CHANNELS.map((c,i)=><option key={i} value={i}>{c.icon} {c.name}</option>)}</select></div>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Assignee</label><select value={f.assignee} onChange={e=>set("assignee",parseInt(e.target.value))} style={sSt(th)}>{USERS.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+    </div>
+    <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Due Date</label><input type="date" value={f.due} onChange={e=>set("due",e.target.value)} style={iSt(th)}/></div>
+    <div style={{marginBottom:14}}>
+      <label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Subtasks</label>
+      <div style={{display:"flex",gap:8,marginBottom:8}}><input value={f.stText} onChange={e=>set("stText",e.target.value)} placeholder="Add a subtask..." style={{...iSt(th),flex:1}} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addSub();}}}/><button onClick={addSub} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>+ Add</button></div>
+      {f.subtasks.map((s,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0"}}><span style={{fontSize:13,color:th.textSecondary,flex:1}}>{s.text}</span><button onClick={()=>set("subtasks",f.subtasks.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",color:th.textFaint,fontSize:14}}>{"\u2715"}</button></div>)}
+    </div>
+    <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:8}}>
+      <button onClick={onClose} style={{padding:"8px 18px",borderRadius:8,border:"1px solid "+th.border,background:"transparent",color:th.textMuted,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+      <button onClick={submit} disabled={!ok} style={{padding:"8px 18px",borderRadius:8,border:"none",background:ok?"#4f46e5":th.textFaint,color:"#fff",fontSize:13,fontWeight:600,cursor:ok?"pointer":"not-allowed",opacity:ok?1:.5}}>Create Task</button>
+    </div>
+  </Modal>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  CREATE GOAL MODAL
+// ═══════════════════════════════════════════════════════════════
+const CreateGoalModal=({open,onClose,onCreate,th,currentUser})=>{
+  const[f,sF]=React.useState({title:"",channel:0,owner:currentUser.id,period:"Q1 2026",krText:"",keyResults:[]});
+  const set=(k,v)=>sF(p=>({...p,[k]:v}));
+  React.useEffect(()=>{if(open)sF(p=>({...p,owner:currentUser.id}));},[open,currentUser.id]);
+  const addKR=()=>{if(!f.krText.trim())return;set("keyResults",[...f.keyResults,{title:f.krText.trim(),start:0,target:100,current:0,progress:0,status:"behind"}]);set("krText","");};
+  const submit=()=>{if(!f.title.trim()||f.keyResults.length===0)return;onCreate({id:"g"+(_gc++),title:f.title.trim(),status:"behind",progress:0,owner:f.owner,channel:f.channel,period:f.period,keyResults:f.keyResults});sF({title:"",channel:0,owner:currentUser.id,period:"Q1 2026",krText:"",keyResults:[]});onClose();};
+  const ok=f.title.trim()&&f.keyResults.length>0;
+  return <Modal open={open} onClose={onClose} title={"\u{1F3AF} Create Goal"} width={540} th={th}>
+    <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Objective</label><input value={f.title} onChange={e=>set("title",e.target.value)} placeholder="e.g. Achieve 99.95% playout uptime" style={iSt(th)}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Channel</label><select value={f.channel} onChange={e=>set("channel",parseInt(e.target.value))} style={sSt(th)}>{CHANNELS.map((c,i)=><option key={i} value={i}>{c.icon} {c.name}</option>)}</select></div>
+      <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Owner</label><select value={f.owner} onChange={e=>set("owner",parseInt(e.target.value))} style={sSt(th)}>{USERS.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+    </div>
+    <div style={{marginBottom:14}}><label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Period</label><select value={f.period} onChange={e=>set("period",e.target.value)} style={sSt(th)}>{["Q1 2026","Q2 2026","Q3 2026","Q4 2026","Annual 2026"].map(p=><option key={p} value={p}>{p}</option>)}</select></div>
+    <div style={{marginBottom:14}}>
+      <label style={{fontSize:12,fontWeight:600,color:th.textMuted,display:"block",marginBottom:5}}>Key Results ({f.keyResults.length})</label>
+      <div style={{display:"flex",gap:8,marginBottom:8}}><input value={f.krText} onChange={e=>set("krText",e.target.value)} placeholder="e.g. Reduce MTTR to < 45 seconds" style={{...iSt(th),flex:1}} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addKR();}}}/><button onClick={addKR} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>+ Add KR</button></div>
+      {f.keyResults.map((kr,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:6,background:th.bgMuted,marginBottom:4}}>
+        <span style={{fontSize:12,color:"#4f46e5",fontWeight:700}}>KR{i+1}</span>
+        <span style={{fontSize:13,color:th.textSecondary,flex:1}}>{kr.title}</span>
+        <button onClick={()=>set("keyResults",f.keyResults.filter((_,j)=>j!==i))} style={{background:"none",border:"none",cursor:"pointer",color:th.textFaint,fontSize:14}}>{"\u2715"}</button>
+      </div>)}
+      {f.keyResults.length===0&&<div style={{fontSize:12,color:th.textFaint,fontStyle:"italic"}}>Add at least one key result</div>}
+    </div>
+    <div style={{display:"flex",justifyContent:"flex-end",gap:10,marginTop:8}}>
+      <button onClick={onClose} style={{padding:"8px 18px",borderRadius:8,border:"1px solid "+th.border,background:"transparent",color:th.textMuted,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+      <button onClick={submit} disabled={!ok} style={{padding:"8px 18px",borderRadius:8,border:"none",background:ok?"#4f46e5":th.textFaint,color:"#fff",fontSize:13,fontWeight:600,cursor:ok?"pointer":"not-allowed",opacity:ok?1:.5}}>Create Goal</button>
+    </div>
+  </Modal>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  PERSONA PANEL (with Stress Test)
+// ═══════════════════════════════════════════════════════════════
+const PersonaPanel=({currentUser,setCurrentUser,dark,setDark,th,onStress})=>{
+  const[open,setOpen]=React.useState(false);
+  const perms=ROLE_PERMS[currentUser.role];
+  return <div style={{position:"fixed",bottom:16,right:16,zIndex:900}}>
+    {open&&<div style={{background:th.bgCard,border:"1px solid "+th.border,borderRadius:14,padding:18,marginBottom:10,width:320,boxShadow:"0 12px 40px rgba(0,0,0,.2)",maxHeight:"80vh",overflow:"auto"}}>
+      <div style={{fontSize:13,fontWeight:700,color:th.text,marginBottom:12}}>Prototype Control Panel</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid "+th.borderLight,marginBottom:10}}>
+        <span style={{fontSize:12,fontWeight:600,color:th.textSecondary}}>{dark?"\u{1F319}":"\u2600\uFE0F"} Dark Mode</span>
+        <button onClick={()=>setDark(!dark)} style={{width:44,height:24,borderRadius:12,border:"none",cursor:"pointer",background:dark?"#4f46e5":"#cbd5e1",position:"relative",transition:"background .2s"}}><div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:dark?23:3,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/></button>
+      </div>
+      <div style={{fontSize:11,fontWeight:600,color:th.textMuted,marginBottom:6,textTransform:"uppercase",letterSpacing:".05em"}}>Switch Persona</div>
+      {USERS.map(u=>{const a=currentUser.id===u.id;return <button key={u.id} onClick={()=>setCurrentUser(u)} style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 10px",borderRadius:8,border:a?"2px solid #4f46e5":"1px solid "+th.borderLight,cursor:"pointer",background:a?"#4f46e520":"transparent",marginBottom:4,textAlign:"left"}}>
+        <Av user={u} size={28}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:th.text}}>{u.name}</div><div style={{fontSize:10,color:th.textFaint}}>{u.title} \u2014 <span style={{color:u.role==="owner"?"#4f46e5":u.role==="manager"?"#059669":"#f59e0b",fontWeight:700}}>{u.role}</span></div></div>
+      </button>;})}
+      <div style={{marginTop:10,padding:10,borderRadius:8,background:th.bgMuted,border:"1px solid "+th.borderLight}}>
+        <div style={{fontSize:11,fontWeight:700,color:th.textMuted,marginBottom:6}}>Active Permissions</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+          {Object.entries(perms).filter(([k,v])=>k.startsWith("can")&&typeof v==="boolean").map(([k,v])=><span key={k} style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:600,background:v?"#10b98120":"#ef444420",color:v?"#10b981":"#ef4444"}}>{v?"\u2713":"\u2717"} {k.replace("can","")}</span>)}
+        </div>
+      </div>
+      <button onClick={()=>{onStress();setOpen(false);}} style={{marginTop:10,width:"100%",padding:"10px 14px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#f59e0b,#ef4444)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>{"\u{1F525}"} Stress Test (+60 tasks)</button>
+    </div>}
+    <button onClick={()=>setOpen(!open)} style={{width:52,height:52,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#4f46e5,#7c3aed)",color:"#fff",fontSize:22,cursor:"pointer",boxShadow:"0 6px 20px rgba(79,70,229,.4)",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform .2s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>{open?"\u2715":"\u2699\uFE0F"}</button>
+  </div>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  PAGES
+// ═══════════════════════════════════════════════════════════════
+const Dashboard=({goals,tasks,kpis,th,dark})=>{
+  const op=goals.length?goals.reduce((s,g)=>s+g.progress,0)/goals.length:0;
+  const urgent=tasks.filter(t=>t.status!=="done"&&daysUntil(t.due)<=3).sort((a,b)=>daysUntil(a.due)-daysUntil(b.due));
+  const gs={on_track:goals.filter(g=>g.status==="on_track").length,at_risk:goals.filter(g=>g.status==="at_risk").length,behind:goals.filter(g=>g.status==="behind").length};
+  return <div style={{display:"flex",flexDirection:"column",gap:24}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16}}>
+      {[{l:"Overall OKR Progress",v:Math.round(op*100)+"%",s:goals.length+" objectives",c:pC(op)},{l:"On Track",v:gs.on_track,s:"objectives",c:"#10b981"},{l:"At Risk",v:gs.at_risk,s:"objectives",c:"#f59e0b"},{l:"Behind",v:gs.behind,s:"objectives",c:"#ef4444"}].map((s,i)=>
+        <div key={i} style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+          <div style={{fontSize:12,fontWeight:500,color:th.textFaint,marginBottom:8,textTransform:"uppercase",letterSpacing:".05em"}}>{s.l}</div>
+          <div style={{fontSize:32,fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div>
+          <div style={{fontSize:12,color:th.textFaint,marginTop:4}}>{s.s}</div>
+        </div>)}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+        <h3 style={{fontSize:15,fontWeight:700,color:th.text,marginBottom:16}}>{"\u{1F4CA}"} Broadcast KPIs</h3>
+        {kpis.map((kpi,i)=>{const st=kpS(kpi);return <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+          <div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:13,fontWeight:600,color:th.textSecondary}}>{kpi.name}</span><span style={{fontSize:12,fontWeight:700,color:st.c}}>{kpi.current}{kpi.unit}</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{flex:1}}><PBar value={kpi.direction==="hi"?kpi.current/kpi.target:kpi.target/kpi.current} color={st.c} th={th}/></div><span style={{fontSize:10,color:th.textFaint,whiteSpace:"nowrap"}}>Target: {kpi.target}{kpi.unit}</span></div></div>
+          <Spark data={kpi.trend} color={st.c}/></div>;})}
+      </div>
+      <div style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+        <h3 style={{fontSize:15,fontWeight:700,color:th.text,marginBottom:16}}>{"\u{1F6A8}"} Urgent Tasks <span style={{fontSize:11,fontWeight:500,color:th.textFaint}}>{"\u2264"} 3 days</span></h3>
+        {urgent.length===0?<div style={{color:th.textFaint,fontSize:13,padding:24,textAlign:"center"}}>No urgent tasks!</div>:
+        urgent.slice(0,8).map(t=>{const tt=TASK_TYPES.find(x=>x.key===t.taskType);return <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,background:th.bgMuted,border:"1px solid "+th.borderLight,marginBottom:8}}>
+          <span style={{fontSize:16}}>{tt?.icon}</span><div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:th.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</div><div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}><Av user={USERS[t.assignee]} size={18}/><span style={{fontSize:11,color:th.textMuted}}>{USERS[t.assignee].name.split(" ")[0]}</span><ChB ch={CHANNELS[t.channel]}/></div></div>
+          <UB days={daysUntil(t.due)} dark={dark}/></div>;})}
+        {urgent.length>8&&<div style={{fontSize:11,color:th.textFaint,textAlign:"center",padding:4}}>+{urgent.length-8} more</div>}
+      </div>
+    </div>
+    <div style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+      <h3 style={{fontSize:15,fontWeight:700,color:th.text,marginBottom:16}}>{"\u{1F4FA}"} Channel Health</h3>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:12}}>
+        {CHANNELS.map((ch,ci)=>{const cg=goals.filter(g=>g.channel===ci),ct=tasks.filter(t=>t.channel===ci&&t.status!=="done"),cu=ct.filter(t=>daysUntil(t.due)<=3).length,cp=cg.length?cg.reduce((s,g)=>s+g.progress,0)/cg.length:0;
+        return <div key={ci} style={{padding:16,borderRadius:10,background:ch.color+"08",border:"1px solid "+ch.color+"22"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><span style={{fontSize:20}}>{ch.icon}</span><div><div style={{fontSize:14,fontWeight:700,color:ch.color}}>{ch.name}</div><div style={{fontSize:11,color:th.textMuted}}>{ch.type}</div></div></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><div><span style={{fontSize:11,color:th.textFaint}}>Goals</span><div style={{fontSize:18,fontWeight:700,color:th.text}}>{cg.length}</div></div><div><span style={{fontSize:11,color:th.textFaint}}>Open</span><div style={{fontSize:18,fontWeight:700,color:th.text}}>{ct.length}{cu>0&&<span style={{fontSize:11,color:"#ef4444",marginLeft:4}}>({cu})</span>}</div></div></div>
+          <div style={{marginTop:10}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}><span style={{color:th.textMuted}}>OKR Progress</span><span style={{fontWeight:700,color:pC(cp)}}>{Math.round(cp*100)}%</span></div><PBar value={cp} color={ch.color} th={th}/></div>
+        </div>;})}
+      </div>
+    </div>
+  </div>;
+};
+
+const Goals=({goals,setGoals,th,perms,onOpenCreate,toast,logAction,currentUser})=>{
+  const[exp,setExp]=React.useState(null);const[fS,sfS]=React.useState("all");const[fC,sfC]=React.useState("all");
+  const fl=goals.filter(g=>(fS==="all"||g.status===fS)&&(fC==="all"||g.channel===parseInt(fC)));
+  const checkIn=(gi,ki)=>{
+    if(!perms.canCheckIn)return;
+    const ng=JSON.parse(JSON.stringify(goals));const kr=ng[gi].keyResults[ki];
+    const range=Math.abs(kr.target-kr.start);
+    if(range===0){kr.progress=1;kr.current=kr.target;}
+    else{const inc=range*.1;kr.current=kr.target>kr.start?Math.min(kr.current+inc,kr.target):Math.max(kr.current-inc,kr.target);kr.progress=Math.min(Math.abs(kr.current-kr.start)/range,1);}
+    kr.status=kr.progress>=.7?"on_track":kr.progress>=.4?"at_risk":"behind";
+    const g=ng[gi];g.progress=g.keyResults.reduce((s,k)=>s+k.progress,0)/g.keyResults.length;g.status=g.progress>=.7?"on_track":g.progress>=.4?"at_risk":"behind";
+    setGoals(ng);toast("\u{1F4C8} Check-in recorded","#4f46e5","\u{1F4C8}");
+    logAction("Checked in on KR: "+kr.title,currentUser.name,"#4f46e5");
+  };
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+      <select value={fS} onChange={e=>sfS(e.target.value)} style={sSt(th)}><option value="all">All Statuses</option><option value="on_track">{"\u{1F7E2}"} On Track</option><option value="at_risk">{"\u{1F7E1}"} At Risk</option><option value="behind">{"\u{1F534}"} Behind</option></select>
+      <select value={fC} onChange={e=>sfC(e.target.value)} style={sSt(th)}><option value="all">All Channels</option>{CHANNELS.map((c,i)=><option key={i} value={i}>{c.icon} {c.name}</option>)}</select>
+      <span style={{fontSize:12,color:th.textFaint,marginLeft:"auto"}}>{fl.length} objective{fl.length!==1?"s":""}</span>
+      {perms.canCreate&&<button onClick={onOpenCreate} style={{padding:"6px 16px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New Goal</button>}
+    </div>
+    {fl.map(goal=>{const ri=goals.indexOf(goal),isO=exp===goal.id;return <div key={goal.id} style={{background:th.bgCard,borderRadius:12,border:"1px solid "+th.border,overflow:"hidden"}}>
+      <div onClick={()=>setExp(isO?null:goal.id)} style={{padding:"16px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+        <span style={{fontSize:18}}>{stI(goal.status)}</span>
+        <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:700,color:th.text}}>{goal.title}</div><div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}><Av user={USERS[goal.owner]} size={20}/><span style={{fontSize:12,color:th.textMuted}}>{USERS[goal.owner].name}</span><ChB ch={CHANNELS[goal.channel]}/><span style={{fontSize:11,padding:"1px 6px",borderRadius:4,background:th.bgMuted,color:th.textMuted}}>{goal.period}</span></div></div>
+        <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:20,fontWeight:800,color:pC(goal.progress)}}>{Math.round(goal.progress*100)}%</div><div style={{width:80,marginTop:4}}><PBar value={goal.progress} th={th}/></div></div>
+        <span style={{fontSize:14,color:th.textFaint,transform:isO?"rotate(180deg)":"rotate(0)",transition:"transform .2s"}}>{"\u25BC"}</span>
+      </div>
+      {isO&&<div style={{borderTop:"1px solid "+th.borderLight,padding:"12px 20px 20px"}}>
+        <div style={{fontSize:12,fontWeight:600,color:th.textMuted,marginBottom:12,textTransform:"uppercase",letterSpacing:".05em"}}>Key Results</div>
+        {goal.keyResults.map((kr,ki)=><div key={ki} style={{padding:"12px 0",borderBottom:ki<goal.keyResults.length-1?"1px solid "+th.bgMuted:"none"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><span style={{fontSize:13,fontWeight:500,color:th.textSecondary}}>{stI(kr.status)} {kr.title}</span><span style={{fontSize:12,fontWeight:700,color:pC(kr.progress)}}>{Math.round(kr.progress*100)}%</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{flex:1}}><PBar value={kr.progress} height={4} th={th}/></div><span style={{fontSize:11,color:th.textFaint}}>{typeof kr.current==="number"?Math.round(kr.current*10)/10:kr.current} / {kr.target}</span>
+          {perms.canCheckIn&&<button onClick={e=>{e.stopPropagation();checkIn(ri,ki);}} style={{padding:"3px 10px",borderRadius:6,border:"1px solid "+th.border,background:th.bgMuted,fontSize:11,fontWeight:600,color:"#4f46e5",cursor:"pointer"}}>+ Check-in</button>}</div>
+        </div>)}
+      </div>}
+    </div>;})}
+  </div>;
+};
+
+const Tasks=({tasks,setTasks,th,perms,onOpenCreate,dark,toast,logAction,currentUser})=>{
+  const[view,setView]=React.useState("kanban");const[fT,sfT]=React.useState("all");const[fC,sfC]=React.useState("all");const[sel,setSel]=React.useState(null);
+  const fl=tasks.filter(t=>(fT==="all"||t.taskType===fT)&&(fC==="all"||t.channel===parseInt(fC)));
+  const move=(id,st)=>{if(!perms.canChangeStatus)return;setTasks(p=>p.map(t=>t.id===id?{...t,status:st}:t));toast("\u{1F504} Status \u2192 "+SL[st],"#8b5cf6","\u{1F504}");logAction("Changed status to "+SL[st],currentUser.name,"#8b5cf6");};
+  const togSub=(id,si)=>setTasks(p=>p.map(t=>{if(t.id!==id)return t;const s=[...t.subtasks];s[si]={...s[si],done:!s[si].done};return{...t,subtasks:s};}));
+  const Card=({task:t})=>{const tt=TASK_TYPES.find(x=>x.key===t.taskType),sd=t.subtasks.filter(s=>s.done).length;
+    return <div onClick={()=>setSel(t)} style={{background:th.bgCard,borderRadius:10,padding:14,border:"1px solid "+th.border,cursor:"pointer",transition:"box-shadow .15s"}} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,.12)"} onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:8}}><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:600,background:tt?.color+"18",color:tt?.color}}>{tt?.icon} {tt?.label}</span><UB days={daysUntil(t.due)} dark={dark}/></div>
+      <div style={{fontSize:13,fontWeight:600,color:th.text,marginBottom:8,lineHeight:1.4}}>{t.title}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{display:"flex",alignItems:"center",gap:6}}><Av user={USERS[t.assignee]} size={22}/><ChB ch={CHANNELS[t.channel]}/></div>{t.subtasks.length>0&&<span style={{fontSize:11,color:sd===t.subtasks.length?"#10b981":th.textFaint}}>{"\u2713"} {sd}/{t.subtasks.length}</span>}</div>
+      <div style={{marginTop:8}}><span style={{fontSize:11,fontWeight:500,color:PR[t.priority]?.color}}>{PR[t.priority]?.icon} {PR[t.priority]?.label}</span></div>
+    </div>;};
+  return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
+      <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid "+th.border}}>{["kanban","list"].map(v=><button key={v} onClick={()=>setView(v)} style={{padding:"6px 14px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:view===v?"#4f46e5":th.bgCard,color:view===v?"#fff":th.textMuted}}>{v==="kanban"?"Board":"List"}</button>)}</div>
+      <select value={fT} onChange={e=>sfT(e.target.value)} style={sSt(th)}><option value="all">All Types</option>{TASK_TYPES.map(t=><option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}</select>
+      <select value={fC} onChange={e=>sfC(e.target.value)} style={sSt(th)}><option value="all">All Channels</option>{CHANNELS.map((c,i)=><option key={i} value={i}>{c.icon} {c.name}</option>)}</select>
+      {perms.canCreate&&<button onClick={onOpenCreate} style={{marginLeft:"auto",padding:"6px 16px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New Task</button>}
+    </div>
+    {view==="kanban"&&<div style={{display:"grid",gridTemplateColumns:"repeat("+SF.length+",minmax(200px,1fr))",gap:12,overflowX:"auto"}}>
+      {SF.map(col=>{const ct=[...fl].filter(t=>t.status===col).sort((a,b)=>daysUntil(a.due)-daysUntil(b.due));return <div key={col} style={{background:th.bgMuted,borderRadius:10,padding:12,minHeight:200}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><div style={{width:8,height:8,borderRadius:"50%",background:SC[col]}}/><span style={{fontSize:12,fontWeight:700,color:th.textSecondary,textTransform:"uppercase",letterSpacing:".05em"}}>{SL[col]}</span><span style={{fontSize:11,color:th.textFaint,marginLeft:"auto"}}>{ct.length}</span></div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>{ct.map(t=><Card key={t.id} task={t}/>)}</div>
+      </div>;})}
+    </div>}
+    {view==="list"&&<div style={{background:th.bgCard,borderRadius:12,border:"1px solid "+th.border,overflow:"hidden"}}>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:th.bgMuted,borderBottom:"1px solid "+th.border}}>
+        {["Task","Type","Status","Priority","Assignee","Channel","Due"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontWeight:600,color:th.textMuted,fontSize:11,textTransform:"uppercase",letterSpacing:".05em"}}>{h}</th>)}
+      </tr></thead><tbody>
+        {[...fl].sort((a,b)=>daysUntil(a.due)-daysUntil(b.due)).map(t=>{const tt=TASK_TYPES.find(x=>x.key===t.taskType);return <tr key={t.id} onClick={()=>setSel(t)} style={{cursor:"pointer",borderBottom:"1px solid "+th.borderLight}} onMouseEnter={e=>e.currentTarget.style.background=th.bgCardHover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <td style={{padding:"10px 14px",fontWeight:600,color:th.text,maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.title}</td>
+          <td style={{padding:"10px 14px"}}><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:600,background:tt?.color+"18",color:tt?.color}}>{tt?.icon} {tt?.label}</span></td>
+          <td style={{padding:"10px 14px"}}><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:600,background:SC[t.status]+"18",color:SC[t.status]}}>{SL[t.status]}</span></td>
+          <td style={{padding:"10px 14px",fontSize:12}}>{PR[t.priority]?.icon} {PR[t.priority]?.label}</td>
+          <td style={{padding:"10px 14px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><Av user={USERS[t.assignee]} size={22}/><span style={{fontSize:12,color:th.textSecondary}}>{USERS[t.assignee].name.split(" ")[0]}</span></div></td>
+          <td style={{padding:"10px 14px"}}><ChB ch={CHANNELS[t.channel]}/></td>
+          <td style={{padding:"10px 14px"}}><UB days={daysUntil(t.due)} dark={dark}/></td>
+        </tr>;})}
+      </tbody></table>
+    </div>}
+    <Modal open={!!sel} onClose={()=>setSel(null)} title="Task Detail" width={520} th={th}>
+      {sel&&(()=>{const t=sel,tt=TASK_TYPES.find(x=>x.key===t.taskType);return <div style={{display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><span style={{padding:"3px 8px",borderRadius:6,fontSize:11,fontWeight:600,background:tt?.color+"18",color:tt?.color}}>{tt?.icon} {tt?.label}</span><ChB ch={CHANNELS[t.channel]}/><UB days={daysUntil(t.due)} dark={dark}/></div>
+        <h4 style={{fontSize:16,fontWeight:700,color:th.text,margin:0}}>{t.title}</h4>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div><span style={{fontSize:11,color:th.textFaint}}>Assignee</span><div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}><Av user={USERS[t.assignee]} size={24}/><span style={{fontSize:13,fontWeight:500,color:th.text}}>{USERS[t.assignee].name}</span></div></div>
+          <div><span style={{fontSize:11,color:th.textFaint}}>Priority</span><div style={{fontSize:13,fontWeight:500,marginTop:4,color:th.text}}>{PR[t.priority]?.icon} {PR[t.priority]?.label}</div></div>
+          <div><span style={{fontSize:11,color:th.textFaint}}>Due</span><div style={{fontSize:13,fontWeight:500,marginTop:4,color:th.text}}>{t.due}</div></div>
+          <div><span style={{fontSize:11,color:th.textFaint}}>Status</span>{perms.canChangeStatus?<select value={t.status} onChange={e=>{move(t.id,e.target.value);setSel({...t,status:e.target.value});}} style={{...sSt(th),marginTop:4}}>{SF.map(s=><option key={s} value={s}>{SL[s]}</option>)}</select>:<div style={{fontSize:13,fontWeight:500,marginTop:4,color:th.text}}>{SL[t.status]}</div>}</div>
+        </div>
+        {t.subtasks.length>0&&<div><div style={{fontSize:12,fontWeight:600,color:th.textMuted,marginBottom:8}}>Subtasks ({t.subtasks.filter(s=>s.done).length}/{t.subtasks.length})</div>
+          {t.subtasks.map((sub,si)=><label key={si} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",cursor:"pointer"}}><input type="checkbox" checked={sub.done} onChange={()=>{togSub(t.id,si);setSel(p=>{const s=[...p.subtasks];s[si]={...s[si],done:!s[si].done};return{...p,subtasks:s};});}}/><span style={{fontSize:13,color:sub.done?th.textFaint:th.textSecondary,textDecoration:sub.done?"line-through":"none"}}>{sub.text}</span></label>)}</div>}
+      </div>;})()}
+    </Modal>
+  </div>;
+};
+
+const Team=({tasks,th})=><div style={{display:"flex",flexDirection:"column",gap:24}}>
+  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:16}}>
+    {USERS.map(u=>{const ut=tasks.filter(t=>t.assignee===u.id&&t.status!=="done"),uc=ut.filter(t=>daysUntil(t.due)<=3).length,tm=TEAMS.find(t=>t.members.includes(u.id));
+    return <div key={u.id} style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}><Av user={u} size={44}/><div><div style={{fontSize:15,fontWeight:700,color:th.text}}>{u.name}</div><div style={{fontSize:12,color:th.textMuted}}>{u.title}</div>{tm&&<div style={{fontSize:11,color:tm.color,fontWeight:500,marginTop:2}}>{tm.icon} {tm.name}</div>}<span style={{fontSize:10,fontWeight:700,color:u.role==="owner"?"#4f46e5":u.role==="manager"?"#059669":"#f59e0b",textTransform:"uppercase"}}>{u.role}</span></div></div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,textAlign:"center"}}>
+        {[{v:ut.length,l:"Open",d:false},{v:uc,l:"Urgent",d:uc>0},{v:tasks.filter(t=>t.assignee===u.id&&t.status==="done").length,l:"Done",d:false}].map((c,i)=>
+          <div key={i} style={{padding:8,borderRadius:8,background:c.d?"#fef2f2":th.bgMuted}}><div style={{fontSize:18,fontWeight:700,color:c.d?"#ef4444":th.text}}>{c.v}</div><div style={{fontSize:10,color:c.d?"#ef4444":th.textFaint}}>{c.l}</div></div>)}
+      </div></div>;})}
+  </div>
+  <div style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+    <h3 style={{fontSize:15,fontWeight:700,color:th.text,marginBottom:16}}>Operations Teams</h3>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12}}>
+      {TEAMS.map((tm,i)=><div key={i} style={{padding:14,borderRadius:10,border:"1px solid "+tm.color+"22",background:tm.color+"08"}}><div style={{fontSize:14,fontWeight:700,color:tm.color}}>{tm.icon} {tm.name}</div><div style={{fontSize:12,color:th.textMuted,marginTop:4}}>{tm.members.length+1} members</div></div>)}</div>
+  </div>
+</div>;
+
+const Reports=({goals,tasks,kpis,th,perms})=>{
+  if(!perms.canViewReports) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:60,flexDirection:"column",gap:12}}><span style={{fontSize:48}}>{"\u{1F512}"}</span><div style={{fontSize:16,fontWeight:700,color:th.text}}>Reports Restricted</div><div style={{fontSize:13,color:th.textMuted,textAlign:"center",maxWidth:300}}>Switch to an owner or manager persona using the control panel.</div></div>;
+  const ct=tasks.filter(t=>t.status==="done").length,tt=tasks.length,ap=goals.length?goals.reduce((s,g)=>s+g.progress,0)/goals.length:0;
+  const bt=TASK_TYPES.map(t=>({...t,count:tasks.filter(x=>x.taskType===t.key).length,done:tasks.filter(x=>x.taskType===t.key&&x.status==="done").length}));
+  const od=tasks.filter(t=>t.status!=="done"&&daysUntil(t.due)<0);
+  return <div style={{display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+      {[{l:"Task Completion",v:ct+"/"+tt,p:tt?ct/tt:0,c:"#10b981"},{l:"Avg OKR Progress",v:Math.round(ap*100)+"%",p:ap,c:"#4f46e5"},{l:"Overdue Tasks",v:od.length,p:tt?1-od.length/tt:1,c:od.length>0?"#ef4444":"#10b981"},{l:"KPIs On Target",v:kpis.filter(k=>kpS(k).l==="On Target").length+"/"+kpis.length,p:kpis.length?kpis.filter(k=>kpS(k).l==="On Target").length/kpis.length:0,c:"#0891b2"}].map((c,i)=>
+        <div key={i} style={{background:th.bgCard,borderRadius:12,padding:16,border:"1px solid "+th.border}}><div style={{fontSize:11,color:th.textFaint,textTransform:"uppercase",fontWeight:500,letterSpacing:".05em"}}>{c.l}</div><div style={{fontSize:28,fontWeight:800,color:c.c,marginTop:4}}>{c.v}</div><div style={{marginTop:8}}><PBar value={c.p} color={c.c} th={th}/></div></div>)}
+    </div>
+    <div style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+      <h3 style={{fontSize:15,fontWeight:700,color:th.text,marginBottom:16}}>Task Breakdown by Type</h3>
+      {bt.filter(t=>t.count>0).map(t=><div key={t.key} style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}><span style={{width:140,fontSize:13,fontWeight:500,color:th.textSecondary}}>{t.icon} {t.label}</span><div style={{flex:1}}><PBar value={t.count?t.done/t.count:0} color={t.color} height={8} th={th}/></div><span style={{fontSize:12,fontWeight:600,color:th.textMuted,width:60,textAlign:"right"}}>{t.done}/{t.count}</span></div>)}
+    </div>
+    <div style={{background:th.bgCard,borderRadius:12,padding:20,border:"1px solid "+th.border}}>
+      <h3 style={{fontSize:15,fontWeight:700,color:th.text,marginBottom:16}}>{"\u2696\uFE0F"} Compliance Snapshot</h3>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16}}>
+        {[{l:"AVMSD EU Works Quota",r:"30%",c:"33%",s:"compliant"},{l:"Independent Production",r:"10%",c:"14%",s:"compliant"},{l:"Ad Minutage (max 12min/h)",r:"\u226412",c:"11.2min",s:"compliant"},{l:"Accessibility (subtitles)",r:"100%",c:"87%",s:"at_risk"}].map((c,i)=>
+          <div key={i} style={{padding:14,borderRadius:10,background:c.s==="compliant"?th.compliantBg:th.atRiskBg,border:"1px solid "+(c.s==="compliant"?th.compliantBorder:th.atRiskBorder)}}>
+            <div style={{fontSize:12,fontWeight:600,color:th.textSecondary}}>{c.l}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}><span style={{fontSize:11,color:th.textMuted}}>Required: {c.r}</span><span style={{fontSize:14,fontWeight:700,color:c.s==="compliant"?"#16a34a":"#d97706"}}>{c.c}</span></div>
+            <div style={{fontSize:10,fontWeight:600,color:c.s==="compliant"?"#16a34a":"#d97706",marginTop:6,textTransform:"uppercase"}}>{c.s==="compliant"?"\u2705 Compliant":"\u26A0\uFE0F At Risk"}</div>
+          </div>)}
+      </div>
+    </div>
+  </div>;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN APP
+// ═══════════════════════════════════════════════════════════════
+const NAV=[{k:"dashboard",l:"Dashboard",i:"\u{1F4CA}"},{k:"goals",l:"Goals",i:"\u{1F3AF}"},{k:"tasks",l:"Tasks",i:"\u2705"},{k:"team",l:"Team",i:"\u{1F465}"},{k:"reports",l:"Reports",i:"\u{1F4C8}"}];
+
+function App(){
+  const[page,setPage]=React.useState("dashboard");
+  const[goals,setGoals]=React.useState(initGoals);
+  const[tasks,setTasks]=React.useState(initTasks);
+  const[kpis]=React.useState(initKPIs);
+  const[user,setUser]=React.useState(USERS[0]);
+  const[sbOpen,setSbOpen]=React.useState(true);
+  const[dark,setDark]=React.useState(false);
+  const[crTaskOpen,setCrTaskOpen]=React.useState(false);
+  const[crGoalOpen,setCrGoalOpen]=React.useState(false);
+  const[toasts,setToasts]=React.useState([]);
+  const[actLog,setActLog]=React.useState([]);
+  const[logOpen,setLogOpen]=React.useState(false);
+  const th=dark?THEMES.dark:THEMES.light;
+  const perms=ROLE_PERMS[user.role];
+
+  // Sync body class for bg flash fix
+  React.useEffect(()=>{document.body.className=dark?"dark":"";},[dark]);
+
+  // Toast system
+  const toast=(text,bg,icon)=>{
+    const id=Date.now()+Math.random();
+    setToasts(p=>[...p,{id,text,bg:bg||"#10b981",icon:icon||"\u2705",exiting:false}]);
+    setTimeout(()=>setToasts(p=>p.map(t=>t.id===id?{...t,exiting:true}:t)),2500);
+    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),2800);
+  };
+
+  // Activity log
+  const logAction=(text,userName,color)=>{
+    setActLog(p=>[{text,user:userName,time:now(),color:color||"#4f46e5"},...p].slice(0,100));
+  };
+
+  const addTask=(t)=>{setTasks(p=>[t,...p]);toast("Task created: "+t.title,"#10b981","\u2705");logAction("Created task: "+t.title,user.name,"#10b981");};
+  const addGoal=(g)=>{setGoals(p=>[g,...p]);toast("Goal created: "+g.title,"#4f46e5","\u{1F3AF}");logAction("Created goal: "+g.title,user.name,"#4f46e5");};
+  const doStress=()=>{const st=genStressTasks(60);setTasks(p=>[...st,...p]);toast("\u{1F525} Stress test: +60 tasks added!","#ef4444","\u{1F525}");logAction("Stress test triggered (+60 tasks)",user.name,"#ef4444");};
+
+  return <div style={{display:"flex",height:"100vh",fontFamily:"'DM Sans','Segoe UI',system-ui,sans-serif",background:th.bg,color:th.text,transition:"background .3s,color .3s"}}>
+    <aside style={{width:sbOpen?240:64,background:th.bgSidebar,display:"flex",flexDirection:"column",transition:"width .25s ease",overflow:"hidden",flexShrink:0}}>
+      <div style={{padding:sbOpen?"20px 20px 16px":"20px 12px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>setSbOpen(!sbOpen)}>
+        <div style={{width:36,height:36,borderRadius:10,background:"linear-gradient(135deg,#4f46e5,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{"\u{1F4E1}"}</div>
+        {sbOpen&&<div><div style={{fontSize:15,fontWeight:800,color:"#fff",letterSpacing:"-.02em"}}>BroadcastOKR</div><div style={{fontSize:10,color:th.sidebarText,fontWeight:500}}>Operations Goals</div></div>}
+      </div>
+      <nav style={{flex:1,padding:"8px"}}>{NAV.map(n=>{const a=page===n.k;return <button key={n.k} onClick={()=>setPage(n.k)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:sbOpen?"10px 12px":"10px 14px",borderRadius:8,border:"none",cursor:"pointer",background:a?th.bgSidebarActive:"transparent",color:a?th.sidebarTextActive:th.sidebarText,fontSize:13,fontWeight:a?600:400,marginBottom:2,textAlign:"left",transition:"all .15s"}}><span style={{fontSize:16,flexShrink:0}}>{n.i}</span>{sbOpen&&n.l}</button>;})}</nav>
+      {sbOpen&&<div style={{padding:"12px 16px 20px",borderTop:"1px solid #1e293b"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}><Av user={user} size={32}/><div><div style={{fontSize:12,fontWeight:600,color:"#fff"}}>{user.name}</div><div style={{fontSize:10,color:th.sidebarText}}>{user.role}</div></div></div>
+        <button onClick={()=>setLogOpen(true)} style={{marginTop:10,width:"100%",padding:"6px 10px",borderRadius:6,border:"1px solid #1e293b",background:"transparent",color:th.sidebarText,fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"left"}}>{"\u{1F4CB}"} Activity Log ({actLog.length})</button>
+      </div>}
+    </aside>
+
+    <main style={{flex:1,overflow:"auto",display:"flex",flexDirection:"column"}}>
+      <header style={{padding:"16px 28px",background:th.headerBg,borderBottom:"1px solid "+th.border,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,transition:"background .3s"}}>
+        <div><h1 style={{fontSize:22,fontWeight:800,color:th.text,margin:0,letterSpacing:"-.02em"}}>{NAV.find(n=>n.k===page)?.i} {NAV.find(n=>n.k===page)?.l}</h1>
+          <p style={{fontSize:12,color:th.textFaint,margin:0,marginTop:2}}>{page==="dashboard"?"Channel health, KPIs, and operational overview":page==="goals"?"OKR objectives and key results by channel":page==="tasks"?"Broadcast operations workflow and task management":page==="team"?"Operations crew and team workload":"Analytics, compliance, and operational reporting"}</p></div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{padding:"4px 10px",borderRadius:6,background:th.bgMuted,border:"1px solid "+th.border,fontSize:11,color:th.textMuted}}>Q1 2026</span>
+          <span style={{padding:"4px 10px",borderRadius:6,background:th.bgMuted,border:"1px solid "+th.border,fontSize:11,color:th.textMuted}}>{tasks.length} tasks</span>
+          {perms.canCreate&&<button onClick={()=>{setPage("tasks");setCrTaskOpen(true);}} style={{padding:"6px 14px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Task</button>}
+        </div>
+      </header>
+      <div style={{padding:28,flex:1}}>
+        {page==="dashboard"&&<Dashboard goals={goals} tasks={tasks} kpis={kpis} th={th} dark={dark}/>}
+        {page==="goals"&&<Goals goals={goals} setGoals={setGoals} th={th} perms={perms} onOpenCreate={()=>setCrGoalOpen(true)} toast={toast} logAction={logAction} currentUser={user}/>}
+        {page==="tasks"&&<Tasks tasks={tasks} setTasks={setTasks} th={th} perms={perms} onOpenCreate={()=>setCrTaskOpen(true)} dark={dark} toast={toast} logAction={logAction} currentUser={user}/>}
+        {page==="team"&&<Team tasks={tasks} th={th}/>}
+        {page==="reports"&&<Reports goals={goals} tasks={tasks} kpis={kpis} th={th} perms={perms}/>}
+      </div>
+    </main>
+
+    <CreateTaskModal open={crTaskOpen} onClose={()=>setCrTaskOpen(false)} onCreate={addTask} th={th} currentUser={user}/>
+    <CreateGoalModal open={crGoalOpen} onClose={()=>setCrGoalOpen(false)} onCreate={addGoal} th={th} currentUser={user}/>
+    <ActivityLog log={actLog} open={logOpen} onClose={()=>setLogOpen(false)} th={th}/>
+    <ToastContainer toasts={toasts}/>
+    <PersonaPanel currentUser={user} setCurrentUser={(u)=>{setUser(u);toast("Switched to "+u.name,"#8b5cf6","\u{1F464}");logAction("Persona switched to "+u.name+" ("+u.role+")",u.name,"#8b5cf6");}} dark={dark} setDark={(d)=>{setDark(d);toast(d?"Dark mode enabled":"Light mode enabled",d?"#1e293b":"#f59e0b",d?"\u{1F319}":"\u2600\uFE0F");}} th={th} onStress={doStress}/>
+  </div>;
+}
+
+// FIX: Use createRoot API (React 18) instead of deprecated ReactDOM.render
+const root=ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>
