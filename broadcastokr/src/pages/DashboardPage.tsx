@@ -19,7 +19,7 @@ export function DashboardPage() {
     .map((t) => ({ ...t, days: daysUntil(t.due) }))
     .filter((t) => t.days <= 3)
     .sort((a, b) => a.days - b.days)
-    .slice(0, 6);
+    .slice(0, 8);
 
   const statusCounts = {
     in_progress: tasks.filter((t) => t.status === 'in_progress').length,
@@ -61,7 +61,7 @@ export function DashboardPage() {
         {/* KPI Panel */}
         <div style={cardStyle}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4CA}'} Key Performance Indicators</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {kpis.map((kpi) => {
               const st = kpiStatus(kpi);
               return (
@@ -116,7 +116,7 @@ export function DashboardPage() {
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
                     <Avatar user={user} size={24} />
                     <div style={{ flex: 1, fontSize: 12, fontWeight: 500, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
-                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.fg, animation: badge.pulse ? 'urgPulse 1.5s infinite' : 'none' }}>{badge.text}</span>
+                    <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.fg, animation: badge.pulse ? 'urgPulse 2s infinite' : 'none' }}>{badge.text}</span>
                   </div>
                 );
               })}

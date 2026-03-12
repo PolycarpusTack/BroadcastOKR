@@ -39,10 +39,14 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
   const [newType, setNewType] = useState('schedule_change');
   const [newAssignee, setNewAssignee] = useState(0);
   const [newDue, setNewDue] = useState('2026-03-15');
+  const [newSubtasks, setNewSubtasks] = useState<string[]>([]);
+  const [newSubtaskText, setNewSubtaskText] = useState('');
+  const [filterType, setFilterType] = useState('all');
 
   const filtered = tasks.filter((t) => {
     if (filterChannel !== 'all' && t.channel !== Number(filterChannel)) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
+    if (filterType !== 'all' && t.taskType !== filterType) return false;
     return true;
   });
 
@@ -67,13 +71,15 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
       channel: newChannel,
       due: newDue,
       taskType: newType,
-      subtasks: [],
+      subtasks: newSubtasks.filter((s) => s.trim()).map((s) => ({ text: s.trim(), done: false })),
     };
     addTask(task);
     toast(`Task created: ${task.title}`, '#4f46e5', '\u2705');
     logAction(`Created task: ${task.title}`, currentUser.name, '#4f46e5');
     setCreateOpen(false);
     setNewTitle('');
+    setNewSubtasks([]);
+    setNewSubtaskText('');
   };
 
   const handleMove = (taskId: string, status: TaskStatus) => {
@@ -104,13 +110,16 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
           padding: '12px 14px',
           cursor: 'pointer',
           borderLeft: `3px solid ${pri.color}`,
+          transition: 'box-shadow .15s',
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,.08)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
       >
         <div style={{ fontSize: 12, fontWeight: 600, color: theme.text, marginBottom: 8 }}>{task.title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <ChannelBadge channel={CHANNELS[task.channel]} />
           {tt && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: tt.color + '18', color: tt.color }}>{tt.icon} {tt.label}</span>}
-          <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.fg, animation: badge.pulse ? 'urgPulse 1.5s infinite' : 'none' }}>{badge.text}</span>
+          <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.fg, animation: badge.pulse ? 'urgPulse 2s infinite' : 'none' }}>{badge.text}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -160,6 +169,12 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
           <option value="all">All Priorities</option>
           {Object.entries(PRIORITIES).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
+          ))}
+        </select>
+        <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={selectStyle}>
+          <option value="all">All Types</option>
+          {TASK_TYPES.map((t) => (
+            <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
           ))}
         </select>
         <div style={{ flex: 1 }} />
@@ -364,6 +379,48 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
+
+          {/* Subtasks */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Subtasks</label>
+            {newSubtasks.map((sub, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: theme.textMuted, flex: 1, padding: '6px 8px', borderRadius: 6, background: theme.bgMuted }}>{sub}</span>
+                <button
+                  onClick={() => setNewSubtasks(newSubtasks.filter((_, j) => j !== i))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.textFaint, fontSize: 12 }}
+                >
+                  {'\u2715'}
+                </button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                value={newSubtaskText}
+                onChange={(e) => setNewSubtaskText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newSubtaskText.trim()) {
+                    setNewSubtasks([...newSubtasks, newSubtaskText.trim()]);
+                    setNewSubtaskText('');
+                  }
+                }}
+                placeholder="Add subtask and press Enter"
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 6, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+              />
+              <button
+                onClick={() => {
+                  if (newSubtaskText.trim()) {
+                    setNewSubtasks([...newSubtasks, newSubtaskText.trim()]);
+                    setNewSubtaskText('');
+                  }
+                }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={handleCreate}
             style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}

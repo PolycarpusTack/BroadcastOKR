@@ -28,6 +28,9 @@ export function GoalsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newChannel, setNewChannel] = useState(0);
+  const [newOwner, setNewOwner] = useState(currentUser.id);
+  const [newPeriod, setNewPeriod] = useState('Q1 2026');
+  const [newKRs, setNewKRs] = useState([{ title: '', start: 0, target: 100 }]);
 
   const filtered = goals.filter((g) => {
     if (filterChannel !== 'all' && g.channel !== Number(filterChannel)) return false;
@@ -47,23 +50,31 @@ export function GoalsPage() {
 
   const handleCreate = () => {
     if (!newTitle.trim()) return;
+    const krs = newKRs.filter((kr) => kr.title.trim());
+    if (krs.length === 0) return;
     const goal: Goal = {
       id: nextGoalId(),
       title: newTitle.trim(),
       status: 'behind',
       progress: 0,
-      owner: currentUser.id,
+      owner: newOwner,
       channel: newChannel,
-      period: 'Q1 2026',
-      keyResults: [
-        { title: 'Key Result 1', start: 0, target: 100, current: 0, progress: 0, status: 'behind' },
-      ],
+      period: newPeriod,
+      keyResults: krs.map((kr) => ({
+        title: kr.title.trim(),
+        start: kr.start,
+        target: kr.target,
+        current: kr.start,
+        progress: 0,
+        status: 'behind' as const,
+      })),
     };
     addGoal(goal);
     toast(`Goal created: ${goal.title}`, '#4f46e5', '\u{1F3AF}');
     logAction(`Created goal: ${goal.title}`, currentUser.name, '#4f46e5');
     setCreateOpen(false);
     setNewTitle('');
+    setNewKRs([{ title: '', start: 0, target: 100 }]);
   };
 
   const handleCheckIn = (goalIndex: number, krIndex: number, goalTitle: string) => {
@@ -181,7 +192,7 @@ export function GoalsPage() {
       )}
 
       {/* Create Goal Modal */}
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={'\u{1F3AF} New Goal'} theme={theme} width={480}>
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={'\u{1F3AF} New Goal'} theme={theme} width={540}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Title</label>
@@ -192,14 +203,78 @@ export function GoalsPage() {
               style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Channel</label>
-            <select value={newChannel} onChange={(e) => setNewChannel(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
-              {CHANNELS.map((ch, i) => (
-                <option key={i} value={i}>{ch.icon} {ch.name}</option>
-              ))}
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Channel</label>
+              <select value={newChannel} onChange={(e) => setNewChannel(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
+                {CHANNELS.map((ch, i) => (
+                  <option key={i} value={i}>{ch.icon} {ch.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Owner</label>
+              <select value={newOwner} onChange={(e) => setNewOwner(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
+                {USERS.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Period</label>
+              <select value={newPeriod} onChange={(e) => setNewPeriod(e.target.value)} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
+                {['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Annual 2026'].map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
           </div>
+
+          {/* Key Results */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted }}>Key Results</label>
+              <button
+                onClick={() => setNewKRs([...newKRs, { title: '', start: 0, target: 100 }])}
+                style={{ padding: '2px 8px', borderRadius: 4, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+              >
+                + Add KR
+              </button>
+            </div>
+            {newKRs.map((kr, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <input
+                  value={kr.title}
+                  onChange={(e) => { const u = [...newKRs]; u[i] = { ...u[i], title: e.target.value }; setNewKRs(u); }}
+                  placeholder={`Key Result ${i + 1}`}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 6, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                />
+                <input
+                  type="number"
+                  value={kr.start}
+                  onChange={(e) => { const u = [...newKRs]; u[i] = { ...u[i], start: Number(e.target.value) }; setNewKRs(u); }}
+                  placeholder="Start"
+                  style={{ width: 60, padding: '8px 6px', borderRadius: 6, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 12, outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
+                />
+                <input
+                  type="number"
+                  value={kr.target}
+                  onChange={(e) => { const u = [...newKRs]; u[i] = { ...u[i], target: Number(e.target.value) }; setNewKRs(u); }}
+                  placeholder="Target"
+                  style={{ width: 60, padding: '8px 6px', borderRadius: 6, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 12, outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
+                />
+                {newKRs.length > 1 && (
+                  <button
+                    onClick={() => setNewKRs(newKRs.filter((_, j) => j !== i))}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.textFaint, fontSize: 14, padding: 2 }}
+                  >
+                    {'\u2715'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
           <button
             onClick={handleCreate}
             style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}
