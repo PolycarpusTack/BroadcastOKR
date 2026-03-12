@@ -1,3 +1,4 @@
+import { useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { Theme } from '../../types';
 
@@ -11,6 +12,46 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children, width = 560, theme }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+      return;
+    }
+    if (e.key === 'Tab' && dialogRef.current) {
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener('keydown', handleKeyDown);
+    const prev = document.activeElement as HTMLElement | null;
+    requestAnimationFrame(() => {
+      const first = dialogRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      first?.focus();
+    });
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      prev?.focus();
+    };
+  }, [open, handleKeyDown]);
+
   if (!open) return null;
 
   return (
@@ -29,6 +70,10 @@ export function Modal({ open, onClose, title, children, width = 560, theme }: Mo
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: theme.bgCard,
@@ -53,6 +98,7 @@ export function Modal({ open, onClose, title, children, width = 560, theme }: Mo
           <h3 style={{ fontSize: 18, fontWeight: 700, color: theme.text, margin: 0 }}>{title}</h3>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: theme.textFaint, padding: 4 }}
           >
             {'\u2715'}

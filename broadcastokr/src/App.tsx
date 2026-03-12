@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { DashboardPage } from './pages/DashboardPage';
 import { GoalsPage } from './pages/GoalsPage';
 import { TasksPage } from './pages/TasksPage';
@@ -12,14 +13,16 @@ export default function App() {
 
   return (
     <AppShell onCreateTask={() => setCreateTaskOpen(true)}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/goals" element={<GoalsPage />} />
-        <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
-        <Route path="/team" element={<TeamPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-      </Routes>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
+          <Route path="/team" element={<TeamPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+        </Routes>
+      </ErrorBoundary>
     </AppShell>
   );
 }

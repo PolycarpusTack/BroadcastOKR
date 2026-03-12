@@ -38,6 +38,9 @@ export function PersonaPanel({ currentUser, setCurrentUser, dark, setDark, theme
             <span style={{ fontSize: 12, fontWeight: 600, color: theme.textSecondary }}>{dark ? '\u{1F319}' : '\u2600\uFE0F'} Dark Mode</span>
             <button
               onClick={() => setDark(!dark)}
+              role="switch"
+              aria-checked={dark}
+              aria-label="Toggle dark mode"
               style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: dark ? '#4f46e5' : '#cbd5e1', position: 'relative', transition: 'background .2s' }}
             >
               <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: dark ? 23 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
@@ -101,6 +104,7 @@ export function PersonaPanel({ currentUser, setCurrentUser, dark, setDark, theme
 
       <button
         onClick={() => setOpen(!open)}
+        aria-label={open ? 'Close control panel' : 'Open control panel'}
         style={{
           width: 52,
           height: 52,

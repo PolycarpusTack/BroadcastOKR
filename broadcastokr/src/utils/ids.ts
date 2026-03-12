@@ -1,5 +1,6 @@
 let taskCounter = 9;
 let goalCounter = 5;
+let stressCounter = 0;
 
 export function nextTaskId(): string {
   return `t${taskCounter++}`;
@@ -10,5 +11,5 @@ export function nextGoalId(): string {
 }
 
 export function nextStressTaskId(): string {
-  return `ts${taskCounter++}`;
+  return `ts${stressCounter++}`;
 }

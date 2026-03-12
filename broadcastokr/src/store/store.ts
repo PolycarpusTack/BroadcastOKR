@@ -33,7 +33,7 @@ export const useStore = create<AppStore>()(
 
       checkIn: (goalIndex, krIndex) =>
         set((s) => {
-          const goals = JSON.parse(JSON.stringify(s.goals)) as Goal[];
+          const goals = structuredClone(s.goals);
           const kr = goals[goalIndex].keyResults[krIndex];
           const range = Math.abs(kr.target - kr.start);
 

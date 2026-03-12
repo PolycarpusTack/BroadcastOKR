@@ -1,6 +1,7 @@
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS } from '../constants';
+import { safeUser } from '../utils/safeGet';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { SparkLine } from '../components/ui/SparkLine';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
@@ -111,7 +112,7 @@ export function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {urgentTasks.map((t) => {
                 const badge = getUrgencyBadge(t.days, dark);
-                const user = USERS[t.assignee];
+                const user = safeUser(USERS, t.assignee);
                 return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
                     <Avatar user={user} size={24} />

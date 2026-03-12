@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS } from '../constants';
+import { safeUser } from '../utils/safeGet';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { Avatar } from '../components/ui/Avatar';
@@ -117,7 +118,7 @@ export function GoalsPage() {
         filtered.map((goal) => {
           const goalIndex = goals.findIndex((g) => g.id === goal.id);
           const isExpanded = expanded === goal.id;
-          const owner = USERS[goal.owner];
+          const owner = safeUser(USERS, goal.owner);
 
           return (
             <div
