@@ -1,11 +1,213 @@
+import { useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useActivityLog } from '../context/ActivityLogContext';
+import { useStore } from '../store/store';
+import { CHANNELS, USERS } from '../constants';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { ChannelBadge } from '../components/ui/ChannelBadge';
+import { Avatar } from '../components/ui/Avatar';
+import { Modal } from '../components/ui/Modal';
+import { progressColor, statusIcon } from '../utils/colors';
+import { nextGoalId } from '../utils/ids';
+import type { Goal } from '../types';
 
 export function GoalsPage() {
   const { theme } = useTheme();
+  const { currentUser, permissions } = useAuth();
+  const { toast } = useToast();
+  const { logAction } = useActivityLog();
+  const goals = useStore((s) => s.goals);
+  const addGoal = useStore((s) => s.addGoal);
+  const checkIn = useStore((s) => s.checkIn);
+
+  const [filterChannel, setFilterChannel] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newChannel, setNewChannel] = useState(0);
+
+  const filtered = goals.filter((g) => {
+    if (filterChannel !== 'all' && g.channel !== Number(filterChannel)) return false;
+    if (filterStatus !== 'all' && g.status !== filterStatus) return false;
+    return true;
+  });
+
+  const selectStyle = {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: `1px solid ${theme.borderInput}`,
+    background: theme.bgInput,
+    color: theme.text,
+    fontSize: 12,
+    outline: 'none',
+  };
+
+  const handleCreate = () => {
+    if (!newTitle.trim()) return;
+    const goal: Goal = {
+      id: nextGoalId(),
+      title: newTitle.trim(),
+      status: 'behind',
+      progress: 0,
+      owner: currentUser.id,
+      channel: newChannel,
+      period: 'Q1 2026',
+      keyResults: [
+        { title: 'Key Result 1', start: 0, target: 100, current: 0, progress: 0, status: 'behind' },
+      ],
+    };
+    addGoal(goal);
+    toast(`Goal created: ${goal.title}`, '#4f46e5', '\u{1F3AF}');
+    logAction(`Created goal: ${goal.title}`, currentUser.name, '#4f46e5');
+    setCreateOpen(false);
+    setNewTitle('');
+  };
+
+  const handleCheckIn = (goalIndex: number, krIndex: number, goalTitle: string) => {
+    checkIn(goalIndex, krIndex);
+    toast('Check-in recorded!', '#10b981', '\u{1F4CB}');
+    logAction(`Check-in on "${goalTitle}" KR #${krIndex + 1}`, currentUser.name, '#10b981');
+  };
+
   return (
-    <div style={{ padding: 28, background: theme.bg, minHeight: '100vh', color: theme.text }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800 }}>Goals</h1>
-      <p style={{ color: theme.textMuted, marginTop: 8 }}>Phase 2: Goals components coming soon.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Filters + Create */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <select value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selectStyle}>
+          <option value="all">All Channels</option>
+          {CHANNELS.map((ch, i) => (
+            <option key={i} value={String(i)}>{ch.icon} {ch.name}</option>
+          ))}
+        </select>
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={selectStyle}>
+          <option value="all">All Statuses</option>
+          <option value="on_track">On Track</option>
+          <option value="at_risk">At Risk</option>
+          <option value="behind">Behind</option>
+        </select>
+        <div style={{ flex: 1 }} />
+        {permissions.canCreate && (
+          <button
+            onClick={() => setCreateOpen(true)}
+            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          >
+            + New Goal
+          </button>
+        )}
+      </div>
+
+      {/* Goal Cards */}
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60, color: theme.textFaint, fontSize: 14 }}>No goals match your filters</div>
+      ) : (
+        filtered.map((goal) => {
+          const goalIndex = goals.findIndex((g) => g.id === goal.id);
+          const isExpanded = expanded === goal.id;
+          const owner = USERS[goal.owner];
+
+          return (
+            <div
+              key={goal.id}
+              style={{
+                background: theme.bgCard,
+                border: `1px solid ${theme.border}`,
+                borderRadius: 14,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Goal Header */}
+              <div
+                onClick={() => setExpanded(isExpanded ? null : goal.id)}
+                style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
+              >
+                <span style={{ fontSize: 18 }}>{statusIcon(goal.status)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{goal.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <ChannelBadge channel={CHANNELS[goal.channel]} />
+                    <span style={{ fontSize: 11, color: theme.textFaint }}>{goal.period}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Avatar user={owner} size={18} />
+                      <span style={{ fontSize: 11, color: theme.textMuted }}>{owner.name}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                  <div style={{ width: 100 }}><ProgressBar value={goal.progress} theme={theme} /></div>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: progressColor(goal.progress), minWidth: 40, textAlign: 'right' }}>
+                    {Math.round(goal.progress * 100)}%
+                  </span>
+                  <span style={{ fontSize: 16, transition: 'transform .2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>{'\u25BC'}</span>
+                </div>
+              </div>
+
+              {/* Expanded Key Results */}
+              {isExpanded && (
+                <div style={{ padding: '0 20px 16px', borderTop: `1px solid ${theme.borderLight}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: theme.textMuted, marginTop: 14, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                    Key Results ({goal.keyResults.length})
+                  </div>
+                  {goal.keyResults.map((kr, ki) => (
+                    <div key={ki} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: theme.bgMuted, border: `1px solid ${theme.borderLight}`, marginBottom: 8 }}>
+                      <span style={{ fontSize: 14 }}>{statusIcon(kr.status)}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>{kr.title}</div>
+                        <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 2 }}>
+                          {kr.current} / {kr.target} (from {kr.start})
+                        </div>
+                      </div>
+                      <div style={{ width: 80 }}><ProgressBar value={kr.progress} height={5} theme={theme} /></div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(kr.progress), minWidth: 36, textAlign: 'right' }}>
+                        {Math.round(kr.progress * 100)}%
+                      </span>
+                      {permissions.canCheckIn && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCheckIn(goalIndex, ki, goal.title); }}
+                          style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#10b981', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          Check In
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+
+      {/* Create Goal Modal */}
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={'\u{1F3AF} New Goal'} theme={theme} width={480}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Title</label>
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="e.g. Achieve 99.95% playout uptime"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Channel</label>
+            <select value={newChannel} onChange={(e) => setNewChannel(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
+              {CHANNELS.map((ch, i) => (
+                <option key={i} value={i}>{ch.icon} {ch.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleCreate}
+            style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}
+          >
+            Create Goal
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
