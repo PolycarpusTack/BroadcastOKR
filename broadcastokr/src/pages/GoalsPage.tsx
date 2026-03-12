@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS } from '../constants';
-import { safeUser } from '../utils/safeGet';
+import { safeUser, safeChannel } from '../utils/safeGet';
 import { selectStyle as makeSelectStyle } from '../utils/styles';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
@@ -134,7 +134,7 @@ export function GoalsPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{goal.title}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <ChannelBadge channel={CHANNELS[goal.channel]} />
+                    <ChannelBadge channel={safeChannel(CHANNELS, goal.channel)} />
                     <span style={{ fontSize: 11, color: theme.textFaint }}>{goal.period}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <Avatar user={owner} size={18} />

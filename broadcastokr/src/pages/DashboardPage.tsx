@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS } from '../constants';
-import { safeUser } from '../utils/safeGet';
+import { safeUser, safeChannel } from '../utils/safeGet';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { SparkLine } from '../components/ui/SparkLine';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
@@ -90,7 +90,7 @@ export function DashboardPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ fontSize: 14 }}>{statusIcon(goal.status)}</span>
                   <div style={{ flex: 1, fontSize: 12, fontWeight: 600, color: theme.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{goal.title}</div>
-                  <ChannelBadge channel={CHANNELS[goal.channel]} />
+                  <ChannelBadge channel={safeChannel(CHANNELS, goal.channel)} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ flex: 1 }}><ProgressBar value={goal.progress} theme={theme} /></div>

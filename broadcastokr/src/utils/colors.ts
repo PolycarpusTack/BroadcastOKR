@@ -1,8 +1,12 @@
 import type { GoalStatus, KPI, KPIStatus, Role } from '../types';
 
+/** Thresholds shared with store.ts goalStatus */
+export const PROGRESS_ON_TRACK = 0.7;
+export const PROGRESS_AT_RISK = 0.4;
+
 export function progressColor(progress: number): string {
-  if (progress >= 0.7) return '#10b981';
-  if (progress >= 0.4) return '#f59e0b';
+  if (progress >= PROGRESS_ON_TRACK) return '#10b981';
+  if (progress >= PROGRESS_AT_RISK) return '#f59e0b';
   return '#ef4444';
 }
 

@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../constants';
-import { safeUser } from '../utils/safeGet';
+import { safeUser, safeChannel } from '../utils/safeGet';
 import { selectStyle as makeSelectStyle } from '../utils/styles';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { Avatar } from '../components/ui/Avatar';
@@ -160,7 +160,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ fontSize: 11, color: pri.color, fontWeight: 600 }}>{pri.icon} {pri.label}</span>
                     </td>
-                    <td style={{ padding: '10px 14px' }}><ChannelBadge channel={CHANNELS[task.channel]} /></td>
+                    <td style={{ padding: '10px 14px' }}><ChannelBadge channel={safeChannel(CHANNELS, task.channel)} /></td>
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Avatar user={user} size={20} />

@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Goal, Task, KPI, GoalStatus } from '../types';
 import { createInitialGoals, createInitialTasks, createInitialKPIs } from '../constants/seedData';
+import { PROGRESS_ON_TRACK, PROGRESS_AT_RISK } from '../utils/colors';
 
 function goalStatus(progress: number): GoalStatus {
-  if (progress >= 0.7) return 'on_track';
-  if (progress >= 0.4) return 'at_risk';
+  if (progress >= PROGRESS_ON_TRACK) return 'on_track';
+  if (progress >= PROGRESS_AT_RISK) return 'at_risk';
   return 'behind';
 }
 

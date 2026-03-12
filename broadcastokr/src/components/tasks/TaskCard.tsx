@@ -1,5 +1,5 @@
 import { CHANNELS, USERS, PRIORITIES, TASK_TYPES } from '../../constants';
-import { safeUser } from '../../utils/safeGet';
+import { safeUser, safeChannel } from '../../utils/safeGet';
 import { ChannelBadge } from '../ui/ChannelBadge';
 import { Avatar } from '../ui/Avatar';
 import { daysUntil, getUrgencyBadge } from '../../utils/dates';
@@ -40,7 +40,7 @@ export function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
     >
       <div style={{ fontSize: 12, fontWeight: 600, color: theme.text, marginBottom: 8 }}>{task.title}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <ChannelBadge channel={CHANNELS[task.channel]} />
+        <ChannelBadge channel={safeChannel(CHANNELS, task.channel)} />
         {tt && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: tt.color + '18', color: tt.color }}>{tt.icon} {tt.label}</span>}
         <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.fg, animation: badge.pulse ? 'urgPulse 2s infinite' : 'none' }}>{badge.text}</span>
       </div>

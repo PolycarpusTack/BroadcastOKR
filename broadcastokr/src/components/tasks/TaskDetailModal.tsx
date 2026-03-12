@@ -1,5 +1,5 @@
 import { CHANNELS, USERS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../../constants';
-import { safeUser } from '../../utils/safeGet';
+import { safeUser, safeChannel } from '../../utils/safeGet';
 import { ChannelBadge } from '../ui/ChannelBadge';
 import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
@@ -46,7 +46,7 @@ function TaskDetailContent({ task, onMove, toggleSubtask, permissions, theme, da
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <ChannelBadge channel={CHANNELS[task.channel]} />
+        <ChannelBadge channel={safeChannel(CHANNELS, task.channel)} />
         {tt && <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: tt.color + '18', color: tt.color }}>{tt.icon} {tt.label}</span>}
         <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: pri.color + '18', color: pri.color }}>{pri.icon} {pri.label}</span>
         <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.fg }}>{badge.text}</span>
