@@ -96,7 +96,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
       </nav>
 
       {open && (
-        <div style={{ padding: '12px 16px 20px', borderTop: '1px solid ${theme.border}' }}>
+        <div style={{ padding: '12px 16px 20px', borderTop: `1px solid ${theme.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Avatar user={user} size={32} />
             <div>
@@ -111,7 +111,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
               width: '100%',
               padding: '6px 10px',
               borderRadius: 6,
-              border: '1px solid ${theme.border}',
+              border: `1px solid ${theme.border}`,
               background: 'transparent',
               color: theme.sidebarText,
               fontSize: 11,
