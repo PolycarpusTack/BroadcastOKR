@@ -6,6 +6,7 @@ import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS } from '../constants';
 import { safeUser } from '../utils/safeGet';
+import { selectStyle as makeSelectStyle } from '../utils/styles';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { Avatar } from '../components/ui/Avatar';
@@ -39,15 +40,7 @@ export function GoalsPage() {
     return true;
   }), [goals, filterChannel, filterStatus]);
 
-  const selectStyle = {
-    padding: '6px 10px',
-    borderRadius: 8,
-    border: `1px solid ${theme.borderInput}`,
-    background: theme.bgInput,
-    color: theme.text,
-    fontSize: 12,
-    outline: 'none',
-  };
+  const selectStyle = makeSelectStyle(theme);
 
   const handleCreate = () => {
     if (!newTitle.trim() || newTitle.length > 200) return;

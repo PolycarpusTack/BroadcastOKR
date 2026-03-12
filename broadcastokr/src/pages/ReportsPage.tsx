@@ -2,12 +2,13 @@ import { useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../store/store';
-import { CHANNELS, STATUS_LABELS, STATUS_COLORS, PRIORITIES } from '../constants';
+import { CHANNELS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES } from '../constants';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { SparkLine } from '../components/ui/SparkLine';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { kpiStatus } from '../utils/colors';
-import type { TaskStatus, Priority } from '../types';
+import { cardStyle as makeCardStyle } from '../utils/styles';
+import type { Priority } from '../types';
 
 export function ReportsPage() {
   const { theme } = useTheme();
@@ -33,18 +34,19 @@ export function ReportsPage() {
     const now = new Date();
     const done = tasks.filter((t) => t.status === 'done').length;
     const overdue = tasks.filter((t) => t.status !== 'done' && new Date(t.due) < now).length;
-    const statuses = Object.entries(STATUS_LABELS).map(([key, label]) => ({
-      status: key as TaskStatus,
-      label,
-      count: tasks.filter((t) => t.status === key).length,
-      color: STATUS_COLORS[key as TaskStatus],
+    const statuses = STATUS_FLOW.map((status) => ({
+      status,
+      label: STATUS_LABELS[status],
+      count: tasks.filter((t) => t.status === status).length,
+      color: STATUS_COLORS[status],
     }));
-    const priorities = Object.entries(PRIORITIES).map(([key, info]) => ({
-      priority: key as Priority,
-      label: info.label,
+    const priorityKeys: Priority[] = ['critical', 'high', 'medium', 'low'];
+    const priorities = priorityKeys.map((key) => ({
+      priority: key,
+      label: PRIORITIES[key].label,
       count: tasks.filter((t) => t.priority === key).length,
-      color: info.color,
-      icon: info.icon,
+      color: PRIORITIES[key].color,
+      icon: PRIORITIES[key].icon,
     }));
     return { doneTasks: done, overdueTasks: overdue, statusBreakdown: statuses, priorityBreakdown: priorities };
   }, [tasks]);
@@ -63,12 +65,7 @@ export function ReportsPage() {
     });
   }, [goals, tasks]);
 
-  const cardStyle = {
-    background: theme.bgCard,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 14,
-    padding: 20,
-  };
+  const cardStyle = makeCardStyle(theme);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

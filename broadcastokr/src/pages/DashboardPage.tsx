@@ -9,6 +9,7 @@ import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { progressColor, statusIcon, kpiStatus } from '../utils/colors';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
+import { cardStyle as makeCardStyle } from '../utils/styles';
 
 export function DashboardPage() {
   const { theme, dark } = useTheme();
@@ -38,19 +39,14 @@ export function DashboardPage() {
     { label: 'Completed', value: statusCounts.done, icon: '\u{1F389}', color: '#10b981' },
   ];
 
-  const cardStyle = {
-    background: theme.bgCard,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 14,
-    padding: 20,
-  };
+  const cStyle = makeCardStyle(theme);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         {statCards.map((s) => (
-          <div key={s.label} style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={s.label} style={{ ...cStyle, display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: s.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
               {s.icon}
             </div>
@@ -64,7 +60,7 @@ export function DashboardPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20 }}>
         {/* KPI Panel */}
-        <div style={cardStyle}>
+        <div style={cStyle}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4CA}'} Key Performance Indicators</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {kpis.map((kpi) => {
@@ -86,7 +82,7 @@ export function DashboardPage() {
         </div>
 
         {/* Goals Summary */}
-        <div style={cardStyle}>
+        <div style={cStyle}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F3AF}'} OKR Progress</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {goals.slice(0, 5).map((goal) => (
@@ -108,7 +104,7 @@ export function DashboardPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20 }}>
         {/* Urgent Tasks */}
-        <div style={cardStyle}>
+        <div style={cStyle}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F525}'} Urgent Tasks</h3>
           {urgentTasks.length === 0 ? (
             <div style={{ color: theme.textFaint, fontSize: 13, textAlign: 'center', padding: 30 }}>No urgent tasks</div>
@@ -130,7 +126,7 @@ export function DashboardPage() {
         </div>
 
         {/* Channel Health */}
-        <div style={cardStyle}>
+        <div style={cStyle}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4FA}'} Channel Health</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {CHANNELS.map((ch, ci) => {

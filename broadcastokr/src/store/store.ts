@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Goal, Task, KPI } from '../types';
-import type { GoalStatus } from '../types';
+import type { Goal, Task, KPI, GoalStatus } from '../types';
 import { createInitialGoals, createInitialTasks, createInitialKPIs } from '../constants/seedData';
 
 function goalStatus(progress: number): GoalStatus {
@@ -23,7 +22,7 @@ interface AppStore {
   // Tasks
   addTask: (task: Task) => void;
   setTasks: (tasks: Task[]) => void;
-  moveTask: (id: string, status: string) => void;
+  moveTask: (id: string, status: Task['status']) => void;
   toggleSubtask: (taskId: string, subtaskIndex: number) => void;
   addBulkTasks: (tasks: Task[]) => void;
 }
@@ -69,7 +68,7 @@ export const useStore = create<AppStore>()(
 
       moveTask: (id, status) =>
         set((s) => ({
-          tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: status as Task['status'] } : t)),
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)),
         })),
 
       toggleSubtask: (taskId, subtaskIndex) =>

@@ -1,4 +1,4 @@
-import type { Task, TaskStatus, Priority } from '../types';
+import type { Task, Priority } from '../types';
 import { STATUS_FLOW } from '../constants/statuses';
 import { TASK_TYPES } from '../constants/taskTypes';
 import { nextStressTaskId } from './ids';
@@ -42,7 +42,7 @@ export function generateStressTasks(count: number): Task[] {
     tasks.push({
       id: nextStressTaskId(),
       title,
-      status: randEl(STATUS_FLOW) as TaskStatus,
+      status: randEl(STATUS_FLOW),
       priority: randEl(priorities),
       assignee: randInt(0, 5),
       channel: randInt(0, 3),

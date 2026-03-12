@@ -1,25 +1,17 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { CHANNELS, USERS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { Modal } from '../ui/Modal';
 import { nextTaskId } from '../../utils/ids';
 import type { Task, Theme, Priority } from '../../types';
 
-interface SelectStyle {
-  padding: string;
-  borderRadius: number;
-  border: string;
-  background: string;
-  color: string;
-  fontSize: number;
-  outline: string;
-}
+const PRIORITY_KEYS: Priority[] = ['critical', 'high', 'medium', 'low'];
 
 interface CreateTaskModalProps {
   open: boolean;
   onClose: () => void;
   onCreated: (task: Task) => void;
   theme: Theme;
-  selectStyle: SelectStyle;
+  selectStyle: CSSProperties;
 }
 
 export function CreateTaskModal({ open, onClose, onCreated, theme, selectStyle }: CreateTaskModalProps) {
@@ -77,9 +69,9 @@ export function CreateTaskModal({ open, onClose, onCreated, theme, selectStyle }
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 }}>Priority</label>
-            <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
-              {Object.entries(PRIORITIES).map(([k, v]) => (
-                <option key={k} value={k}>{v.icon} {v.label}</option>
+            <select value={priority} onChange={(e) => { const v = e.target.value; if (PRIORITY_KEYS.includes(v as Priority)) setPriority(v as Priority); }} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
+              {PRIORITY_KEYS.map((k) => (
+                <option key={k} value={k}>{PRIORITIES[k].icon} {PRIORITIES[k].label}</option>
               ))}
             </select>
           </div>

@@ -6,6 +6,7 @@ import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../constants';
 import { safeUser } from '../utils/safeGet';
+import { selectStyle as makeSelectStyle } from '../utils/styles';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
@@ -41,15 +42,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
     return true;
   }), [tasks, filterChannel, filterPriority, filterType]);
 
-  const selectStyle = {
-    padding: '6px 10px',
-    borderRadius: 8,
-    border: `1px solid ${theme.borderInput}`,
-    background: theme.bgInput,
-    color: theme.text,
-    fontSize: 12,
-    outline: 'none',
-  };
+  const selStyle = makeSelectStyle(theme);
 
   const handleMove = (taskId: string, status: TaskStatus) => {
     if (!permissions.canChangeStatus) {
@@ -91,19 +84,19 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
             </button>
           ))}
         </div>
-        <select aria-label="Filter by channel" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter by channel" value={filterChannel} onChange={(e) => setFilterChannel(e.target.value)} style={selStyle}>
           <option value="all">All Channels</option>
           {CHANNELS.map((ch, i) => (
             <option key={i} value={String(i)}>{ch.icon} {ch.name}</option>
           ))}
         </select>
-        <select aria-label="Filter by priority" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter by priority" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} style={selStyle}>
           <option value="all">All Priorities</option>
           {Object.entries(PRIORITIES).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
           ))}
         </select>
-        <select aria-label="Filter by task type" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={selectStyle}>
+        <select aria-label="Filter by task type" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={selStyle}>
           <option value="all">All Types</option>
           {TASK_TYPES.map((t) => (
             <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
@@ -199,7 +192,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
         onClose={() => setCreateOpen(false)}
         onCreated={handleCreated}
         theme={theme}
-        selectStyle={selectStyle}
+        selectStyle={selStyle}
       />
     </div>
   );
