@@ -1,4 +1,4 @@
-import type { GoalStatus, KPI, KPIStatus } from '../types';
+import type { GoalStatus, KPI, KPIStatus, Role } from '../types';
 
 export function progressColor(progress: number): string {
   if (progress >= 0.7) return '#10b981';
@@ -14,6 +14,16 @@ export function statusIcon(status: GoalStatus | string): string {
     done: '\u2705',
   };
   return icons[status] || '\u26AA';
+}
+
+const ROLE_COLORS: Record<Role, string> = {
+  owner: '#4f46e5',
+  manager: '#059669',
+  member: '#f59e0b',
+};
+
+export function roleColor(role: Role): string {
+  return ROLE_COLORS[role] || '#94a3b8';
 }
 
 export function kpiStatus(kpi: KPI): KPIStatus {

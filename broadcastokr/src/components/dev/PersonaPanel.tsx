@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Theme, User } from '../../types';
 import { USERS, ROLE_PERMS } from '../../constants';
 import { Avatar } from '../ui/Avatar';
+import { roleColor } from '../../utils/colors';
 
 interface PersonaPanelProps {
   currentUser: User;
@@ -73,7 +74,7 @@ export function PersonaPanel({ currentUser, setCurrentUser, dark, setDark, theme
                   <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>{u.name}</div>
                   <div style={{ fontSize: 10, color: theme.textFaint }}>
                     {u.title} &mdash;{' '}
-                    <span style={{ color: u.role === 'owner' ? '#4f46e5' : u.role === 'manager' ? '#059669' : '#f59e0b', fontWeight: 700 }}>{u.role}</span>
+                    <span style={{ color: roleColor(u.role), fontWeight: 700 }}>{u.role}</span>
                   </div>
                 </div>
               </button>

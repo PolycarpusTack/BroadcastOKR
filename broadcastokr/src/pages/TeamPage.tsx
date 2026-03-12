@@ -5,13 +5,14 @@ import { USERS, TEAMS } from '../constants';
 import { safeUser } from '../utils/safeGet';
 import { Avatar } from '../components/ui/Avatar';
 import { ProgressBar } from '../components/ui/ProgressBar';
+import { roleColor } from '../utils/colors';
 
 export function TeamPage() {
   const { theme } = useTheme();
   const tasks = useStore((s) => s.tasks);
   const goals = useStore((s) => s.goals);
 
-  const now = useMemo(() => new Date(), [tasks]);
+  const now = useMemo(() => new Date(), []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -68,7 +69,7 @@ export function TeamPage() {
                     <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{user.name}</div>
                     <div style={{ fontSize: 11, color: theme.textFaint }}>{user.title}</div>
                     <div style={{ fontSize: 11, marginTop: 2 }}>
-                      <span style={{ color: user.role === 'owner' ? '#4f46e5' : user.role === 'manager' ? '#059669' : '#f59e0b', fontWeight: 700 }}>{user.role}</span>
+                      <span style={{ color: roleColor(user.role), fontWeight: 700 }}>{user.role}</span>
                       <span style={{ color: theme.textFaint }}> &middot; {user.dept}</span>
                     </div>
                   </div>
