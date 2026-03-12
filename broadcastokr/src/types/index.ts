@@ -126,6 +126,7 @@ export interface Toast {
 }
 
 export interface ActivityEntry {
+  id: number;
   text: string;
   user: string;
   time: string;

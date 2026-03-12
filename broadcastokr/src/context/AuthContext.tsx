@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, type ReactNode } from 'react';
 import type { User, RolePermissions } from '../types';
 import { USERS, ROLE_PERMS } from '../constants';
 
@@ -14,8 +14,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User>(USERS[0]);
   const permissions = ROLE_PERMS[currentUser.role];
 
+  const value = useMemo(() => ({ currentUser, setCurrentUser, permissions }), [currentUser, permissions]);
+
   return (
-    <AuthContext.Provider value={{ currentUser, setCurrentUser, permissions }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -34,12 +34,12 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
   const [filterType, setFilterType] = useState('all');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  const filtered = tasks.filter((t) => {
+  const filtered = useMemo(() => tasks.filter((t) => {
     if (filterChannel !== 'all' && t.channel !== Number(filterChannel)) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
     if (filterType !== 'all' && t.taskType !== filterType) return false;
     return true;
-  });
+  }), [tasks, filterChannel, filterPriority, filterType]);
 
   const selectStyle = {
     padding: '6px 10px',

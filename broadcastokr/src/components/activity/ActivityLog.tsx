@@ -35,8 +35,8 @@ export function ActivityLog({ log, open, onClose, theme }: ActivityLogProps) {
         {log.length === 0 ? (
           <div style={{ color: theme.textFaint, fontSize: 13, textAlign: 'center', padding: 40 }}>No activity yet</div>
         ) : (
-          log.map((entry, i) => (
-            <div key={i} style={{ padding: '10px 0', borderBottom: `1px solid ${theme.borderLight}`, display: 'flex', gap: 10 }}>
+          log.map((entry) => (
+            <div key={entry.id} style={{ padding: '10px 0', borderBottom: `1px solid ${theme.borderLight}`, display: 'flex', gap: 10 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: entry.color || '#4f46e5', marginTop: 5, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>{entry.text}</div>

@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
 import { USERS, TEAMS } from '../constants';
+import { safeUser } from '../utils/safeGet';
 import { Avatar } from '../components/ui/Avatar';
 import { ProgressBar } from '../components/ui/ProgressBar';
 
@@ -9,6 +11,8 @@ export function TeamPage() {
   const tasks = useStore((s) => s.tasks);
   const goals = useStore((s) => s.goals);
 
+  const now = useMemo(() => new Date(), [tasks]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Team Grid */}
@@ -16,7 +20,7 @@ export function TeamPage() {
         <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F465}'} Teams</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
           {TEAMS.map((team) => {
-            const memberUsers = team.members.map((id) => USERS[id]);
+            const memberUsers = team.members.map((id) => safeUser(USERS, id));
             const memberTasks = tasks.filter((t) => team.members.includes(t.assignee));
             const doneTasks = memberTasks.filter((t) => t.status === 'done').length;
             const progress = memberTasks.length ? doneTasks / memberTasks.length : 0;
@@ -54,7 +58,7 @@ export function TeamPage() {
             const userGoals = goals.filter((g) => g.owner === user.id);
             const doneTasks = userTasks.filter((t) => t.status === 'done').length;
             const inProgress = userTasks.filter((t) => t.status === 'in_progress').length;
-            const overdue = userTasks.filter((t) => t.status !== 'done' && new Date(t.due) < new Date()).length;
+            const overdue = userTasks.filter((t) => t.status !== 'done' && new Date(t.due) < now).length;
 
             return (
               <div key={user.id} style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 14, padding: 18 }}>

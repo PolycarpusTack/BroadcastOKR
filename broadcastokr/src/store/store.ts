@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Goal, Task, KPI, GoalStatus } from '../types';
+import type { Goal, Task, KPI } from '../types';
+import type { GoalStatus } from '../types';
 import { createInitialGoals, createInitialTasks, createInitialKPIs } from '../constants/seedData';
+
+function goalStatus(progress: number): GoalStatus {
+  if (progress >= 0.7) return 'on_track';
+  if (progress >= 0.4) return 'at_risk';
+  return 'behind';
+}
 
 interface AppStore {
   goals: Goal[];
@@ -48,11 +55,11 @@ export const useStore = create<AppStore>()(
             kr.progress = Math.min(Math.abs(kr.current - kr.start) / range, 1);
           }
 
-          kr.status = (kr.progress >= 0.7 ? 'on_track' : kr.progress >= 0.4 ? 'at_risk' : 'behind') as GoalStatus;
+          kr.status = goalStatus(kr.progress);
 
           const g = goals[goalIndex];
           g.progress = g.keyResults.reduce((sum, k) => sum + k.progress, 0) / g.keyResults.length;
-          g.status = (g.progress >= 0.7 ? 'on_track' : g.progress >= 0.4 ? 'at_risk' : 'behind') as GoalStatus;
+          g.status = goalStatus(g.progress);
 
           return { goals };
         }),

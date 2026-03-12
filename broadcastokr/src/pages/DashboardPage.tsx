@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
 import { CHANNELS, USERS } from '../constants';
@@ -15,17 +16,20 @@ export function DashboardPage() {
   const tasks = useStore((s) => s.tasks);
   const kpis = useStore((s) => s.kpis);
 
-  const activeTasks = tasks.filter((t) => t.status !== 'done');
-  const urgentTasks = activeTasks
-    .map((t) => ({ ...t, days: daysUntil(t.due) }))
-    .filter((t) => t.days <= 3)
-    .sort((a, b) => a.days - b.days)
-    .slice(0, 8);
+  const activeTasks = useMemo(() => tasks.filter((t) => t.status !== 'done'), [tasks]);
+  const urgentTasks = useMemo(() =>
+    activeTasks
+      .map((t) => ({ ...t, days: daysUntil(t.due) }))
+      .filter((t) => t.days <= 3)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 8),
+    [activeTasks]
+  );
 
-  const statusCounts = {
+  const statusCounts = useMemo(() => ({
     in_progress: tasks.filter((t) => t.status === 'in_progress').length,
     done: tasks.filter((t) => t.status === 'done').length,
-  };
+  }), [tasks]);
 
   const statCards = [
     { label: 'Total Goals', value: goals.length, icon: '\u{1F3AF}', color: '#4f46e5' },

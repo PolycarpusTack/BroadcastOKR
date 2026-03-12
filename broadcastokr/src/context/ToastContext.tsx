@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react';
 import type { Toast } from '../types';
 
 interface ToastContextValue {
@@ -18,8 +18,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2800);
   }, []);
 
+  const value = useMemo(() => ({ toasts, toast }), [toasts, toast]);
+
   return (
-    <ToastContext.Provider value={{ toasts, toast }}>
+    <ToastContext.Provider value={value}>
       {children}
     </ToastContext.Provider>
   );

@@ -1,7 +1,9 @@
 import type { UrgencyBadge } from '../types';
 
 export function daysUntil(dateStr: string): number {
-  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 864e5);
+  const time = new Date(dateStr).getTime();
+  if (Number.isNaN(time)) return 0;
+  return Math.ceil((time - Date.now()) / 864e5);
 }
 
 export function getUrgencyBadge(days: number, dark: boolean): UrgencyBadge {

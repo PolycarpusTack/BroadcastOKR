@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -33,11 +33,11 @@ export function GoalsPage() {
   const [newPeriod, setNewPeriod] = useState('Q1 2026');
   const [newKRs, setNewKRs] = useState([{ title: '', start: 0, target: 100 }]);
 
-  const filtered = goals.filter((g) => {
+  const filtered = useMemo(() => goals.filter((g) => {
     if (filterChannel !== 'all' && g.channel !== Number(filterChannel)) return false;
     if (filterStatus !== 'all' && g.status !== filterStatus) return false;
     return true;
-  });
+  }), [goals, filterChannel, filterStatus]);
 
   const selectStyle = {
     padding: '6px 10px',
@@ -50,9 +50,11 @@ export function GoalsPage() {
   };
 
   const handleCreate = () => {
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || newTitle.length > 200) return;
     const krs = newKRs.filter((kr) => kr.title.trim());
     if (krs.length === 0) return;
+    if (newChannel < 0 || newChannel >= CHANNELS.length) return;
+    if (newOwner < 0 || newOwner >= USERS.length) return;
     const goal: Goal = {
       id: nextGoalId(),
       title: newTitle.trim(),

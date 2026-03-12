@@ -33,7 +33,10 @@ export function CreateTaskModal({ open, onClose, onCreated, theme, selectStyle }
   const [subtaskText, setSubtaskText] = useState('');
 
   const handleCreate = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || title.length > 200) return;
+    if (channel < 0 || channel >= CHANNELS.length) return;
+    if (assignee < 0 || assignee >= USERS.length) return;
+    if (!due) return;
     const task: Task = {
       id: nextTaskId(),
       title: title.trim(),

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../store/store';
@@ -28,24 +29,39 @@ export function ReportsPage() {
   }
 
   const totalTasks = tasks.length;
-  const doneTasks = tasks.filter((t) => t.status === 'done').length;
+  const { doneTasks, overdueTasks, statusBreakdown, priorityBreakdown } = useMemo(() => {
+    const now = new Date();
+    const done = tasks.filter((t) => t.status === 'done').length;
+    const overdue = tasks.filter((t) => t.status !== 'done' && new Date(t.due) < now).length;
+    const statuses = Object.entries(STATUS_LABELS).map(([key, label]) => ({
+      status: key as TaskStatus,
+      label,
+      count: tasks.filter((t) => t.status === key).length,
+      color: STATUS_COLORS[key as TaskStatus],
+    }));
+    const priorities = Object.entries(PRIORITIES).map(([key, info]) => ({
+      priority: key as Priority,
+      label: info.label,
+      count: tasks.filter((t) => t.priority === key).length,
+      color: info.color,
+      icon: info.icon,
+    }));
+    return { doneTasks: done, overdueTasks: overdue, statusBreakdown: statuses, priorityBreakdown: priorities };
+  }, [tasks]);
   const completionRate = totalTasks ? doneTasks / totalTasks : 0;
-  const overdueTasks = tasks.filter((t) => t.status !== 'done' && new Date(t.due) < new Date()).length;
 
-  const statusBreakdown = Object.entries(STATUS_LABELS).map(([key, label]) => ({
-    status: key as TaskStatus,
-    label,
-    count: tasks.filter((t) => t.status === key).length,
-    color: STATUS_COLORS[key as TaskStatus],
-  }));
-
-  const priorityBreakdown = Object.entries(PRIORITIES).map(([key, info]) => ({
-    priority: key as Priority,
-    label: info.label,
-    count: tasks.filter((t) => t.priority === key).length,
-    color: info.color,
-    icon: info.icon,
-  }));
+  const channelCompliance = useMemo(() => {
+    const now = new Date();
+    return CHANNELS.map((ch, ci) => {
+      const chGoals = goals.filter((g) => g.channel === ci);
+      const chTasks = tasks.filter((t) => t.channel === ci);
+      const chDone = chTasks.filter((t) => t.status === 'done').length;
+      const chOverdue = chTasks.filter((t) => t.status !== 'done' && new Date(t.due) < now).length;
+      const avgProgress = chGoals.length ? chGoals.reduce((s, g) => s + g.progress, 0) / chGoals.length : 0;
+      const compliant = chOverdue === 0 && avgProgress >= 0.5;
+      return { ch, chDone, chOverdue, chTasks, avgProgress, compliant };
+    });
+  }, [goals, tasks]);
 
   const cardStyle = {
     background: theme.bgCard,
@@ -130,15 +146,7 @@ export function ReportsPage() {
         {/* Channel Compliance */}
         <div style={cardStyle}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u2696\uFE0F'} Channel Compliance</h3>
-          {CHANNELS.map((ch, ci) => {
-            const chGoals = goals.filter((g) => g.channel === ci);
-            const chTasks = tasks.filter((t) => t.channel === ci);
-            const chDone = chTasks.filter((t) => t.status === 'done').length;
-            const chOverdue = chTasks.filter((t) => t.status !== 'done' && new Date(t.due) < new Date()).length;
-            const avgProgress = chGoals.length ? chGoals.reduce((s, g) => s + g.progress, 0) / chGoals.length : 0;
-            const compliant = chOverdue === 0 && avgProgress >= 0.5;
-
-            return (
+          {channelCompliance.map(({ ch, chDone, chOverdue, chTasks, avgProgress, compliant }) => (
               <div key={ch.name} style={{ padding: '12px 14px', borderRadius: 10, background: compliant ? theme.compliantBg : theme.atRiskBg, border: `1px solid ${compliant ? theme.compliantBorder : theme.atRiskBorder}`, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <ChannelBadge channel={ch} />
@@ -152,8 +160,7 @@ export function ReportsPage() {
                   <span>{Math.round(avgProgress * 100)}% goal progress</span>
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       </div>
     </div>
