@@ -345,7 +345,7 @@ const Dashboard=({goals,tasks,kpis,th,dark})=>{
 
 const Goals=({goals,setGoals,th,perms,onOpenCreate,toast,logAction,currentUser})=>{
   const[exp,setExp]=React.useState(null);const[fS,sfS]=React.useState("all");const[fC,sfC]=React.useState("all");
-  const fl=goals.filter(g=>(fS==="all"||g.status===fS)&&(fC==="all"||g.channel===parseInt(fC)));
+  const fl=goals.filter(g=>(fS==="all"||g.status===fS)&&(fC==="all"||g.channel===Number(fC)));
   const checkIn=(gi,ki)=>{
     if(!perms.canCheckIn)return;
     const ng=JSON.parse(JSON.stringify(goals));const kr=ng[gi].keyResults[ki];
@@ -360,11 +360,11 @@ const Goals=({goals,setGoals,th,perms,onOpenCreate,toast,logAction,currentUser})
   return <div style={{display:"flex",flexDirection:"column",gap:16}}>
     <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
       <select value={fS} onChange={e=>sfS(e.target.value)} style={sSt(th)}><option value="all">All Statuses</option><option value="on_track">{"\u{1F7E2}"} On Track</option><option value="at_risk">{"\u{1F7E1}"} At Risk</option><option value="behind">{"\u{1F534}"} Behind</option></select>
-      <select value={fC} onChange={e=>sfC(e.target.value)} style={sSt(th)}><option value="all">All Channels</option>{CHANNELS.map((c,i)=><option key={i} value={i}>{c.icon} {c.name}</option>)}</select>
+      <select value={fC} onChange={e=>sfC(e.target.value)} style={sSt(th)}><option value="all">All Channels</option>{CHANNELS.map((c,i)=><option key={i} value={String(i)}>{c.icon} {c.name}</option>)}</select>
       <span style={{fontSize:12,color:th.textFaint,marginLeft:"auto"}}>{fl.length} objective{fl.length!==1?"s":""}</span>
       {perms.canCreate&&<button onClick={onOpenCreate} style={{padding:"6px 16px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New Goal</button>}
     </div>
-    {fl.map(goal=>{const ri=goals.indexOf(goal),isO=exp===goal.id;return <div key={goal.id} style={{background:th.bgCard,borderRadius:12,border:"1px solid "+th.border,overflow:"hidden"}}>
+    {fl.map(goal=>{const ri=goals.findIndex(g=>g.id===goal.id),isO=exp===goal.id;return <div key={goal.id} style={{background:th.bgCard,borderRadius:12,border:"1px solid "+th.border,overflow:"hidden"}}>
       <div onClick={()=>setExp(isO?null:goal.id)} style={{padding:"16px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
         <span style={{fontSize:18}}>{stI(goal.status)}</span>
         <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:700,color:th.text}}>{goal.title}</div><div style={{display:"flex",alignItems:"center",gap:8,marginTop:4,flexWrap:"wrap"}}><Av user={USERS[goal.owner]} size={20}/><span style={{fontSize:12,color:th.textMuted}}>{USERS[goal.owner].name}</span><ChB ch={CHANNELS[goal.channel]}/><span style={{fontSize:11,padding:"1px 6px",borderRadius:4,background:th.bgMuted,color:th.textMuted}}>{goal.period}</span></div></div>
@@ -385,7 +385,7 @@ const Goals=({goals,setGoals,th,perms,onOpenCreate,toast,logAction,currentUser})
 
 const Tasks=({tasks,setTasks,th,perms,onOpenCreate,dark,toast,logAction,currentUser})=>{
   const[view,setView]=React.useState("kanban");const[fT,sfT]=React.useState("all");const[fC,sfC]=React.useState("all");const[sel,setSel]=React.useState(null);
-  const fl=tasks.filter(t=>(fT==="all"||t.taskType===fT)&&(fC==="all"||t.channel===parseInt(fC)));
+  const fl=tasks.filter(t=>(fT==="all"||t.taskType===fT)&&(fC==="all"||t.channel===Number(fC)));
   const move=(id,st)=>{if(!perms.canChangeStatus)return;setTasks(p=>p.map(t=>t.id===id?{...t,status:st}:t));toast("\u{1F504} Status \u2192 "+SL[st],"#8b5cf6","\u{1F504}");logAction("Changed status to "+SL[st],currentUser.name,"#8b5cf6");};
   const togSub=(id,si)=>setTasks(p=>p.map(t=>{if(t.id!==id)return t;const s=[...t.subtasks];s[si]={...s[si],done:!s[si].done};return{...t,subtasks:s};}));
   const Card=({task:t})=>{const tt=TASK_TYPES.find(x=>x.key===t.taskType),sd=t.subtasks.filter(s=>s.done).length;
@@ -399,7 +399,7 @@ const Tasks=({tasks,setTasks,th,perms,onOpenCreate,dark,toast,logAction,currentU
     <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
       <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid "+th.border}}>{["kanban","list"].map(v=><button key={v} onClick={()=>setView(v)} style={{padding:"6px 14px",fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:view===v?"#4f46e5":th.bgCard,color:view===v?"#fff":th.textMuted}}>{v==="kanban"?"Board":"List"}</button>)}</div>
       <select value={fT} onChange={e=>sfT(e.target.value)} style={sSt(th)}><option value="all">All Types</option>{TASK_TYPES.map(t=><option key={t.key} value={t.key}>{t.icon} {t.label}</option>)}</select>
-      <select value={fC} onChange={e=>sfC(e.target.value)} style={sSt(th)}><option value="all">All Channels</option>{CHANNELS.map((c,i)=><option key={i} value={i}>{c.icon} {c.name}</option>)}</select>
+      <select value={fC} onChange={e=>sfC(e.target.value)} style={sSt(th)}><option value="all">All Channels</option>{CHANNELS.map((c,i)=><option key={i} value={String(i)}>{c.icon} {c.name}</option>)}</select>
       {perms.canCreate&&<button onClick={onOpenCreate} style={{marginLeft:"auto",padding:"6px 16px",borderRadius:8,border:"none",background:"#4f46e5",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>+ New Task</button>}
     </div>
     {view==="kanban"&&<div style={{display:"grid",gridTemplateColumns:"repeat("+SF.length+",minmax(200px,1fr))",gap:12,overflowX:"auto"}}>
@@ -492,9 +492,9 @@ const NAV=[{k:"dashboard",l:"Dashboard",i:"\u{1F4CA}"},{k:"goals",l:"Goals",i:"\
 
 function App(){
   const[page,setPage]=React.useState("dashboard");
-  const[goals,setGoals]=React.useState(initGoals);
-  const[tasks,setTasks]=React.useState(initTasks);
-  const[kpis]=React.useState(initKPIs);
+  const[goals,setGoals]=React.useState(()=>initGoals());
+  const[tasks,setTasks]=React.useState(()=>initTasks());
+  const[kpis]=React.useState(()=>initKPIs());
   const[user,setUser]=React.useState(USERS[0]);
   const[sbOpen,setSbOpen]=React.useState(true);
   const[dark,setDark]=React.useState(false);
