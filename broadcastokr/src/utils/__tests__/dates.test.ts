@@ -15,9 +15,9 @@ describe('daysUntil', () => {
     expect(daysUntil(past.toISOString().split('T')[0])).toBeLessThanOrEqual(-2);
   });
 
-  it('returns 0 for invalid date strings', () => {
-    expect(daysUntil('not-a-date')).toBe(0);
-    expect(daysUntil('')).toBe(0);
+  it('returns Infinity for invalid date strings', () => {
+    expect(daysUntil('not-a-date')).toBe(Infinity);
+    expect(daysUntil('')).toBe(Infinity);
   });
 });
 

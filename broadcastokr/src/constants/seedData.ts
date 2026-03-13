@@ -1,5 +1,11 @@
 import type { Goal, Task, KPI } from '../types';
 
+function futureDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d.toISOString().slice(0, 10);
+}
+
 export function createInitialGoals(): Goal[] {
   return [
     {
@@ -42,14 +48,14 @@ export function createInitialGoals(): Goal[] {
 
 export function createInitialTasks(): Task[] {
   return [
-    { id: 't1', title: "Clear rights for 'Undercover' S03 \u2014 VRT 1 prime-time", status: 'in_progress', priority: 'critical', assignee: 4, channel: 0, due: '2026-02-18', taskType: 'rights_clearance', subtasks: [{ text: 'Verify license window', done: true }, { text: 'Check holdback vs VRT MAX', done: false }, { text: 'Confirm music rights', done: false }] },
-    { id: 't2', title: 'EPG delivery for Week 9 \u2014 all channels', status: 'todo', priority: 'high', assignee: 5, channel: 2, due: '2026-02-19', taskType: 'epg_delivery', subtasks: [{ text: 'Validate synopsis completeness', done: false }, { text: 'Check thumbnail aspect ratios', done: false }] },
-    { id: 't3', title: "Schedule change: move 'Thuis' repeat to 14:30", status: 'review', priority: 'medium', assignee: 1, channel: 0, due: '2026-02-17', taskType: 'schedule_change', subtasks: [{ text: 'Check downstream EPG impact', done: true }, { text: 'Verify no rights conflict', done: true }, { text: 'Update promo schedule', done: false }] },
-    { id: 't4', title: 'Playout prep for live sports \u2014 Club Brugge vs Anderlecht', status: 'in_progress', priority: 'critical', assignee: 2, channel: 0, due: '2026-02-15', taskType: 'playout_prep', subtasks: [{ text: 'Confirm live feed routing', done: true }, { text: 'Test failover path', done: true }, { text: 'Prepare overrun buffer', done: false }] },
-    { id: 't5', title: 'AVMSD Q1 compliance snapshot', status: 'backlog', priority: 'high', assignee: 3, channel: 2, due: '2026-03-01', taskType: 'compliance_check', subtasks: [{ text: 'Calculate EU works % per channel', done: false }, { text: 'Verify independent production quota', done: false }] },
-    { id: 't6', title: 'QC check: new acquisition batch (12 titles)', status: 'todo', priority: 'medium', assignee: 2, channel: 2, due: '2026-02-21', taskType: 'content_qc', subtasks: [{ text: 'Audio loudness (EBU R128)', done: false }, { text: 'Subtitle sync verification', done: false }] },
-    { id: 't7', title: 'FAST channel loop schedule \u2014 Week 9', status: 'in_progress', priority: 'high', assignee: 1, channel: 3, due: '2026-02-17', taskType: 'schedule_change', subtasks: [{ text: 'Fill 18h content grid', done: true }, { text: 'No repeat within 4h window', done: false }, { text: 'SSAI marker placement', done: false }] },
-    { id: 't8', title: "Promo campaign: 'Spring Schedule' launch", status: 'backlog', priority: 'low', assignee: 5, channel: 0, due: '2026-03-10', taskType: 'promo', subtasks: [] },
+    { id: 't1', title: "Clear rights for 'Undercover' S03 \u2014 VRT 1 prime-time", status: 'in_progress', priority: 'critical', assignee: 4, channel: 0, due: futureDate(5), taskType: 'rights_clearance', subtasks: [{ text: 'Verify license window', done: true }, { text: 'Check holdback vs VRT MAX', done: false }, { text: 'Confirm music rights', done: false }] },
+    { id: 't2', title: 'EPG delivery for Week 9 \u2014 all channels', status: 'todo', priority: 'high', assignee: 5, channel: 2, due: futureDate(6), taskType: 'epg_delivery', subtasks: [{ text: 'Validate synopsis completeness', done: false }, { text: 'Check thumbnail aspect ratios', done: false }] },
+    { id: 't3', title: "Schedule change: move 'Thuis' repeat to 14:30", status: 'review', priority: 'medium', assignee: 1, channel: 0, due: futureDate(4), taskType: 'schedule_change', subtasks: [{ text: 'Check downstream EPG impact', done: true }, { text: 'Verify no rights conflict', done: true }, { text: 'Update promo schedule', done: false }] },
+    { id: 't4', title: 'Playout prep for live sports \u2014 Club Brugge vs Anderlecht', status: 'in_progress', priority: 'critical', assignee: 2, channel: 0, due: futureDate(2), taskType: 'playout_prep', subtasks: [{ text: 'Confirm live feed routing', done: true }, { text: 'Test failover path', done: true }, { text: 'Prepare overrun buffer', done: false }] },
+    { id: 't5', title: 'AVMSD Q1 compliance snapshot', status: 'backlog', priority: 'high', assignee: 3, channel: 2, due: futureDate(18), taskType: 'compliance_check', subtasks: [{ text: 'Calculate EU works % per channel', done: false }, { text: 'Verify independent production quota', done: false }] },
+    { id: 't6', title: 'QC check: new acquisition batch (12 titles)', status: 'todo', priority: 'medium', assignee: 2, channel: 2, due: futureDate(8), taskType: 'content_qc', subtasks: [{ text: 'Audio loudness (EBU R128)', done: false }, { text: 'Subtitle sync verification', done: false }] },
+    { id: 't7', title: 'FAST channel loop schedule \u2014 Week 9', status: 'in_progress', priority: 'high', assignee: 1, channel: 3, due: futureDate(4), taskType: 'schedule_change', subtasks: [{ text: 'Fill 18h content grid', done: true }, { text: 'No repeat within 4h window', done: false }, { text: 'SSAI marker placement', done: false }] },
+    { id: 't8', title: "Promo campaign: 'Spring Schedule' launch", status: 'backlog', priority: 'low', assignee: 5, channel: 0, due: futureDate(27), taskType: 'promo', subtasks: [] },
   ];
 }
 

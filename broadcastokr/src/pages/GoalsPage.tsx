@@ -73,8 +73,8 @@ export function GoalsPage() {
     setNewKRs([{ title: '', start: 0, target: 100 }]);
   };
 
-  const handleCheckIn = (goalIndex: number, krIndex: number, goalTitle: string) => {
-    checkIn(goalIndex, krIndex);
+  const handleCheckIn = (goalId: string, krIndex: number, goalTitle: string) => {
+    checkIn(goalId, krIndex);
     toast('Check-in recorded!', '#10b981', '\u{1F4CB}');
     logAction(`Check-in on "${goalTitle}" KR #${krIndex + 1}`, currentUser.name, '#10b981');
   };
@@ -111,7 +111,6 @@ export function GoalsPage() {
         <div style={{ textAlign: 'center', padding: 60, color: theme.textFaint, fontSize: 14 }}>No goals match your filters</div>
       ) : (
         filtered.map((goal) => {
-          const goalIndex = goals.findIndex((g) => g.id === goal.id);
           const isExpanded = expanded === goal.id;
           const owner = safeUser(USERS, goal.owner);
 
@@ -172,7 +171,7 @@ export function GoalsPage() {
                       </span>
                       {permissions.canCheckIn && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleCheckIn(goalIndex, ki, goal.title); }}
+                          onClick={(e) => { e.stopPropagation(); handleCheckIn(goal.id, ki, goal.title); }}
                           style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#10b981', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           Check In

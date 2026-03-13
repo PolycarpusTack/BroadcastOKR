@@ -17,18 +17,6 @@ export function ReportsPage() {
   const goals = useStore((s) => s.goals);
   const kpis = useStore((s) => s.kpis);
 
-  if (!permissions.canViewReports) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60, flexDirection: 'column', gap: 12 }}>
-        <span style={{ fontSize: 48 }}>{'\u{1F512}'}</span>
-        <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>Reports Restricted</div>
-        <div style={{ fontSize: 13, color: theme.textMuted, textAlign: 'center', maxWidth: 300 }}>
-          Switch to an owner or manager persona using the control panel.
-        </div>
-      </div>
-    );
-  }
-
   const totalTasks = tasks.length;
   const { doneTasks, overdueTasks, statusBreakdown, priorityBreakdown } = useMemo(() => {
     const now = new Date();
@@ -66,6 +54,18 @@ export function ReportsPage() {
   }, [goals, tasks]);
 
   const cardStyle = makeCardStyle(theme);
+
+  if (!permissions.canViewReports) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60, flexDirection: 'column', gap: 12 }}>
+        <span style={{ fontSize: 48 }}>{'\u{1F512}'}</span>
+        <div style={{ fontSize: 16, fontWeight: 700, color: theme.text }}>Reports Restricted</div>
+        <div style={{ fontSize: 13, color: theme.textMuted, textAlign: 'center', maxWidth: 300 }}>
+          Switch to an owner or manager persona using the control panel.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

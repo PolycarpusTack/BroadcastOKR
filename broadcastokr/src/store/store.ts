@@ -18,7 +18,7 @@ interface AppStore {
   // Goals
   addGoal: (goal: Goal) => void;
   setGoals: (goals: Goal[]) => void;
-  checkIn: (goalIndex: number, krIndex: number) => void;
+  checkIn: (goalId: string, krIndex: number) => void;
 
   // Tasks
   addTask: (task: Task) => void;
@@ -38,10 +38,12 @@ export const useStore = create<AppStore>()(
       addGoal: (goal) => set((s) => ({ goals: [goal, ...s.goals] })),
       setGoals: (goals) => set({ goals }),
 
-      checkIn: (goalIndex, krIndex) =>
+      checkIn: (goalId, krIndex) =>
         set((s) => {
           const goals = structuredClone(s.goals);
-          const kr = goals[goalIndex].keyResults[krIndex];
+          const goalIdx = goals.findIndex((g) => g.id === goalId);
+          if (goalIdx === -1) return {};
+          const kr = goals[goalIdx].keyResults[krIndex];
           const range = Math.abs(kr.target - kr.start);
 
           if (range === 0) {
@@ -57,7 +59,7 @@ export const useStore = create<AppStore>()(
 
           kr.status = goalStatus(kr.progress);
 
-          const g = goals[goalIndex];
+          const g = goals[goalIdx];
           g.progress = g.keyResults.reduce((sum, k) => sum + k.progress, 0) / g.keyResults.length;
           g.status = goalStatus(g.progress);
 

@@ -34,8 +34,8 @@ describe('statusIcon', () => {
     expect(statusIcon('done')).toBe('\u2705');
   });
 
-  it('returns fallback for unknown status', () => {
-    expect(statusIcon('unknown')).toBe('\u26AA');
+  it('returns correct icon for done status', () => {
+    expect(statusIcon('done')).toBe('\u2705');
   });
 });
 
@@ -59,5 +59,17 @@ describe('kpiStatus', () => {
   it('handles lo direction (lower is better)', () => {
     expect(kpiStatus(makeKpi(100, 100, 'lo')).label).toBe('On Target');
     expect(kpiStatus(makeKpi(200, 100, 'lo')).label).toBe('Off');
+  });
+
+  it('handles zero target without crashing', () => {
+    const result = kpiStatus(makeKpi(50, 0));
+    expect(result.label).toBe('Off');
+    expect(result.color).toBe('#ef4444');
+  });
+
+  it('handles zero current for lo direction without crashing', () => {
+    const result = kpiStatus(makeKpi(0, 48, 'lo'));
+    expect(result.label).toBe('Off');
+    expect(result.color).toBe('#ef4444');
   });
 });

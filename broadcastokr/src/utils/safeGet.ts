@@ -17,8 +17,8 @@ const FALLBACK_CHANNEL: Channel = {
   icon: '\u2753',
 };
 
-export function safeUser(users: User[], index: number): User {
-  return users[index] ?? FALLBACK_USER;
+export function safeUser(users: User[], id: number): User {
+  return users.find((u) => u.id === id) ?? FALLBACK_USER;
 }
 
 export function safeChannel(channels: Channel[], index: number): Channel {

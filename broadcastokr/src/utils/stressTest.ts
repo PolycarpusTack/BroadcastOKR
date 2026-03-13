@@ -1,6 +1,8 @@
 import type { Task, Priority } from '../types';
 import { STATUS_FLOW } from '../constants/statuses';
 import { TASK_TYPES } from '../constants/taskTypes';
+import { USERS } from '../constants/users';
+import { CHANNELS } from '../constants/channels';
 import { nextStressTaskId } from './ids';
 
 const STRESS_TITLES = [
@@ -44,8 +46,8 @@ export function generateStressTasks(count: number): Task[] {
       title,
       status: randEl(STATUS_FLOW),
       priority: randEl(priorities),
-      assignee: randInt(0, 5),
-      channel: randInt(0, 3),
+      assignee: randInt(0, USERS.length - 1),
+      channel: randInt(0, CHANNELS.length - 1),
       due: d.toISOString().slice(0, 10),
       taskType: randEl(TASK_TYPES).key,
       subtasks: Array.from({ length: randInt(0, 4) }, (_, j) => ({

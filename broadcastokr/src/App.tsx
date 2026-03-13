@@ -21,6 +21,7 @@ export default function App() {
           <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
           <Route path="/team" element={<TeamPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </ErrorBoundary>
     </AppShell>

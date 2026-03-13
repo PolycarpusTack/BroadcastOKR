@@ -6,6 +6,16 @@ interface SparkLineProps {
 }
 
 export function SparkLine({ data, color, w = 80, h = 28 }: SparkLineProps) {
+  if (data.length === 0) return <svg width={w} height={h} />;
+  if (data.length === 1) {
+    const cy = h / 2;
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
+        <circle cx={w / 2} cy={cy} r="3" fill={color} />
+      </svg>
+    );
+  }
+
   const mn = Math.min(...data);
   const mx = Math.max(...data);
   const rn = mx - mn || 1;

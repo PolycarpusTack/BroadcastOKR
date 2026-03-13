@@ -20,7 +20,11 @@ export function CreateTaskModal({ open, onClose, onCreated, theme, selectStyle }
   const [priority, setPriority] = useState<Priority>('medium');
   const [type, setType] = useState('schedule_change');
   const [assignee, setAssignee] = useState(0);
-  const [due, setDue] = useState('2026-03-15');
+  const [due, setDue] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [subtaskText, setSubtaskText] = useState('');
 

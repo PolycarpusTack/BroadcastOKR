@@ -10,8 +10,8 @@ export function progressColor(progress: number): string {
   return '#ef4444';
 }
 
-export function statusIcon(status: GoalStatus | string): string {
-  const icons: Record<string, string> = {
+export function statusIcon(status: GoalStatus): string {
+  const icons: Record<GoalStatus, string> = {
     on_track: '\u{1F7E2}',
     at_risk: '\u{1F7E1}',
     behind: '\u{1F534}',
@@ -31,6 +31,8 @@ export function roleColor(role: Role): string {
 }
 
 export function kpiStatus(kpi: KPI): KPIStatus {
+  const divisor = kpi.direction === 'hi' ? kpi.target : kpi.current;
+  if (divisor === 0) return { label: 'Off', color: '#ef4444' };
   const ratio = kpi.direction === 'hi' ? kpi.current / kpi.target : kpi.target / kpi.current;
   if (ratio >= 0.98) return { label: 'On Target', color: '#10b981' };
   if (ratio >= 0.9) return { label: 'Near', color: '#f59e0b' };

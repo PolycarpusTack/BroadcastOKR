@@ -1,6 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Theme, RolePermissions } from '../../types';
 
+function currentQuarter(): string {
+  const now = new Date();
+  const q = Math.ceil((now.getMonth() + 1) / 3);
+  return `Q${q} ${now.getFullYear()}`;
+}
+
 const PAGE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
   '/dashboard': { icon: '\u{1F4CA}', label: 'Dashboard', desc: 'Channel health, KPIs, and operational overview' },
   '/goals': { icon: '\u{1F3AF}', label: 'Goals', desc: 'OKR objectives and key results by channel' },
@@ -56,7 +62,7 @@ export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu }: 
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ padding: '4px 10px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.border}`, fontSize: 11, color: theme.textMuted }}>
-          Q1 2026
+          {currentQuarter()}
         </span>
         <span aria-label={`${taskCount} tasks total`} style={{ padding: '4px 10px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.border}`, fontSize: 11, color: theme.textMuted }}>
           {taskCount} tasks

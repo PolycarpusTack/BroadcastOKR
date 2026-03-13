@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { Theme, ActivityEntry } from '../../types';
 
 interface ActivityLogProps {
@@ -8,6 +9,15 @@ interface ActivityLogProps {
 }
 
 export function ActivityLog({ log, open, onClose, theme }: ActivityLogProps) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (

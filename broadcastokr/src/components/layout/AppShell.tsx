@@ -21,7 +21,7 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
   const { currentUser, setCurrentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { log, logAction } = useActivityLog();
-  const tasks = useStore((s) => s.tasks);
+  const taskCount = useStore((s) => s.tasks.length);
   const addBulkTasks = useStore((s) => s.addBulkTasks);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -64,7 +64,7 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
 
       {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (
-        <div className="sidebar-mobile-overlay" style={{ display: 'none' }}>
+        <div className="sidebar-mobile-overlay">
           <div
             onClick={closeMobileSidebar}
             onKeyDown={(e) => { if (e.key === 'Escape') closeMobileSidebar(); }}
@@ -89,7 +89,7 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
       <main id="main-content" role="main" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         <Header
           theme={theme}
-          taskCount={tasks.length}
+          taskCount={taskCount}
           perms={permissions}
           onCreateTask={onCreateTask || (() => {})}
           onMobileMenu={() => setMobileSidebarOpen(true)}
@@ -99,21 +99,23 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
 
       <ActivityLog log={log} open={logOpen} onClose={() => setLogOpen(false)} theme={theme} />
       <ToastContainer />
-      <PersonaPanel
-        currentUser={currentUser}
-        setCurrentUser={(u) => {
-          setCurrentUser(u);
-          toast(`Switched to ${u.name}`, '#8b5cf6', '\u{1F464}');
-          logAction(`Persona switched to ${u.name} (${u.role})`, u.name, '#8b5cf6');
-        }}
-        dark={dark}
-        setDark={(d) => {
-          setDark(d);
-          toast(d ? 'Dark mode enabled' : 'Light mode enabled', d ? '#1e293b' : '#f59e0b', d ? '\u{1F319}' : '\u2600\uFE0F');
-        }}
-        theme={theme}
-        onStress={handleStress}
-      />
+      {import.meta.env.DEV && (
+        <PersonaPanel
+          currentUser={currentUser}
+          setCurrentUser={(u) => {
+            setCurrentUser(u);
+            toast(`Switched to ${u.name}`, '#8b5cf6', '\u{1F464}');
+            logAction(`Persona switched to ${u.name} (${u.role})`, u.name, '#8b5cf6');
+          }}
+          dark={dark}
+          setDark={(d) => {
+            setDark(d);
+            toast(d ? 'Dark mode enabled' : 'Light mode enabled', d ? '#1e293b' : '#f59e0b', d ? '\u{1F319}' : '\u2600\uFE0F');
+          }}
+          theme={theme}
+          onStress={handleStress}
+        />
+      )}
     </div>
   );
 }

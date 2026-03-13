@@ -1,15 +1,11 @@
-let taskCounter = 9;
-let goalCounter = 5;
-let stressCounter = 0;
-
 export function nextTaskId(): string {
-  return `t${taskCounter++}`;
+  return `t-${crypto.randomUUID().slice(0, 8)}`;
 }
 
 export function nextGoalId(): string {
-  return `g${goalCounter++}`;
+  return `g-${crypto.randomUUID().slice(0, 8)}`;
 }
 
 export function nextStressTaskId(): string {
-  return `ts${stressCounter++}`;
+  return `ts-${crypto.randomUUID().slice(0, 8)}`;
 }

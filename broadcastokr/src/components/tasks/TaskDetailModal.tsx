@@ -17,10 +17,8 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ taskId, onClose, onMove, permissions, theme, dark }: TaskDetailModalProps) {
-  const tasks = useStore((s) => s.tasks);
+  const task = useStore((s) => taskId ? s.tasks.find((t) => t.id === taskId) ?? null : null);
   const toggleSubtask = useStore((s) => s.toggleSubtask);
-
-  const task = taskId ? tasks.find((t) => t.id === taskId) ?? null : null;
 
   return (
     <Modal open={!!task} onClose={onClose} title={task?.title || ''} theme={theme} width={560}>
