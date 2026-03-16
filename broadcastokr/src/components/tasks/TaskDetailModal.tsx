@@ -154,7 +154,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
   );
 
   const editAllScopedChannels = useMemo(
-    () => editSelectedClientsData.flatMap((c) => c.channels.map((ch) => ({ ...ch, clientId: c.id, clientName: c.name, clientColor: c.color }))),
+    () => editSelectedClientsData.flatMap((c) => (c.channels || []).map((ch) => ({ ...ch, clientId: c.id, clientName: c.name, clientColor: c.color }))),
     [editSelectedClientsData],
   );
 
@@ -229,7 +229,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
                   />
                   <span style={{ width: 9, height: 9, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>{c.name}</span>
-                  <span style={{ fontSize: 10, color: theme.textFaint }}>{c.channels.length} ch</span>
+                  <span style={{ fontSize: 10, color: theme.textFaint }}>{(c.channels || []).length} ch</span>
                 </label>
               ))}
             </div>
@@ -238,7 +238,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
 
         <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <div style={labelStyle}>Channel</div>
+            <div style={labelStyle}>{editClientsSelected ? 'Channels' : 'Category'}</div>
             {!editClientsSelected ? (
               <select value={editChannel} onChange={(e) => setEditChannel(Number(e.target.value))} style={selectStyle}>
                 {CHANNELS.map((ch, i) => <option key={i} value={i}>{ch.icon} {ch.name}</option>)}
@@ -308,7 +308,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
             <div style={labelStyle}>Select Channels</div>
             <div style={{ maxHeight: 160, overflowY: 'auto', borderRadius: 8, border: `1px solid ${theme.borderLight}`, background: theme.bgMuted }}>
               {editSelectedClientsData.map((client) => {
-                if (client.channels.length === 0) return null;
+                if ((client.channels || []).length === 0) return null;
                 return (
                   <div key={client.id}>
                     <div style={{
@@ -325,7 +325,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: client.color, flexShrink: 0 }} />
                       {client.name}
                     </div>
-                    {client.channels.map((ch) => (
+                    {(client.channels || []).map((ch) => (
                       <label
                         key={ch.id}
                         style={{

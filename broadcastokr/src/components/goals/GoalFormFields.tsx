@@ -136,7 +136,7 @@ export function GoalFormFields({
   );
 
   const allScopedChannels = useMemo(
-    () => selectedClientsData.flatMap((c) => c.channels.map((ch) => ({ ...ch, clientId: c.id, clientName: c.name, clientColor: c.color }))),
+    () => selectedClientsData.flatMap((c) => (c.channels || []).map((ch) => ({ ...ch, clientId: c.id, clientName: c.name, clientColor: c.color }))),
     [selectedClientsData],
   );
 
@@ -280,7 +280,7 @@ export function GoalFormFields({
                         />
                         <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>{c.name}</span>
-                        <span style={{ fontSize: 10, color: theme.textFaint }}>{c.channels.length} ch</span>
+                        <span style={{ fontSize: 10, color: theme.textFaint }}>{(c.channels || []).length} ch</span>
                       </label>
                     ))
                   )}
@@ -300,11 +300,11 @@ export function GoalFormFields({
       )}
 
       <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        {/* Channel: legacy static dropdown when no clients, scope selector when clients selected */}
+        {/* Channel: category dropdown when no clients, scope selector when clients selected */}
         <div>
-          <label style={labelStyle}>Channel</label>
+          <label style={labelStyle}>{clientsSelected ? 'Channels' : 'Category'}</label>
           {!clientsSelected ? (
-            <select aria-label="Channel" value={channel} onChange={(e) => setChannel(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
+            <select aria-label="Category" value={channel} onChange={(e) => setChannel(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
               {CHANNELS.map((ch, i) => <option key={i} value={i}>{ch.icon} {ch.name}</option>)}
             </select>
           ) : (
@@ -395,7 +395,7 @@ export function GoalFormFields({
           </div>
           <div style={{ maxHeight: 200, overflowY: 'auto', borderRadius: 8, border: `1px solid ${theme.borderLight}`, background: theme.bgMuted }}>
             {selectedClientsData.map((client) => {
-              const clientChannels = client.channels.filter((ch) =>
+              const clientChannels = (client.channels || []).filter((ch) =>
                 ch.name.toLowerCase().includes(channelSearch.toLowerCase()),
               );
               if (clientChannels.length === 0) return null;

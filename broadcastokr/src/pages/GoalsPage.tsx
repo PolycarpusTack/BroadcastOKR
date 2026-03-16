@@ -601,8 +601,8 @@ export function GoalsPage({
                         />
                       ) : (
                         goal.channelScope.channelIds.map((chId) => {
-                          const ownerClient = clients.find((c) => c.channels.some((ch) => ch.id === chId));
-                          const chInfo = ownerClient?.channels.find((ch) => ch.id === chId);
+                          const ownerClient = clients.find((c) => (c.channels || []).some((ch) => ch.id === chId));
+                          const chInfo = (ownerClient?.channels || []).find((ch) => ch.id === chId);
                           return chInfo ? (
                             <PillBadge
                               key={chId}
