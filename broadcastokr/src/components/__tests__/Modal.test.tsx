@@ -68,7 +68,7 @@ describe('Modal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('has aria-modal and aria-label', () => {
+  it('has aria-modal and aria-labelledby', () => {
     render(
       <Modal open onClose={() => {}} title="Accessible Modal" theme={theme}>
         <p>Content</p>
@@ -76,6 +76,8 @@ describe('Modal', () => {
     );
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveAttribute('aria-label', 'Accessible Modal');
+    expect(dialog).toHaveAttribute('aria-labelledby');
+    const labelId = dialog.getAttribute('aria-labelledby')!;
+    expect(document.getElementById(labelId)?.textContent).toBe('Accessible Modal');
   });
 });

@@ -1,4 +1,5 @@
 import type { UrgencyBadge } from '../types';
+import { COLOR_DANGER, COLOR_WARNING } from '../constants/config';
 
 export function daysUntil(dateStr: string): number {
   const time = new Date(dateStr).getTime();
@@ -6,14 +7,14 @@ export function daysUntil(dateStr: string): number {
   return Math.ceil((time - Date.now()) / 864e5);
 }
 
-export function getUrgencyBadge(days: number, dark: boolean): UrgencyBadge {
-  if (!Number.isFinite(days)) return { text: '--', bg: dark ? '#334155' : '#e2e8f0', fg: dark ? '#94a3b8' : '#64748b', pulse: false };
-  if (days < 0) return { text: `${Math.abs(days)}d overdue`, bg: '#dc2626', fg: '#fff', pulse: true };
-  if (days === 0) return { text: 'TODAY', bg: '#ef4444', fg: '#fff', pulse: true };
-  if (days === 1) return { text: 'Tomorrow', bg: '#f97316', fg: '#fff', pulse: false };
-  if (days <= 3) return { text: `${days}d`, bg: '#f59e0b', fg: '#fff', pulse: false };
-  if (days <= 7) return { text: `${days}d`, bg: dark ? '#854d0e' : '#fbbf24', fg: dark ? '#fbbf24' : '#1c1917', pulse: false };
-  return { text: `${days}d`, bg: dark ? '#334155' : '#e2e8f0', fg: dark ? '#94a3b8' : '#64748b', pulse: false };
+export function getUrgencyBadge(days: number, _dark: boolean): UrgencyBadge {
+  if (!Number.isFinite(days)) return { text: '--', bg: '#1C2333', fg: '#5E6F8A', pulse: false };
+  if (days < 0) return { text: `${Math.abs(days)}d overdue`, bg: COLOR_DANGER, fg: '#fff', pulse: true };
+  if (days === 0) return { text: 'TODAY', bg: COLOR_DANGER, fg: '#fff', pulse: true };
+  if (days === 1) return { text: 'Tomorrow', bg: COLOR_WARNING, fg: '#000', pulse: false };
+  if (days <= 3) return { text: `${days}d`, bg: COLOR_WARNING, fg: '#000', pulse: false };
+  if (days <= 7) return { text: `${days}d`, bg: '#78490A', fg: COLOR_WARNING, pulse: false };
+  return { text: `${days}d`, bg: '#1C2333', fg: '#5E6F8A', pulse: false };
 }
 
 export function formatTime(): string {

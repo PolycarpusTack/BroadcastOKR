@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BroadcastOKR — Client Channels Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cobalt: #3805E3;
+    --cobalt-mid: #5B33F0;
+    --cobalt-light: #7C5CFF;
+    --bg: #0F1729;
+    --bg-card: #1A2332;
+    --bg-card-hover: #1F2D45;
+    --bg-input: #141E2E;
+    --bg-muted: #151F30;
+    --border: #2A3855;
+    --border-light: #253045;
+    --border-input: #2E3F5C;
+    --text: #E8EDF5;
+    --text-secondary: #B0BDD0;
+    --text-muted: #7A8BA5;
+    --text-faint: #4A5B73;
+    --success: #2DD4BF;
+    --warning: #F59E0B;
+    --danger: #F87171;
+    --info: #60A5FA;
+    --overlay: rgba(5, 10, 20, 0.8);
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    width: 240px;
+    background: #111B2A;
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    flex-shrink: 0;
+  }
+
+  .sidebar-brand {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sidebar-brand .icon {
+    width: 32px; height: 32px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--cobalt), var(--cobalt-mid));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .sidebar-brand h1 {
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: 700;
+    color: #F0F4FF;
+    letter-spacing: -0.4px;
+  }
+
+  .sidebar-brand .sub {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: #3D4F68;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .nav { padding: 12px 0; }
+  .nav-label {
+    padding: 6px 20px 8px;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #3D4F68;
+    font-weight: 600;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 18px;
+    margin: 1px 10px;
+    border-radius: 6px;
+    color: #5E6F8A;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .12s;
+    position: relative;
+    text-decoration: none;
+  }
+
+  .nav-item:hover { background: #1A2332; color: var(--cobalt-mid); }
+  .nav-item.active {
+    background: #2A3855;
+    color: var(--cobalt-mid);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: -10px; top: 50%;
+    transform: translateY(-50%);
+    width: 3px; height: 16px;
+    background: var(--cobalt);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .main { flex: 1; padding: 28px 32px; overflow-y: auto; }
+
+  /* ── Page Header ── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .page-title {
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    border: none; border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .btn-primary { background: var(--cobalt); color: #fff; }
+  .btn-primary:hover { background: var(--cobalt-mid); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .btn-ghost:hover { border-color: var(--cobalt); color: var(--cobalt-light); }
+  .btn-success { background: var(--success); color: #0F1729; }
+  .btn-success:hover { opacity: 0.9; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    transition: border-color .15s;
+  }
+
+  .card:hover { border-color: var(--cobalt); }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── Client Card ── */
+  .client-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .client-card .accent {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+
+  .client-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .color-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .client-name {
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .health-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-left: auto;
+  }
+
+  .health-dot.green { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .health-dot.red { background: var(--danger); }
+  .health-dot.gray { background: #555; }
+
+  .client-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .client-meta .conn-name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  /* ── Pills / Badges ── */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .pill-channel {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: default;
+  }
+
+  .channel-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .tag-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .client-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn .2s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  .modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 560px;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideUp .25s ease;
+    box-shadow: 0 25px 60px rgba(0,0,0,.5);
+  }
+
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title {
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .modal-close {
+    background: none; border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: var(--bg-muted); color: var(--text); }
+
+  .modal-body { padding: 20px 24px; }
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ── Form ── */
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .form-input, .form-select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-input);
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-body);
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .form-input:focus, .form-select:focus { border-color: var(--cobalt); }
+
+  .form-select { cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237A8BA5' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  .form-hint {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 4px;
+  }
+
+  /* ── Channel Scope Section ── */
+  .channel-scope {
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .scope-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .scope-header .icon { font-size: 14px; }
+  .scope-header .label {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .radio-group {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .radio-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: all .12s;
+  }
+
+  .radio-btn.active {
+    background: var(--cobalt);
+    border-color: var(--cobalt);
+    color: #fff;
+  }
+
+  .radio-btn:not(.active):hover {
+    border-color: var(--cobalt);
+    color: var(--text);
+  }
+
+  /* ── Channel Multi-Select ── */
+  .channel-select {
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    background: var(--bg-input);
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .channel-search {
+    position: sticky;
+    top: 0;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .channel-search input {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+    font-family: var(--font-body);
+    outline: none;
+  }
+
+  .channel-search input:focus { border-color: var(--cobalt); }
+
+  .channel-actions {
+    padding: 4px 10px;
+    display: flex;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .channel-actions a {
+    font-size: 11px;
+    color: var(--cobalt-light);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .channel-actions a:hover { text-decoration: underline; }
+
+  .channel-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: background .1s;
+  }
+
+  .channel-item:hover { background: var(--bg-card-hover); }
+
+  .channel-item input[type="checkbox"] {
+    accent-color: var(--cobalt);
+    width: 14px; height: 14px;
+    cursor: pointer;
+  }
+
+  .channel-item .ch-color {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .channel-item .ch-name {
+    font-size: 12px;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .channel-item .ch-kind {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+  }
+
+  .selected-count {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 8px;
+    font-family: var(--font-mono);
+  }
+
+  /* ── Demo Tabs ── */
+  .demo-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 32px;
+    padding: 4px;
+    background: var(--bg-muted);
+    border-radius: 8px;
+    width: fit-content;
+  }
+
+  .demo-tab {
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .12s;
+  }
+
+  .demo-tab.active {
+    background: var(--cobalt);
+    color: #fff;
+  }
+
+  .demo-tab:not(.active):hover { color: var(--text); }
+
+  .demo-section { display: none; }
+  .demo-section.active { display: block; }
+
+  /* ── Goal Card Channel Display ── */
+  .goal-card { margin-bottom: 12px; }
+  .goal-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .goal-title {
+    font-family: var(--font-heading);
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .goal-client-badge {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--cobalt-light);
+    background: rgba(56, 5, 227, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .goal-channel-scope {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .scope-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .3s ease;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="icon">&#x1F4E1;</div>
+      <div>
+        <h1>BroadcastOKR</h1>
+        <div class="sub">Operations Goals</div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Navigation</div>
+      <div class="nav-item">&#x1F4CA; Dashboard</div>
+      <div class="nav-item active">&#x1F3AF; Goals</div>
+      <div class="nav-item">&#x1F50D; Compare</div>
+      <div class="nav-item">&#x2705; Tasks</div>
+      <div class="nav-item">&#x1F465; Team</div>
+      <div class="nav-item">&#x1F3E2; Clients</div>
+      <div class="nav-item">&#x1F4C8; Reports</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="page-header">
+      <h2 class="page-title">Client Channels Mockup</h2>
+    </div>
+
+    <!-- Demo navigation -->
+    <div class="demo-tabs">
+      <button class="demo-tab active" onclick="showSection('goal-modal')">Goal Modal</button>
+      <button class="demo-tab" onclick="showSection('client-page')">Client Page</button>
+      <button class="demo-tab" onclick="showSection('goal-cards')">Goal Cards</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SECTION 1: Goal Modal with Client/Channel -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="goal-modal" class="demo-section active">
+      <div style="max-width: 560px;">
+        <div class="modal" style="position: relative; animation: none;">
+          <div class="modal-header">
+            <div class="modal-title">Create Goal</div>
+            <button class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <!-- Title -->
+            <div class="form-group">
+              <label class="form-label">Title</label>
+              <input class="form-input" value="HC - Long Term Planning" />
+            </div>
+
+            <!-- Client Dropdown -->
+            <div class="form-group">
+              <label class="form-label">Client</label>
+              <select class="form-select" id="clientSelect" onchange="onClientChange()">
+                <option value="">No client (internal goal)</option>
+                <option value="vrt" selected>&#x1F7E3; VRT</option>
+                <option value="rtbf">&#x1F535; RTBF</option>
+                <option value="ch4">&#x1F7E2; Channel 4</option>
+                <option value="ard">&#x1F7E1; ARD</option>
+              </select>
+              <div class="form-hint">Select a client to scope this goal to their database channels</div>
+            </div>
+
+            <!-- Channel Scope (Client mode) -->
+            <div id="channelScopeSection" class="form-group">
+              <label class="form-label">Channels</label>
+              <div class="channel-scope">
+                <div class="scope-header">
+                  <span class="icon">&#x1F4E1;</span>
+                  <span class="label">VRT Channels</span>
+                  <span style="margin-left: auto; font-size: 10px; color: var(--text-faint); font-family: var(--font-mono);">8 channels loaded</span>
+                </div>
+
+                <div class="radio-group">
+                  <button class="radio-btn active" id="radioAll" onclick="setScope('all')">All Channels</button>
+                  <button class="radio-btn" id="radioSelect" onclick="setScope('selected')">Select Channels</button>
+                </div>
+
+                <!-- Multi-select (hidden by default) -->
+                <div id="channelMultiSelect" style="display: none;">
+                  <div class="channel-select">
+                    <div class="channel-search">
+                      <input placeholder="Search channels..." oninput="filterChannels(this.value)" />
+                    </div>
+                    <div class="channel-actions">
+                      <a onclick="selectAll(true)">Select All</a>
+                      <a onclick="selectAll(false)">Deselect All</a>
+                    </div>
+                    <div id="channelList">
+                      <!-- Populated by JS -->
+                    </div>
+                  </div>
+                  <div class="selected-count" id="selectedCount">3 of 8 channels selected</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Legacy Channel (hidden when client selected) -->
+            <div id="legacyChannelSection" class="form-group" style="display: none;">
+              <label class="form-label">Channel</label>
+              <select class="form-select">
+                <option>VRT 1</option>
+                <option>Canvas</option>
+                <option>Ketnet</option>
+                <option>Sporza</option>
+              </select>
+            </div>
+
+            <!-- Owner -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label class="form-label">Owner</label>
+                <select class="form-select">
+                  <option>Yannick Verrydt</option>
+                  <option>Andrew Stanton</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Period</label>
+                <select class="form-select">
+                  <option>Q1 2026</option>
+                  <option>Q2 2026</option>
+                  <option selected>Annual 2026</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- KRs preview -->
+            <div class="form-group">
+              <label class="form-label">Key Results</label>
+              <div style="background: var(--bg-muted); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 11px; color: var(--success);">&#x25CF;</span>
+                  <span style="font-size: 12px; font-weight: 500;">Rights Coverage</span>
+                  <span style="margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">0% → 95% target</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 11px; color: var(--info);">&#x25CF;</span>
+                  <span style="font-size: 12px; font-weight: 500;">Media Coverage</span>
+                  <span style="margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">0% → 90% target</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 11px; color: var(--warning);">&#x25CF;</span>
+                  <span style="font-size: 12px; font-weight: 500;">Schedule Lead Time</span>
+                  <span style="margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">0 → 30 days target</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-primary">Create Goal</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SECTION 2: Client Page with Channels -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="client-page" class="demo-section">
+      <div class="page-header">
+        <div>
+          <h2 class="page-title" style="font-size: 18px;">Clients</h2>
+          <div style="font-size: 11px; color: var(--text-faint); margin-top: 2px;">4 clients configured</div>
+        </div>
+        <button class="btn btn-primary">+ Add Client</button>
+      </div>
+
+      <div class="card-grid">
+        <!-- VRT -->
+        <div class="card client-card">
+          <div class="accent" style="background: #3805E3;"></div>
+          <div class="client-card-header">
+            <div class="color-dot" style="background: #3805E3;"></div>
+            <div class="client-name">VRT</div>
+            <div class="health-dot green" title="Connected"></div>
+          </div>
+          <div class="client-meta">
+            <span class="conn-name">whatson-vrt-test</span>
+            <span style="color: var(--text-faint);">&#x2022;</span>
+            <span>3 templates active</span>
+          </div>
+          <div class="tag-pills">
+            <span class="pill" style="background: rgba(56,5,227,0.15); color: var(--cobalt-light);">tier-1</span>
+            <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">europe</span>
+            <span class="pill" style="background: rgba(96,165,250,0.15); color: var(--info);">oracle</span>
+          </div>
+          <!-- Channels -->
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>&#x1F4E1;</span>
+            <span style="font-family: var(--font-heading); font-weight: 600;">8 channels</span>
+          </div>
+          <div class="channel-pills">
+            <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25);">VRT 1</span>
+            <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">Canvas</span>
+            <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">Ketnet</span>
+            <span class="pill-channel" style="background: rgba(248,113,113,0.12); color: #FF9B9B; border: 1px solid rgba(248,113,113,0.25);">Sporza</span>
+            <span class="pill-channel" style="background: rgba(96,165,250,0.12); color: #8BB8FC; border: 1px solid rgba(96,165,250,0.25);">VRTMAX</span>
+            <span class="pill-channel" style="background: rgba(167,139,250,0.12); color: #BCA8FC; border: 1px solid rgba(167,139,250,0.25);">VRT NWS</span>
+            <span class="pill-channel" style="background: rgba(251,146,60,0.12); color: #FCAB6C; border: 1px solid rgba(251,146,60,0.25);">MNM</span>
+            <span class="pill-channel" style="background: rgba(52,211,153,0.12); color: #6EEDC0; border: 1px solid rgba(52,211,153,0.25);">Studio Brussel</span>
+          </div>
+          <div class="client-actions">
+            <button class="btn btn-ghost btn-sm">Edit</button>
+            <button class="btn btn-success btn-sm">&#x1F504; Refresh Channels</button>
+            <button class="btn btn-ghost btn-sm" style="margin-left: auto; color: var(--danger); border-color: rgba(248,113,113,0.3);">Delete</button>
+          </div>
+        </div>
+
+        <!-- RTBF -->
+        <div class="card client-card">
+          <div class="accent" style="background: #60A5FA;"></div>
+          <div class="client-card-header">
+            <div class="color-dot" style="background: #60A5FA;"></div>
+            <div class="client-name">RTBF</div>
+            <div class="health-dot green" title="Connected"></div>
+          </div>
+          <div class="client-meta">
+            <span class="conn-name">whatson-rtbf-test</span>
+            <span style="color: var(--text-faint);">&#x2022;</span>
+            <span>2 templates active</span>
+          </div>
+          <div class="tag-pills">
+            <span class="pill" style="background: rgba(56,5,227,0.15); color: var(--cobalt-light);">tier-1</span>
+            <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">europe</span>
+            <span class="pill" style="background: rgba(96,165,250,0.15); color: var(--info);">postgres</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>&#x1F4E1;</span>
+            <span style="font-family: var(--font-heading); font-weight: 600;">5 channels</span>
+          </div>
+          <div class="channel-pills">
+            <span class="pill-channel" style="background: rgba(96,165,250,0.12); color: #8BB8FC; border: 1px solid rgba(96,165,250,0.25);">La Une</span>
+            <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">Tipik</span>
+            <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">La Trois</span>
+            <span class="pill-channel" style="background: rgba(167,139,250,0.12); color: #BCA8FC; border: 1px solid rgba(167,139,250,0.25);">Auvio</span>
+            <span class="pill-channel" style="background: rgba(248,113,113,0.12); color: #FF9B9B; border: 1px solid rgba(248,113,113,0.25);">Classic 21</span>
+          </div>
+          <div class="client-actions">
+            <button class="btn btn-ghost btn-sm">Edit</button>
+            <button class="btn btn-success btn-sm">&#x1F504; Refresh Channels</button>
+            <button class="btn btn-ghost btn-sm" style="margin-left: auto; color: var(--danger); border-color: rgba(248,113,113,0.3);">Delete</button>
+          </div>
+        </div>
+
+        <!-- Channel 4 -->
+        <div class="card client-card">
+          <div class="accent" style="background: #2DD4BF;"></div>
+          <div class="client-card-header">
+            <div class="color-dot" style="background: #2DD4BF;"></div>
+            <div class="client-name">Channel 4</div>
+            <div class="health-dot red" title="Connection failed"></div>
+          </div>
+          <div class="client-meta">
+            <span class="conn-name">whatson-ch4-prod</span>
+            <span style="color: var(--text-faint);">&#x2022;</span>
+            <span>1 template active</span>
+          </div>
+          <div class="tag-pills">
+            <span class="pill" style="background: rgba(245,158,11,0.15); color: var(--warning);">tier-2</span>
+            <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">uk</span>
+          </div>
+          <div style="font-size: 11px; color: var(--warning); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>&#x26A0;</span>
+            <span style="font-family: var(--font-heading); font-weight: 600;">No channels loaded</span>
+          </div>
+          <div class="client-actions">
+            <button class="btn btn-ghost btn-sm">Edit</button>
+            <button class="btn btn-success btn-sm">&#x1F4E1; Pull Channels</button>
+            <button class="btn btn-ghost btn-sm" style="margin-left: auto; color: var(--danger); border-color: rgba(248,113,113,0.3);">Delete</button>
+          </div>
+        </div>
+
+        <!-- ARD -->
+        <div class="card client-card">
+          <div class="accent" style="background: #F59E0B;"></div>
+          <div class="client-card-header">
+            <div class="color-dot" style="background: #F59E0B;"></div>
+            <div class="client-name">ARD</div>
+            <div class="health-dot gray" title="Not tested"></div>
+          </div>
+          <div class="client-meta">
+            <span class="conn-name">whatson-ard-staging</span>
+            <span style="color: var(--text-faint);">&#x2022;</span>
+            <span>0 templates</span>
+          </div>
+          <div class="tag-pills">
+            <span class="pill" style="background: rgba(245,158,11,0.15); color: var(--warning);">tier-2</span>
+            <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">europe</span>
+            <span class="pill" style="background: rgba(248,113,113,0.15); color: var(--danger);">oracle</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>&#x1F4E1;</span>
+            <span style="font-family: var(--font-heading); font-weight: 600;">12 channels</span>
+          </div>
+          <div class="channel-pills">
+            <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">Das Erste</span>
+            <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25);">ONE</span>
+            <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">tagesschau24</span>
+            <span class="pill-channel" style="background: rgba(248,113,113,0.12); color: #FF9B9B; border: 1px solid rgba(248,113,113,0.25);">ARD alpha</span>
+            <span style="font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); padding: 3px 0;">+8 more</span>
+          </div>
+          <div class="client-actions">
+            <button class="btn btn-ghost btn-sm">Edit</button>
+            <button class="btn btn-success btn-sm">&#x1F504; Refresh Channels</button>
+            <button class="btn btn-ghost btn-sm" style="margin-left: auto; color: var(--danger); border-color: rgba(248,113,113,0.3);">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- SECTION 3: Goal Cards with Channel Scope -->
+    <!-- ═══════════════════════════════════════ -->
+    <div id="goal-cards" class="demo-section">
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">How goals display their channel scope on goal cards:</div>
+
+      <!-- All Channels goal -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="color-dot" style="background: #3805E3;"></div>
+          <div class="goal-title">HC - Long Term Planning — VRT</div>
+          <span class="goal-client-badge">VRT</span>
+          <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">On Track</span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channels:</span>
+          <span class="pill-channel" style="background: rgba(56,5,227,0.1); color: var(--cobalt-light); border: 1px solid rgba(56,5,227,0.2); font-weight: 600;">&#x1F4E1; All Channels</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 72%; background: var(--success);"></div>
+        </div>
+      </div>
+
+      <!-- Selected Channels goal -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="color-dot" style="background: #3805E3;"></div>
+          <div class="goal-title">HC - Media Management — VRT</div>
+          <span class="goal-client-badge">VRT</span>
+          <span class="pill" style="background: rgba(245,158,11,0.15); color: var(--warning);">At Risk</span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channels:</span>
+          <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25);">VRT 1</span>
+          <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">Canvas</span>
+          <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">Ketnet</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 48%; background: var(--warning);"></div>
+        </div>
+      </div>
+
+      <!-- Legacy goal (no client) -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="color-dot" style="background: #2DD4BF;"></div>
+          <div class="goal-title">Improve Content QC Turnaround</div>
+          <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">On Track</span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channel:</span>
+          <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">&#x1F4FA; VRT 1</span>
+          <span style="font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); margin-left: 4px;">(legacy)</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 85%; background: var(--success);"></div>
+        </div>
+      </div>
+
+      <!-- RTBF All Channels -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="color-dot" style="background: #60A5FA;"></div>
+          <div class="goal-title">HC - Long Term Planning — RTBF</div>
+          <span class="goal-client-badge" style="color: var(--info); background: rgba(96,165,250,0.15);">RTBF</span>
+          <span class="pill" style="background: rgba(248,113,113,0.15); color: var(--danger);">Behind</span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channels:</span>
+          <span class="pill-channel" style="background: rgba(96,165,250,0.1); color: var(--info); border: 1px solid rgba(96,165,250,0.2); font-weight: 600;">&#x1F4E1; All Channels</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: 28%; background: var(--danger);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const VRT_CHANNELS = [
+    { id: '1', name: 'VRT 1', kind: 'Linear', color: '#3805E3', checked: true },
+    { id: '2', name: 'Canvas', kind: 'Linear', color: '#2DD4BF', checked: true },
+    { id: '3', name: 'Ketnet', kind: 'Linear', color: '#F59E0B', checked: true },
+    { id: '4', name: 'Sporza', kind: 'Linear', color: '#F87171', checked: false },
+    { id: '5', name: 'VRTMAX', kind: 'On demand', color: '#60A5FA', checked: false },
+    { id: '6', name: 'VRT NWS', kind: 'Linear', color: '#A78BFA', checked: false },
+    { id: '7', name: 'MNM', kind: 'Linear', color: '#FB923C', checked: false },
+    { id: '8', name: 'Studio Brussel', kind: 'Linear', color: '#34D399', checked: false },
+  ];
+
+  function renderChannelList(filter = '') {
+    const list = document.getElementById('channelList');
+    const lower = filter.toLowerCase();
+    list.innerHTML = VRT_CHANNELS
+      .filter(ch => ch.name.toLowerCase().includes(lower))
+      .map(ch => `
+        <label class="channel-item">
+          <input type="checkbox" ${ch.checked ? 'checked' : ''} onchange="toggleChannel('${ch.id}')" />
+          <div class="ch-color" style="background: ${ch.color};"></div>
+          <span class="ch-name">${ch.name}</span>
+          <span class="ch-kind">${ch.kind}</span>
+        </label>
+      `).join('');
+    updateCount();
+  }
+
+  function toggleChannel(id) {
+    const ch = VRT_CHANNELS.find(c => c.id === id);
+    if (ch) ch.checked = !ch.checked;
+    updateCount();
+  }
+
+  function selectAll(checked) {
+    VRT_CHANNELS.forEach(ch => ch.checked = checked);
+    renderChannelList();
+  }
+
+  function updateCount() {
+    const count = VRT_CHANNELS.filter(c => c.checked).length;
+    document.getElementById('selectedCount').textContent = `${count} of ${VRT_CHANNELS.length} channels selected`;
+  }
+
+  function filterChannels(val) {
+    renderChannelList(val);
+  }
+
+  function setScope(mode) {
+    document.getElementById('radioAll').classList.toggle('active', mode === 'all');
+    document.getElementById('radioSelect').classList.toggle('active', mode === 'selected');
+    document.getElementById('channelMultiSelect').style.display = mode === 'selected' ? 'block' : 'none';
+  }
+
+  function onClientChange() {
+    const val = document.getElementById('clientSelect').value;
+    document.getElementById('channelScopeSection').style.display = val ? 'block' : 'none';
+    document.getElementById('legacyChannelSection').style.display = val ? 'none' : 'block';
+  }
+
+  function showSection(id) {
+    document.querySelectorAll('.demo-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // Init
+  renderChannelList();
+</script>
+</body>
+</html>

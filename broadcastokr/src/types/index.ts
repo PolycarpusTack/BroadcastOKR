@@ -46,13 +46,35 @@ export interface RolePermissions {
   label: string;
 }
 
+/** Sync status for live (database-backed) key results */
+export type SyncStatus = 'ok' | 'error' | 'timeout' | 'no_data' | 'stale' | 'pending';
+
+/** Configuration for a live KR linked to a database query */
+export interface LiveKRConfig {
+  connectionId: string;
+  sql: string;
+  unit: string;
+  direction: 'hi' | 'lo';
+  timeframeDays?: number;
+}
+
 export interface KeyResult {
+  id: string;
   title: string;
   start: number;
   target: number;
   current: number;
   progress: number;
   status: GoalStatus;
+  /** If present, this KR is live — synced from a database via the bridge */
+  liveConfig?: LiveKRConfig;
+  /** Last sync status (only for live KRs) */
+  syncStatus?: SyncStatus;
+  /** Error message from last sync attempt */
+  syncError?: string;
+  /** ISO timestamp of last successful sync */
+  lastSyncAt?: string;
+  krTemplateId?: string;
 }
 
 export interface Goal {
@@ -64,6 +86,9 @@ export interface Goal {
   channel: number;
   period: string;
   keyResults: KeyResult[];
+  clientIds?: string[];
+  channelScope?: ChannelScope;
+  templateId?: string;
 }
 
 export interface Subtask {
@@ -74,6 +99,7 @@ export interface Subtask {
 export interface Task {
   id: string;
   title: string;
+  description?: string;
   status: TaskStatus;
   priority: Priority;
   assignee: number;
@@ -81,6 +107,9 @@ export interface Task {
   due: string;
   taskType: string;
   subtasks: Subtask[];
+  clientIds?: string[];
+  channelScope?: ChannelScope;
+  goalId?: string;
 }
 
 export interface KPI {
@@ -149,4 +178,48 @@ export interface UrgencyBadge {
 export interface KPIStatus {
   label: string;
   color: string;
+}
+
+export interface ClientChannel {
+  id: string;
+  name: string;
+  internalValue?: string;
+  channelKind?: string;
+  color?: string;
+}
+
+export type ChannelScope =
+  | { type: 'all' }
+  | { type: 'selected'; channelIds: string[] };
+
+export interface Client {
+  id: string;
+  name: string;
+  connectionId: string;
+  logo?: string;
+  color: string;
+  tags?: string[];
+  channels: ClientChannel[];
+  /** templateId → { krTemplateId → custom SQL } */
+  sqlOverrides?: Record<string, Record<string, string>>;
+}
+
+export interface KRTemplate {
+  id: string;
+  title: string;
+  sql: string;
+  unit: string;
+  direction: 'hi' | 'lo';
+  start: number;
+  target: number;
+  timeframeDays?: number;
+}
+
+export interface GoalTemplate {
+  id: string;
+  title: string;
+  category: string;
+  period: string;
+  syncIntervalMs?: number;
+  krTemplates: KRTemplate[];
 }

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import type { Toast } from '../types';
+import { COLOR_SUCCESS } from '../constants/config';
 
 interface ToastContextValue {
   toasts: Toast[];
@@ -15,7 +16,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toast = useCallback((text: string, bg?: string, icon?: string) => {
     const id = ++idRef.current;
-    setToasts((prev) => [...prev, { id, text, bg: bg || '#10b981', icon: icon || '\u2705', exiting: false }]);
+    setToasts((prev) => [...prev, { id, text, bg: bg || COLOR_SUCCESS, icon: icon || '\u2705', exiting: false }]);
     setTimeout(() => setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t))), 2500);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2800);
   }, []);

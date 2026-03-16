@@ -4,12 +4,14 @@ import { Header } from './Header';
 import { ToastContainer } from '../toast/ToastContainer';
 import { ActivityLog } from '../activity/ActivityLog';
 import { PersonaPanel } from '../dev/PersonaPanel';
+import { ImportExportModal } from '../data/ImportExportModal';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useActivityLog } from '../../context/ActivityLogContext';
 import { useStore } from '../../store/store';
 import { generateStressTasks } from '../../utils';
+import { COLOR_DANGER, FONT_BODY } from '../../constants/config';
 
 interface AppShellProps {
   children: ReactNode;
@@ -17,7 +19,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, onCreateTask }: AppShellProps) {
-  const { dark, setDark, theme } = useTheme();
+  const { theme } = useTheme();
   const { currentUser, setCurrentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { log, logAction } = useActivityLog();
@@ -27,12 +29,13 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [importExportOpen, setImportExportOpen] = useState(false);
 
   const handleStress = () => {
     const st = generateStressTasks(60);
     addBulkTasks(st);
-    toast('\u{1F525} Stress test: +60 tasks added!', '#ef4444', '\u{1F525}');
-    logAction('Stress test triggered (+60 tasks)', currentUser.name, '#ef4444');
+    toast('\u{1F525} Stress test: +60 tasks added!', COLOR_DANGER, '\u{1F525}');
+    logAction('Stress test triggered (+60 tasks)', currentUser.name, COLOR_DANGER);
   };
 
   const closeMobileSidebar = useCallback(() => setMobileSidebarOpen(false), []);
@@ -42,7 +45,7 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
       style={{
         display: 'flex',
         height: '100vh',
-        fontFamily: "'DM Sans','Segoe UI',system-ui,sans-serif",
+        fontFamily: FONT_BODY,
         background: theme.bg,
         color: theme.text,
         transition: 'background .3s,color .3s',
@@ -93,10 +96,12 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
           perms={permissions}
           onCreateTask={onCreateTask || (() => {})}
           onMobileMenu={() => setMobileSidebarOpen(true)}
+          onImportExport={() => setImportExportOpen(true)}
         />
         <div className="main-content" style={{ padding: 28, flex: 1 }}>{children}</div>
       </main>
 
+      <ImportExportModal open={importExportOpen} onClose={() => setImportExportOpen(false)} theme={theme} />
       <ActivityLog log={log} open={logOpen} onClose={() => setLogOpen(false)} theme={theme} />
       <ToastContainer />
       {import.meta.env.DEV && (
@@ -104,13 +109,8 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
           currentUser={currentUser}
           setCurrentUser={(u) => {
             setCurrentUser(u);
-            toast(`Switched to ${u.name}`, '#8b5cf6', '\u{1F464}');
-            logAction(`Persona switched to ${u.name} (${u.role})`, u.name, '#8b5cf6');
-          }}
-          dark={dark}
-          setDark={(d) => {
-            setDark(d);
-            toast(d ? 'Dark mode enabled' : 'Light mode enabled', d ? '#1e293b' : '#f59e0b', d ? '\u{1F319}' : '\u2600\uFE0F');
+            toast(`Switched to ${u.name}`, '#A78BFA', '\u{1F464}');
+            logAction(`Persona switched to ${u.name} (${u.role})`, u.name, '#A78BFA');
           }}
           theme={theme}
           onStress={handleStress}

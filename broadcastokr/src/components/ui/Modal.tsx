@@ -1,6 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useId } from 'react';
 import type { ReactNode } from 'react';
 import type { Theme } from '../../types';
+import { FONT_HEADING } from '../../constants/config';
 
 interface ModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, width = 560, theme }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -73,16 +75,16 @@ export function Modal({ open, onClose, title, children, width = 560, theme }: Mo
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: theme.bgCard,
-          borderRadius: 16,
+          borderRadius: 10,
           width: '100%',
           maxWidth: width,
           maxHeight: '85vh',
           overflow: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,.35)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
           border: `1px solid ${theme.border}`,
         }}
       >
@@ -95,7 +97,7 @@ export function Modal({ open, onClose, title, children, width = 560, theme }: Mo
             borderBottom: `1px solid ${theme.borderLight}`,
           }}
         >
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: theme.text, margin: 0 }}>{title}</h3>
+          <h3 id={titleId} style={{ fontFamily: FONT_HEADING, fontSize: 18, fontWeight: 600, color: theme.text, margin: 0 }}>{title}</h3>
           <button
             onClick={onClose}
             aria-label="Close"

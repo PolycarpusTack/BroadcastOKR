@@ -6,8 +6,10 @@ import { CHANNELS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES } from 
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { SparkLine } from '../components/ui/SparkLine';
 import { ChannelBadge } from '../components/ui/ChannelBadge';
+import { PillBadge } from '../components/ui/PillBadge';
 import { kpiStatus } from '../utils/colors';
 import { cardStyle as makeCardStyle } from '../utils/styles';
+import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_COBALT_MID, FONT_HEADING } from '../constants/config';
 import type { Priority } from '../types';
 
 export function ReportsPage() {
@@ -17,28 +19,42 @@ export function ReportsPage() {
   const goals = useStore((s) => s.goals);
   const kpis = useStore((s) => s.kpis);
 
-  const totalTasks = tasks.length;
-  const { doneTasks, overdueTasks, statusBreakdown, priorityBreakdown } = useMemo(() => {
+  const taskStats = useMemo(() => {
     const now = new Date();
-    const done = tasks.filter((t) => t.status === 'done').length;
-    const overdue = tasks.filter((t) => t.status !== 'done' && new Date(t.due) < now).length;
-    const statuses = STATUS_FLOW.map((status) => ({
+    let done = 0;
+    let overdue = 0;
+    const byStatus: Record<string, number> = {};
+    const byPriority: Record<string, number> = {};
+    for (const t of tasks) {
+      byStatus[t.status] = (byStatus[t.status] || 0) + 1;
+      byPriority[t.priority] = (byPriority[t.priority] || 0) + 1;
+      if (t.status === 'done') done++;
+      else if (new Date(t.due) < now) overdue++;
+    }
+    return { done, overdue, byStatus, byPriority, total: tasks.length };
+  }, [tasks]);
+
+  const statusBreakdown = useMemo(() =>
+    STATUS_FLOW.map((status) => ({
       status,
       label: STATUS_LABELS[status],
-      count: tasks.filter((t) => t.status === status).length,
+      count: taskStats.byStatus[status] || 0,
       color: STATUS_COLORS[status],
-    }));
+    })),
+  [taskStats.byStatus]);
+
+  const priorityBreakdown = useMemo(() => {
     const priorityKeys: Priority[] = ['critical', 'high', 'medium', 'low'];
-    const priorities = priorityKeys.map((key) => ({
+    return priorityKeys.map((key) => ({
       priority: key,
       label: PRIORITIES[key].label,
-      count: tasks.filter((t) => t.priority === key).length,
+      count: taskStats.byPriority[key] || 0,
       color: PRIORITIES[key].color,
       icon: PRIORITIES[key].icon,
     }));
-    return { doneTasks: done, overdueTasks: overdue, statusBreakdown: statuses, priorityBreakdown: priorities };
-  }, [tasks]);
-  const completionRate = totalTasks ? doneTasks / totalTasks : 0;
+  }, [taskStats.byPriority]);
+
+  const completionRate = taskStats.total ? taskStats.done / taskStats.total : 0;
 
   const channelCompliance = useMemo(() => {
     const now = new Date();
@@ -53,7 +69,7 @@ export function ReportsPage() {
     });
   }, [goals, tasks]);
 
-  const cardStyle = makeCardStyle(theme);
+  const cardStyle = useMemo(() => makeCardStyle(theme), [theme]);
 
   if (!permissions.canViewReports) {
     return (
@@ -72,10 +88,10 @@ export function ReportsPage() {
       {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         {[
-          { label: 'Completion Rate', value: `${Math.round(completionRate * 100)}%`, icon: '\u{1F4CA}', color: '#10b981' },
-          { label: 'Total Tasks', value: totalTasks, icon: '\u{1F4CB}', color: '#4f46e5' },
-          { label: 'Overdue', value: overdueTasks, icon: '\u26A0\uFE0F', color: overdueTasks > 0 ? '#ef4444' : '#10b981' },
-          { label: 'Goals Tracked', value: goals.length, icon: '\u{1F3AF}', color: '#7c3aed' },
+          { label: 'Completion Rate', value: `${Math.round(completionRate * 100)}%`, icon: '\u{1F4CA}', color: COLOR_SUCCESS },
+          { label: 'Total Tasks', value: taskStats.total, icon: '\u{1F4CB}', color: PRIMARY_COLOR },
+          { label: 'Overdue', value: taskStats.overdue, icon: '\u26A0\uFE0F', color: taskStats.overdue > 0 ? COLOR_DANGER : COLOR_SUCCESS },
+          { label: 'Goals Tracked', value: goals.length, icon: '\u{1F3AF}', color: COLOR_COBALT_MID },
         ].map((s) => (
           <div key={s.label} style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: s.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
@@ -92,12 +108,12 @@ export function ReportsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
         {/* Status Breakdown */}
         <div style={cardStyle}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4CA}'} Task Status Breakdown</h3>
+          <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4CA}'} Task Status Breakdown</h3>
           {statusBreakdown.map((s) => (
             <div key={s.status} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: theme.text, width: 90 }}>{s.label}</span>
-              <div style={{ flex: 1 }}><ProgressBar value={totalTasks ? s.count / totalTasks : 0} color={s.color} theme={theme} /></div>
+              <div style={{ flex: 1 }}><ProgressBar value={taskStats.total ? s.count / taskStats.total : 0} color={s.color} theme={theme} /></div>
               <span style={{ fontSize: 12, fontWeight: 700, color: s.color, minWidth: 30, textAlign: 'right' }}>{s.count}</span>
             </div>
           ))}
@@ -105,12 +121,12 @@ export function ReportsPage() {
 
         {/* Priority Breakdown */}
         <div style={cardStyle}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u26A1'} Priority Distribution</h3>
+          <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u26A1'} Priority Distribution</h3>
           {priorityBreakdown.map((p) => (
             <div key={p.priority} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
               <span style={{ fontSize: 14 }}>{p.icon}</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: theme.text, width: 70 }}>{p.label}</span>
-              <div style={{ flex: 1 }}><ProgressBar value={totalTasks ? p.count / totalTasks : 0} color={p.color} theme={theme} /></div>
+              <div style={{ flex: 1 }}><ProgressBar value={taskStats.total ? p.count / taskStats.total : 0} color={p.color} theme={theme} /></div>
               <span style={{ fontSize: 12, fontWeight: 700, color: p.color, minWidth: 30, textAlign: 'right' }}>{p.count}</span>
             </div>
           ))}
@@ -120,8 +136,10 @@ export function ReportsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
         {/* KPI Report */}
         <div style={cardStyle}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4C8}'} KPI Trends</h3>
-          {kpis.map((kpi) => {
+          <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F4C8}'} KPI Trends</h3>
+          {kpis.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 24, color: theme.textFaint, fontSize: 13 }}>No KPIs to display.</div>
+          ) : kpis.map((kpi) => {
             const st = kpiStatus(kpi);
             const pct = kpi.direction === 'hi'
               ? Math.min(kpi.current / kpi.target, 1)
@@ -134,7 +152,7 @@ export function ReportsPage() {
                   <div style={{ marginTop: 4 }}><ProgressBar value={pct} color={st.color} theme={theme} height={4} /></div>
                 </div>
                 <SparkLine data={kpi.trend} color={st.color} w={70} h={24} />
-                <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: st.color + '20', color: st.color }}>{st.label}</span>
+                <PillBadge label={st.label} color={st.color} bold />
               </div>
             );
           })}
@@ -142,14 +160,14 @@ export function ReportsPage() {
 
         {/* Channel Compliance */}
         <div style={cardStyle}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u2696\uFE0F'} Channel Compliance</h3>
-          {channelCompliance.map(({ ch, chDone, chOverdue, chTasks, avgProgress, compliant }) => (
+          <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u2696\uFE0F'} Channel Compliance</h3>
+          {goals.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 24, color: theme.textFaint, fontSize: 13 }}>No goals to analyze.</div>
+          ) : channelCompliance.map(({ ch, chDone, chOverdue, chTasks, avgProgress, compliant }) => (
               <div key={ch.name} style={{ padding: '12px 14px', borderRadius: 10, background: compliant ? theme.compliantBg : theme.atRiskBg, border: `1px solid ${compliant ? theme.compliantBorder : theme.atRiskBorder}`, marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <ChannelBadge channel={ch} />
-                  <span style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: compliant ? '#10b98120' : '#ef444420', color: compliant ? '#10b981' : '#ef4444' }}>
-                    {compliant ? '\u2713 Compliant' : '\u26A0 At Risk'}
-                  </span>
+                  <PillBadge label={compliant ? '\u2713 Compliant' : '\u26A0 At Risk'} color={compliant ? COLOR_SUCCESS : COLOR_DANGER} bold />
                 </div>
                 <div style={{ display: 'flex', gap: 16, fontSize: 11, color: theme.textMuted }}>
                   <span>{chDone}/{chTasks.length} tasks done</span>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import type { ActivityEntry } from '../types';
 import { formatTime } from '../utils';
+import { PRIMARY_COLOR } from '../constants/config';
 
 interface ActivityLogContextValue {
   log: ActivityEntry[];
@@ -16,7 +17,7 @@ export function ActivityLogProvider({ children }: { children: ReactNode }) {
   const logAction = useCallback((text: string, userName: string, color?: string) => {
     const id = ++idRef.current;
     setLog((prev) =>
-      [{ id, text, user: userName, time: formatTime(), color: color || '#4f46e5' }, ...prev].slice(0, 100),
+      [{ id, text, user: userName, time: formatTime(), color: color || PRIMARY_COLOR }, ...prev].slice(0, 100),
     );
   }, []);
 

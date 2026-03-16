@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Theme } from '../../types';
 import { progressColor } from '../../utils';
 
@@ -8,7 +9,7 @@ interface ProgressBarProps {
   theme: Theme;
 }
 
-export function ProgressBar({ value, height = 6, color, theme }: ProgressBarProps) {
+export const ProgressBar = memo(function ProgressBar({ value, height = 6, color, theme }: ProgressBarProps) {
   return (
     <div role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100} style={{ height, borderRadius: height / 2, background: theme.border, overflow: 'hidden', width: '100%' }}>
       <div
@@ -22,4 +23,4 @@ export function ProgressBar({ value, height = 6, color, theme }: ProgressBarProp
       />
     </div>
   );
-}
+});

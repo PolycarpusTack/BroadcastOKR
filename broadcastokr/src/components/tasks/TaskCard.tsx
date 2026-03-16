@@ -1,8 +1,11 @@
+import { memo, useMemo } from 'react';
 import { CHANNELS, USERS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { safeUser, safeChannel } from '../../utils/safeGet';
 import { ChannelBadge } from '../ui/ChannelBadge';
+import { PillBadge } from '../ui/PillBadge';
 import { Avatar } from '../ui/Avatar';
 import { daysUntil, getUrgencyBadge } from '../../utils/dates';
+import { useStore } from '../../store/store';
 import type { Task, Theme } from '../../types';
 
 interface TaskCardProps {
@@ -12,12 +15,20 @@ interface TaskCardProps {
   onClick: () => void;
 }
 
-export function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
+  const clients = useStore((s) => s.clients);
   const user = safeUser(USERS, task.assignee);
   const days = daysUntil(task.due);
   const badge = getUrgencyBadge(days, dark);
   const pri = PRIORITIES[task.priority];
   const tt = TASK_TYPES.find((t) => t.key === task.taskType);
+
+  const taskClientsData = useMemo(
+    () => clients.filter((c) => task.clientIds?.includes(c.id)),
+    [clients, task.clientIds],
+  );
+
+  const hasClientScope = task.clientIds && task.clientIds.length > 0;
 
   return (
     <div
@@ -35,14 +46,45 @@ export function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
         borderLeft: `3px solid ${pri.color}`,
         transition: 'box-shadow .15s',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,.08)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.3)'; e.currentTarget.style.background = theme.bgCardHover; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = theme.bgCard; }}
     >
       <div style={{ fontSize: 12, fontWeight: 600, color: theme.text, marginBottom: 8 }}>{task.title}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <ChannelBadge channel={safeChannel(CHANNELS, task.channel)} />
-        {tt && <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: tt.color + '18', color: tt.color }}>{tt.icon} {tt.label}</span>}
-        <span style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.fg, animation: badge.pulse ? 'urgPulse 2s infinite' : 'none' }}>{badge.text}</span>
+        {hasClientScope ? (
+          <>
+            {taskClientsData.map((c) => (
+              <span
+                key={c.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  padding: '1px 6px',
+                  borderRadius: 8,
+                  background: c.color + '22',
+                  border: `1px solid ${c.color}55`,
+                  fontSize: 10,
+                  color: theme.text,
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, flexShrink: 0 }} />
+                {c.name}
+              </span>
+            ))}
+            {task.channelScope && (
+              <span style={{ fontSize: 10, color: theme.textMuted, padding: '1px 5px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
+                {task.channelScope.type === 'all'
+                  ? 'All Ch.'
+                  : `${task.channelScope.channelIds.length} ch.`}
+              </span>
+            )}
+          </>
+        ) : (
+          <ChannelBadge channel={safeChannel(CHANNELS, task.channel)} />
+        )}
+        {tt && <PillBadge label={tt.label} color={tt.color} icon={tt.icon} bg={tt.color + '18'} style={{ padding: '2px 6px' }} />}
+        <PillBadge label={badge.text} color={badge.fg} bold bg={badge.bg} fg={badge.fg} pulse={badge.pulse} style={{ padding: '2px 6px' }} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -57,4 +99,4 @@ export function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
       </div>
     </div>
   );
-}
+});

@@ -11,7 +11,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(true);
   const theme = dark ? THEMES.dark : THEMES.light;
 
   useEffect(() => {

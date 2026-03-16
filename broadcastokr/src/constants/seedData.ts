@@ -12,35 +12,35 @@ export function createInitialGoals(): Goal[] {
       id: 'g1', title: 'Achieve 99.95% playout uptime across all linear channels',
       status: 'on_track', progress: 0.72, owner: 2, channel: 0, period: 'Q1 2026',
       keyResults: [
-        { title: 'Zero unplanned off-air incidents > 30s', start: 5, target: 0, current: 1, progress: 0.80, status: 'on_track' },
-        { title: 'Failover test success rate \u2265 99%', start: 90, target: 99, current: 97, progress: 0.78, status: 'on_track' },
-        { title: 'Mean time to recovery < 45 seconds', start: 120, target: 45, current: 52, progress: 0.91, status: 'on_track' },
+        { id: crypto.randomUUID(), title: 'Zero unplanned off-air incidents > 30s', start: 5, target: 0, current: 1, progress: 0.80, status: 'on_track' },
+        { id: crypto.randomUUID(), title: 'Failover test success rate \u2265 99%', start: 90, target: 99, current: 97, progress: 0.78, status: 'on_track' },
+        { id: crypto.randomUUID(), title: 'Mean time to recovery < 45 seconds', start: 120, target: 45, current: 52, progress: 0.91, status: 'on_track' },
       ],
     },
     {
       id: 'g2', title: 'Deliver EPG data with \u2265 98% accuracy to all aggregators',
       status: 'at_risk', progress: 0.55, owner: 5, channel: 2, period: 'Q1 2026',
       keyResults: [
-        { title: 'Synopsis completeness \u2265 98%', start: 80, target: 98, current: 91, progress: 0.61, status: 'at_risk' },
-        { title: 'EPG delivery deadline misses < 1', start: 5, target: 0, current: 2, progress: 0.60, status: 'at_risk' },
-        { title: 'Automated validation coverage \u2265 100%', start: 0, target: 100, current: 45, progress: 0.45, status: 'at_risk' },
+        { id: crypto.randomUUID(), title: 'Synopsis completeness \u2265 98%', start: 80, target: 98, current: 91, progress: 0.61, status: 'at_risk' },
+        { id: crypto.randomUUID(), title: 'EPG delivery deadline misses < 1', start: 5, target: 0, current: 2, progress: 0.60, status: 'at_risk' },
+        { id: crypto.randomUUID(), title: 'Automated validation coverage \u2265 100%', start: 0, target: 100, current: 45, progress: 0.45, status: 'at_risk' },
       ],
     },
     {
       id: 'g3', title: 'Launch VRT NWS FAST channel by April 1',
       status: 'behind', progress: 0.35, owner: 0, channel: 3, period: 'Q2 2026',
       keyResults: [
-        { title: 'Content pipeline delivering 18h/day', start: 0, target: 18, current: 6, progress: 0.33, status: 'behind' },
-        { title: 'FAST playout integration tested and signed off', start: 0, target: 100, current: 40, progress: 0.4, status: 'behind' },
-        { title: 'EPG feed live on 3 aggregator platforms', start: 0, target: 3, current: 1, progress: 0.33, status: 'behind' },
+        { id: crypto.randomUUID(), title: 'Content pipeline delivering 18h/day', start: 0, target: 18, current: 6, progress: 0.33, status: 'behind' },
+        { id: crypto.randomUUID(), title: 'FAST playout integration tested and signed off', start: 0, target: 100, current: 40, progress: 0.4, status: 'behind' },
+        { id: crypto.randomUUID(), title: 'EPG feed live on 3 aggregator platforms', start: 0, target: 3, current: 1, progress: 0.33, status: 'behind' },
       ],
     },
     {
       id: 'g4', title: 'Meet AVMSD European works quota (30%) for all channels',
       status: 'on_track', progress: 0.78, owner: 3, channel: 2, period: 'Annual 2026',
       keyResults: [
-        { title: 'VRT 1 European works share \u2265 35%', start: 28, target: 35, current: 33, progress: 0.71, status: 'on_track' },
-        { title: 'VRT MAX catalogue European works \u2265 32%', start: 25, target: 32, current: 31, progress: 0.86, status: 'on_track' },
+        { id: crypto.randomUUID(), title: 'VRT 1 European works share \u2265 35%', start: 28, target: 35, current: 33, progress: 0.71, status: 'on_track' },
+        { id: crypto.randomUUID(), title: 'VRT MAX catalogue European works \u2265 32%', start: 25, target: 32, current: 31, progress: 0.86, status: 'on_track' },
       ],
     },
   ];

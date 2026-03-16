@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BroadcastOKR — Client Channels v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cobalt: #3805E3;
+    --cobalt-mid: #5B33F0;
+    --cobalt-light: #7C5CFF;
+    --bg: #0F1729;
+    --bg-card: #1A2332;
+    --bg-card-hover: #1F2D45;
+    --bg-input: #141E2E;
+    --bg-muted: #151F30;
+    --border: #2A3855;
+    --border-light: #253045;
+    --border-input: #2E3F5C;
+    --text: #E8EDF5;
+    --text-secondary: #B0BDD0;
+    --text-muted: #7A8BA5;
+    --text-faint: #4A5B73;
+    --success: #2DD4BF;
+    --warning: #F59E0B;
+    --danger: #F87171;
+    --info: #60A5FA;
+    --overlay: rgba(5, 10, 20, 0.8);
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 13px; min-height: 100vh; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px; background: #111B2A; border-right: 1px solid var(--border);
+    padding: 24px 0; flex-shrink: 0;
+  }
+  .sidebar-brand {
+    padding: 0 20px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-brand .icon {
+    width: 32px; height: 32px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--cobalt), var(--cobalt-mid));
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .sidebar-brand h1 { font-family: var(--font-heading); font-size: 17px; font-weight: 700; color: #F0F4FF; letter-spacing: -0.4px; }
+  .sidebar-brand .sub { font-family: var(--font-mono); font-size: 9.5px; color: #3D4F68; text-transform: uppercase; letter-spacing: 0.8px; }
+  .nav { padding: 12px 0; }
+  .nav-label { padding: 6px 20px 8px; font-size: 9.5px; text-transform: uppercase; letter-spacing: 1.2px; color: #3D4F68; font-weight: 600; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 18px; margin: 1px 10px;
+    border-radius: 6px; color: #5E6F8A; font-size: 12.5px; font-weight: 500;
+    cursor: pointer; transition: all .12s; position: relative; text-decoration: none;
+  }
+  .nav-item:hover { background: #1A2332; color: var(--cobalt-mid); }
+  .nav-item.active { background: #2A3855; color: var(--cobalt-mid); }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 16px; background: var(--cobalt); border-radius: 0 2px 2px 0;
+  }
+  .nav-divider { height: 1px; background: var(--border); margin: 8px 16px; }
+
+  .main { flex: 1; padding: 28px 32px; overflow-y: auto; }
+
+  /* ── Common ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border: none; border-radius: 8px;
+    font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .btn-primary { background: var(--cobalt); color: #fff; }
+  .btn-primary:hover { background: var(--cobalt-mid); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+  .btn-ghost:hover { border-color: var(--cobalt); color: var(--cobalt-light); }
+  .btn-success { background: var(--success); color: #0F1729; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+  .btn-xs { padding: 3px 8px; font-size: 10px; border-radius: 5px; }
+  .btn-danger-ghost { background: transparent; border: 1px solid rgba(248,113,113,0.3); color: var(--danger); }
+
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; transition: border-color .15s; }
+  .card:hover { border-color: #3A4D6E; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600;
+    font-family: var(--font-mono); white-space: nowrap;
+  }
+  .pill-channel {
+    padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 500;
+    font-family: var(--font-body); cursor: default;
+  }
+
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+  .form-input, .form-select {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-input);
+    background: var(--bg-input); color: var(--text); font-size: 13px; font-family: var(--font-body); outline: none; transition: border-color .15s;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--cobalt); }
+  .form-select {
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237A8BA5' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
+  }
+  .form-hint { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+
+  .color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Modal ── */
+  .modal {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    width: 580px; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 25px 60px rgba(0,0,0,.5);
+  }
+  .modal-header {
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-family: var(--font-heading); font-size: 17px; font-weight: 700; }
+  .modal-close {
+    background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer;
+    width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: var(--bg-muted); color: var(--text); }
+  .modal-body { padding: 20px 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* ── Demo Tabs ── */
+  .demo-tabs {
+    display: flex; gap: 4px; margin-bottom: 32px; padding: 4px;
+    background: var(--bg-muted); border-radius: 8px; width: fit-content;
+  }
+  .demo-tab {
+    padding: 8px 20px; border-radius: 6px; border: none; background: transparent;
+    color: var(--text-muted); font-family: var(--font-heading); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .12s;
+  }
+  .demo-tab.active { background: var(--cobalt); color: #fff; }
+  .demo-tab:not(.active):hover { color: var(--text); }
+  .demo-section { display: none; }
+  .demo-section.active { display: block; }
+
+  /* ── Multi-select dropdown ── */
+  .multiselect {
+    position: relative;
+  }
+  .multiselect-trigger {
+    width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-input);
+    background: var(--bg-input); color: var(--text); font-size: 13px; font-family: var(--font-body);
+    cursor: pointer; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 40px;
+    transition: border-color .15s;
+  }
+  .multiselect-trigger:hover, .multiselect-trigger.open { border-color: var(--cobalt); }
+  .multiselect-trigger .placeholder { color: var(--text-faint); }
+
+  .multiselect-selected-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
+    background: rgba(56,5,227,0.15); color: var(--cobalt-light);
+  }
+  .multiselect-selected-pill .remove {
+    cursor: pointer; font-size: 13px; line-height: 1; opacity: 0.6;
+  }
+  .multiselect-selected-pill .remove:hover { opacity: 1; }
+
+  .multiselect-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.4); z-index: 100; overflow: hidden;
+    max-height: 280px; display: flex; flex-direction: column;
+  }
+  .multiselect-search {
+    padding: 8px 10px; border-bottom: 1px solid var(--border-light);
+  }
+  .multiselect-search input {
+    width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 12px; font-family: var(--font-body); outline: none;
+  }
+  .multiselect-search input:focus { border-color: var(--cobalt); }
+  .multiselect-list { overflow-y: auto; flex: 1; }
+
+  .multiselect-item {
+    display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+    cursor: pointer; transition: background .1s;
+  }
+  .multiselect-item:hover { background: var(--bg-card-hover); }
+  .multiselect-item input[type="checkbox"] { accent-color: var(--cobalt); width: 14px; height: 14px; cursor: pointer; }
+  .multiselect-item .name { font-size: 12px; font-weight: 500; flex: 1; }
+  .multiselect-item .meta { font-size: 10px; font-family: var(--font-mono); color: var(--text-faint); }
+
+  .multiselect-footer {
+    padding: 6px 10px; border-top: 1px solid var(--border-light);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .multiselect-footer .count { font-size: 10px; font-family: var(--font-mono); color: var(--text-faint); }
+  .multiselect-footer a { font-size: 11px; color: var(--cobalt-light); cursor: pointer; text-decoration: none; }
+  .multiselect-footer a:hover { text-decoration: underline; }
+
+  /* ── Channel dependent dropdown ── */
+  .channel-multiselect {
+    margin-top: 4px;
+  }
+  .channel-group-label {
+    padding: 6px 12px 4px; font-size: 10px; font-family: var(--font-mono);
+    color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .channel-group-label .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* ── Settings Page ── */
+  .settings-section { margin-bottom: 32px; }
+  .settings-section-title {
+    font-family: var(--font-heading); font-size: 15px; font-weight: 700; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .client-row {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    border-bottom: 1px solid var(--border-light); transition: background .1s;
+  }
+  .client-row:last-child { border-bottom: none; }
+  .client-row:hover { background: var(--bg-card-hover); }
+  .client-row .name { font-weight: 600; font-size: 13px; flex-shrink: 0; min-width: 100px; }
+  .client-row .conn { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); flex: 1; }
+  .client-row .channels-info { font-size: 11px; color: var(--text-muted); min-width: 100px; text-align: right; }
+  .health-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .health-dot.green { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .health-dot.red { background: var(--danger); }
+
+  .channel-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding-left: 22px; }
+
+  /* ── Goal card display ── */
+  .goal-card { margin-bottom: 12px; }
+  .goal-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .goal-title { font-family: var(--font-heading); font-size: 14px; font-weight: 600; flex: 1; }
+  .goal-client-badge {
+    font-size: 10px; font-family: var(--font-mono); padding: 2px 8px; border-radius: 4px;
+  }
+  .goal-channel-scope { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .scope-label { font-size: 10px; font-family: var(--font-mono); color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; }
+
+  .client-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; font-size: 10px; font-family: var(--font-mono); font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="icon">&#x1F4E1;</div>
+      <div><h1>BroadcastOKR</h1><div class="sub">Operations Goals</div></div>
+    </div>
+    <div class="nav">
+      <div class="nav-label">Navigation</div>
+      <div class="nav-item" onclick="showSection('goal-modal'); activateNav(this)">&#x1F3AF; Goals</div>
+      <div class="nav-item" onclick="showSection('goal-cards'); activateNav(this)">&#x1F50D; Compare</div>
+      <div class="nav-item">&#x2705; Tasks</div>
+      <div class="nav-item">&#x1F465; Team</div>
+      <div class="nav-item">&#x1F4C8; Reports</div>
+      <div class="nav-divider"></div>
+      <div class="nav-item active" onclick="showSection('settings'); activateNav(this)">&#x2699;&#xFE0F; Settings</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Demo navigation -->
+    <div class="demo-tabs">
+      <button class="demo-tab" onclick="showSection('settings')">Settings: Clients & Channels</button>
+      <button class="demo-tab active" onclick="showSection('goal-modal')">Goal Modal</button>
+      <button class="demo-tab" onclick="showSection('goal-cards')">Goal Cards</button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SETTINGS PAGE: Client & Channel Config     -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="settings" class="demo-section">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+        <div>
+          <h2 style="font-family: var(--font-heading); font-size: 22px; font-weight: 700;">Settings</h2>
+          <p style="font-size: 12px; color: var(--text-faint); margin-top: 2px;">Manage clients, database connections, and channels</p>
+        </div>
+      </div>
+
+      <!-- Clients Section -->
+      <div class="settings-section">
+        <div class="settings-section-title">
+          <span>&#x1F3E2;</span> Clients
+          <button class="btn btn-primary btn-sm" style="margin-left: auto;">+ Add Client</button>
+        </div>
+
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <!-- VRT -->
+          <div class="client-row" style="cursor: pointer;" onclick="toggleClient('vrt')">
+            <div class="color-dot" style="background: #3805E3;"></div>
+            <div class="health-dot green"></div>
+            <div class="name">VRT</div>
+            <div style="flex: 1;"></div>
+            <div class="channels-info">&#x1F4E1; 8 channels</div>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Edit</button>
+            <span id="vrt-arrow" style="color: var(--text-faint); font-size: 11px; transition: transform .2s;">&#x25BC;</span>
+          </div>
+          <div id="vrt-detail" style="display: block; background: var(--bg-muted); border-bottom: 1px solid var(--border-light);">
+            <!-- DB Connection -->
+            <div style="padding: 12px 16px 8px 38px; border-bottom: 1px solid var(--border-light);">
+              <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); margin-bottom: 6px;">&#x1F5C4; Database Connection</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="health-dot green"></div>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text);">whatson-vrt-test</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-faint);">Oracle &middot; vrt-db.mediagenix.tv:1521 &middot; PSI</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">Test</button>
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Configure</button>
+              </div>
+            </div>
+            <!-- Channels -->
+            <div style="padding: 10px 16px 14px 38px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint);">&#x1F4E1; Channels</span>
+                <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">(8)</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">&#x1F504; Refresh</button>
+              </div>
+              <div class="channel-tags" style="display: flex; padding: 0; gap: 4px;">
+                <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25);">VRT 1</span>
+                <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">Canvas</span>
+                <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">Ketnet</span>
+                <span class="pill-channel" style="background: rgba(248,113,113,0.12); color: #FF9B9B; border: 1px solid rgba(248,113,113,0.25);">Sporza</span>
+                <span class="pill-channel" style="background: rgba(96,165,250,0.12); color: #8BB8FC; border: 1px solid rgba(96,165,250,0.25);">VRTMAX</span>
+                <span class="pill-channel" style="background: rgba(167,139,250,0.12); color: #BCA8FC; border: 1px solid rgba(167,139,250,0.25);">VRT NWS</span>
+                <span class="pill-channel" style="background: rgba(251,146,60,0.12); color: #FCAB6C; border: 1px solid rgba(251,146,60,0.25);">MNM</span>
+                <span class="pill-channel" style="background: rgba(52,211,153,0.12); color: #6EEDC0; border: 1px solid rgba(52,211,153,0.25);">Studio Brussel</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RTBF -->
+          <div class="client-row" style="cursor: pointer;" onclick="toggleClient('rtbf')">
+            <div class="color-dot" style="background: #60A5FA;"></div>
+            <div class="health-dot green"></div>
+            <div class="name">RTBF</div>
+            <div style="flex: 1;"></div>
+            <div class="channels-info">&#x1F4E1; 5 channels</div>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Edit</button>
+            <span id="rtbf-arrow" style="color: var(--text-faint); font-size: 11px;">&#x25B6;</span>
+          </div>
+          <div id="rtbf-detail" style="display: none; background: var(--bg-muted); border-bottom: 1px solid var(--border-light);">
+            <div style="padding: 12px 16px 8px 38px; border-bottom: 1px solid var(--border-light);">
+              <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); margin-bottom: 6px;">&#x1F5C4; Database Connection</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="health-dot green"></div>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text);">whatson-rtbf-test</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-faint);">PostgreSQL &middot; rtbf-db.mediagenix.tv:5432 &middot; psi</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">Test</button>
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Configure</button>
+              </div>
+            </div>
+            <div style="padding: 10px 16px 14px 38px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint);">&#x1F4E1; Channels</span>
+                <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">(5)</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">&#x1F504; Refresh</button>
+              </div>
+              <div class="channel-tags" style="display: flex; padding: 0; gap: 4px;">
+                <span class="pill-channel" style="background: rgba(96,165,250,0.12); color: #8BB8FC; border: 1px solid rgba(96,165,250,0.25);">La Une</span>
+                <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">Tipik</span>
+                <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">La Trois</span>
+                <span class="pill-channel" style="background: rgba(167,139,250,0.12); color: #BCA8FC; border: 1px solid rgba(167,139,250,0.25);">Auvio</span>
+                <span class="pill-channel" style="background: rgba(248,113,113,0.12); color: #FF9B9B; border: 1px solid rgba(248,113,113,0.25);">Classic 21</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Channel 4 -->
+          <div class="client-row" style="cursor: pointer;" onclick="toggleClient('ch4')">
+            <div class="color-dot" style="background: #2DD4BF;"></div>
+            <div class="health-dot red"></div>
+            <div class="name">Channel 4</div>
+            <div style="flex: 1;"></div>
+            <div class="channels-info" style="color: var(--warning);">&#x26A0; No channels</div>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Edit</button>
+            <span id="ch4-arrow" style="color: var(--text-faint); font-size: 11px;">&#x25B6;</span>
+          </div>
+          <div id="ch4-detail" style="display: none; background: var(--bg-muted); border-bottom: 1px solid var(--border-light);">
+            <div style="padding: 12px 16px 8px 38px; border-bottom: 1px solid var(--border-light);">
+              <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); margin-bottom: 6px;">&#x1F5C4; Database Connection</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="health-dot red"></div>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text);">whatson-ch4-prod</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--danger);">Oracle &middot; ch4-db.channel4.com:1521 &middot; Connection failed</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">Test</button>
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Configure</button>
+              </div>
+            </div>
+            <div style="padding: 10px 16px 14px 38px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint);">&#x1F4E1; Channels</span>
+                <button class="btn btn-success btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">&#x1F4E1; Pull Channels</button>
+              </div>
+              <div style="font-size: 12px; color: var(--text-faint); padding: 8px 0;">No channels loaded. Fix the database connection, then click "Pull Channels" to import.</div>
+            </div>
+          </div>
+
+          <!-- ARD -->
+          <div class="client-row" style="cursor: pointer;" onclick="toggleClient('ard')">
+            <div class="color-dot" style="background: #F59E0B;"></div>
+            <div class="health-dot green"></div>
+            <div class="name">ARD</div>
+            <div style="flex: 1;"></div>
+            <div class="channels-info">&#x1F4E1; 12 channels</div>
+            <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Edit</button>
+            <span id="ard-arrow" style="color: var(--text-faint); font-size: 11px;">&#x25B6;</span>
+          </div>
+          <div id="ard-detail" style="display: none; background: var(--bg-muted);">
+            <div style="padding: 12px 16px 8px 38px; border-bottom: 1px solid var(--border-light);">
+              <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); margin-bottom: 6px;">&#x1F5C4; Database Connection</div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="health-dot green"></div>
+                <span style="font-size: 12px; font-weight: 600; color: var(--text);">whatson-ard-staging</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-faint);">Oracle &middot; ard-staging.ard.de:1521 &middot; PSI</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">Test</button>
+                <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation()">Configure</button>
+              </div>
+            </div>
+            <div style="padding: 10px 16px 14px 38px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint);">&#x1F4E1; Channels</span>
+                <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">(12)</span>
+                <button class="btn btn-ghost btn-xs" style="margin-left: auto;" onclick="event.stopPropagation()">&#x1F504; Refresh</button>
+              </div>
+              <div class="channel-tags" style="display: flex; padding: 0; gap: 4px;">
+                <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25);">Das Erste</span>
+                <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25);">ONE</span>
+                <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25);">tagesschau24</span>
+                <span class="pill-channel" style="background: rgba(248,113,113,0.12); color: #FF9B9B; border: 1px solid rgba(248,113,113,0.25);">ARD alpha</span>
+                <span class="pill-channel" style="background: rgba(96,165,250,0.12); color: #8BB8FC; border: 1px solid rgba(96,165,250,0.25);">phoenix</span>
+                <span class="pill-channel" style="background: rgba(167,139,250,0.12); color: #BCA8FC; border: 1px solid rgba(167,139,250,0.25);">KiKA</span>
+                <span style="font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); padding: 3px 4px;">+6 more</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- GOAL MODAL: Multi-client + dependent channels -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="goal-modal" class="demo-section active">
+      <div style="max-width: 580px;">
+        <div class="modal" style="position: relative;">
+          <div class="modal-header">
+            <div class="modal-title">Create Goal</div>
+            <button class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label class="form-label">Title</label>
+              <input class="form-input" value="HC - Long Term Planning" />
+            </div>
+
+            <!-- Multi-Client Select -->
+            <div class="form-group">
+              <label class="form-label">Clients</label>
+              <div class="multiselect" id="clientMultiselect">
+                <div class="multiselect-trigger open" onclick="toggleDropdown('clientDropdown')">
+                  <span class="multiselect-selected-pill" style="background: rgba(56,5,227,0.15); color: var(--cobalt-light);">
+                    <span class="color-dot" style="width:6px;height:6px;background:#3805E3;"></span> VRT <span class="remove" onclick="event.stopPropagation(); removeClient('vrt')">&times;</span>
+                  </span>
+                  <span class="multiselect-selected-pill" style="background: rgba(96,165,250,0.15); color: var(--info);">
+                    <span class="color-dot" style="width:6px;height:6px;background:#60A5FA;"></span> RTBF <span class="remove" onclick="event.stopPropagation(); removeClient('rtbf')">&times;</span>
+                  </span>
+                </div>
+                <div class="multiselect-dropdown" id="clientDropdown" style="display: none;">
+                  <div class="multiselect-search"><input placeholder="Search clients..." /></div>
+                  <div class="multiselect-list">
+                    <label class="multiselect-item"><input type="checkbox" checked /> <span class="color-dot" style="background:#3805E3;"></span> <span class="name">VRT</span> <span class="meta">8 channels</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked /> <span class="color-dot" style="background:#60A5FA;"></span> <span class="name">RTBF</span> <span class="meta">5 channels</span></label>
+                    <label class="multiselect-item"><input type="checkbox" /> <span class="color-dot" style="background:#2DD4BF;"></span> <span class="name">Channel 4</span> <span class="meta" style="color:var(--warning);">no channels</span></label>
+                    <label class="multiselect-item"><input type="checkbox" /> <span class="color-dot" style="background:#F59E0B;"></span> <span class="name">ARD</span> <span class="meta">12 channels</span></label>
+                  </div>
+                  <div class="multiselect-footer">
+                    <span class="count">2 of 4 selected</span>
+                    <a onclick="toggleDropdown('clientDropdown')">Done</a>
+                  </div>
+                </div>
+              </div>
+              <div class="form-hint">Select one or more clients to evaluate this goal against</div>
+            </div>
+
+            <!-- Dependent Channel Multi-Select -->
+            <div class="form-group">
+              <label class="form-label">Channels</label>
+              <div class="multiselect" id="channelMultiselect">
+                <div class="multiselect-trigger" onclick="toggleDropdown('channelDropdown')" style="gap: 4px;">
+                  <span class="multiselect-selected-pill" style="background: rgba(56,5,227,0.1); color: var(--cobalt-light); font-weight: 600; gap: 3px;">
+                    &#x1F4E1; All Channels
+                  </span>
+                </div>
+                <div class="multiselect-dropdown" id="channelDropdown" style="display: none; max-height: 360px;">
+                  <div class="multiselect-search"><input placeholder="Search channels..." /></div>
+                  <div class="multiselect-list">
+                    <!-- All Channels option -->
+                    <label class="multiselect-item" style="background: var(--bg-muted); border-bottom: 1px solid var(--border-light); font-weight: 600;">
+                      <input type="checkbox" checked id="allChannelsCheck" onchange="toggleAllChannels()" />
+                      <span style="font-size: 12px; font-weight: 600;">&#x1F4E1; All Channels</span>
+                    </label>
+
+                    <!-- VRT group -->
+                    <div class="channel-group-label"><span class="dot" style="background:#3805E3;"></span> VRT</div>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#3805E3;"></span> <span class="name">VRT 1</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#2DD4BF;"></span> <span class="name">Canvas</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#F59E0B;"></span> <span class="name">Ketnet</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#F87171;"></span> <span class="name">Sporza</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#60A5FA;"></span> <span class="name">VRTMAX</span> <span class="meta">On demand</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#A78BFA;"></span> <span class="name">VRT NWS</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#FB923C;"></span> <span class="name">MNM</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#34D399;"></span> <span class="name">Studio Brussel</span> <span class="meta">Linear</span></label>
+
+                    <!-- RTBF group -->
+                    <div class="channel-group-label"><span class="dot" style="background:#60A5FA;"></span> RTBF</div>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#60A5FA;"></span> <span class="name">La Une</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#2DD4BF;"></span> <span class="name">Tipik</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#F59E0B;"></span> <span class="name">La Trois</span> <span class="meta">Linear</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#A78BFA;"></span> <span class="name">Auvio</span> <span class="meta">On demand</span></label>
+                    <label class="multiselect-item"><input type="checkbox" checked disabled /> <span class="color-dot" style="background:#F87171;"></span> <span class="name">Classic 21</span> <span class="meta">Linear</span></label>
+                  </div>
+                  <div class="multiselect-footer">
+                    <span class="count">All 13 channels selected</span>
+                    <a onclick="toggleDropdown('channelDropdown')">Done</a>
+                  </div>
+                </div>
+              </div>
+              <div class="form-hint">Channels are grouped by client. "All Channels" includes every channel from selected clients.</div>
+            </div>
+
+            <!-- Owner + Period -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="form-group">
+                <label class="form-label">Owner</label>
+                <select class="form-select"><option>Yannick Verrydt</option><option>Andrew Stanton</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Period</label>
+                <select class="form-select"><option>Q1 2026</option><option selected>Annual 2026</option></select>
+              </div>
+            </div>
+
+            <!-- KRs -->
+            <div class="form-group">
+              <label class="form-label">Key Results</label>
+              <div style="background: var(--bg-muted); border: 1px solid var(--border-light); border-radius: 8px; padding: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 11px; color: var(--success);">&#x25CF;</span>
+                  <span style="font-size: 12px; font-weight: 500;">Rights Coverage</span>
+                  <span style="margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">0% &rarr; 95%</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 11px; color: var(--info);">&#x25CF;</span>
+                  <span style="font-size: 12px; font-weight: 500;">Media Coverage</span>
+                  <span style="margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">0% &rarr; 90%</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 11px; color: var(--warning);">&#x25CF;</span>
+                  <span style="font-size: 12px; font-weight: 500;">Schedule Lead Time</span>
+                  <span style="margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--text-faint);">0 &rarr; 30 days</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-primary">Create Goal</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- GOAL CARDS: Multi-client display            -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="goal-cards" class="demo-section">
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">How goals display multiple clients and channel scopes:</div>
+
+      <!-- Multi-client, All Channels -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="goal-title">HC - Long Term Planning</div>
+          <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">On Track</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+          <span class="scope-label">Clients:</span>
+          <span class="client-tag" style="background: rgba(56,5,227,0.12); color: var(--cobalt-light);">
+            <span class="color-dot" style="width:6px;height:6px;background:#3805E3;"></span> VRT
+          </span>
+          <span class="client-tag" style="background: rgba(96,165,250,0.12); color: var(--info);">
+            <span class="color-dot" style="width:6px;height:6px;background:#60A5FA;"></span> RTBF
+          </span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channels:</span>
+          <span class="pill-channel" style="background: rgba(56,5,227,0.08); color: var(--cobalt-light); border: 1px solid rgba(56,5,227,0.15); font-weight: 600; font-size: 10px;">&#x1F4E1; All Channels (13)</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width: 72%; background: var(--success);"></div></div>
+      </div>
+
+      <!-- Multi-client, Selected Channels -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="goal-title">HC - Media Management</div>
+          <span class="pill" style="background: rgba(245,158,11,0.15); color: var(--warning);">At Risk</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+          <span class="scope-label">Clients:</span>
+          <span class="client-tag" style="background: rgba(56,5,227,0.12); color: var(--cobalt-light);">
+            <span class="color-dot" style="width:6px;height:6px;background:#3805E3;"></span> VRT
+          </span>
+          <span class="client-tag" style="background: rgba(245,158,11,0.12); color: var(--warning);">
+            <span class="color-dot" style="width:6px;height:6px;background:#F59E0B;"></span> ARD
+          </span>
+          <span class="client-tag" style="background: rgba(45,212,191,0.12); color: var(--success);">
+            <span class="color-dot" style="width:6px;height:6px;background:#2DD4BF;"></span> Channel 4
+          </span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channels:</span>
+          <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25); font-size: 10px;">VRT 1</span>
+          <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25); font-size: 10px;">Canvas</span>
+          <span class="pill-channel" style="background: rgba(245,158,11,0.12); color: #FBB63C; border: 1px solid rgba(245,158,11,0.25); font-size: 10px;">Das Erste</span>
+          <span class="pill-channel" style="background: rgba(56,5,227,0.12); color: #7C5CFF; border: 1px solid rgba(56,5,227,0.25); font-size: 10px;">ONE</span>
+          <span style="font-size: 10px; color: var(--text-faint); font-family: var(--font-mono);">+2 more</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width: 48%; background: var(--warning);"></div></div>
+      </div>
+
+      <!-- Single client -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="goal-title">HC - Automation Rate</div>
+          <span class="pill" style="background: rgba(248,113,113,0.15); color: var(--danger);">Behind</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px;">
+          <span class="scope-label">Client:</span>
+          <span class="client-tag" style="background: rgba(96,165,250,0.12); color: var(--info);">
+            <span class="color-dot" style="width:6px;height:6px;background:#60A5FA;"></span> RTBF
+          </span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channels:</span>
+          <span class="pill-channel" style="background: rgba(96,165,250,0.12); color: #8BB8FC; border: 1px solid rgba(96,165,250,0.25); font-size: 10px;">La Une</span>
+          <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25); font-size: 10px;">Tipik</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width: 22%; background: var(--danger);"></div></div>
+      </div>
+
+      <!-- Legacy goal (no client) -->
+      <div class="card goal-card">
+        <div class="goal-card-header">
+          <div class="goal-title">Improve Content QC Turnaround</div>
+          <span class="pill" style="background: rgba(45,212,191,0.15); color: var(--success);">On Track</span>
+        </div>
+        <div class="goal-channel-scope">
+          <span class="scope-label">Channel:</span>
+          <span class="pill-channel" style="background: rgba(45,212,191,0.12); color: #5BE8D5; border: 1px solid rgba(45,212,191,0.25); font-size: 10px;">&#x1F4FA; VRT 1</span>
+          <span style="font-size: 9px; color: var(--text-faint); font-family: var(--font-mono);">(internal)</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width: 85%; background: var(--success);"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showSection(id) {
+    document.querySelectorAll('.demo-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.demo-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function activateNav(el) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function toggleDropdown(id) {
+    const dd = document.getElementById(id);
+    dd.style.display = dd.style.display === 'none' ? 'flex' : 'none';
+    dd.style.flexDirection = 'column';
+  }
+
+  function toggleClient(clientId) {
+    const el = document.getElementById(clientId + '-detail');
+    const arrow = document.getElementById(clientId + '-arrow');
+    if (el.style.display === 'none') {
+      el.style.display = 'block';
+      arrow.innerHTML = '&#x25BC;';
+    } else {
+      el.style.display = 'none';
+      arrow.innerHTML = '&#x25B6;';
+    }
+  }
+
+  function toggleAllChannels() {
+    const checked = document.getElementById('allChannelsCheck').checked;
+    document.querySelectorAll('#channelDropdown .multiselect-item input[type=checkbox]').forEach(cb => {
+      if (cb.id !== 'allChannelsCheck') {
+        cb.checked = checked;
+        cb.disabled = checked;
+      }
+    });
+    const countEl = document.querySelector('#channelDropdown .count');
+    countEl.textContent = checked ? 'All 13 channels selected' : '0 of 13 channels selected';
+    const trigger = document.querySelector('#channelMultiselect .multiselect-trigger');
+    if (checked) {
+      trigger.innerHTML = '<span class="multiselect-selected-pill" style="background:rgba(56,5,227,0.1);color:var(--cobalt-light);font-weight:600;gap:3px;">&#x1F4E1; All Channels</span>';
+    } else {
+      trigger.innerHTML = '<span class="placeholder">Select channels...</span>';
+    }
+  }
+
+  function removeClient(id) {
+    // Demo only — visual feedback
+    const trigger = document.querySelector('#clientMultiselect .multiselect-trigger');
+    const pills = trigger.querySelectorAll('.multiselect-selected-pill');
+    pills.forEach(p => {
+      if (p.textContent.toLowerCase().includes(id)) p.remove();
+    });
+  }
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#clientMultiselect')) {
+      document.getElementById('clientDropdown').style.display = 'none';
+    }
+    if (!e.target.closest('#channelMultiselect')) {
+      document.getElementById('channelDropdown').style.display = 'none';
+    }
+  });
+</script>
+</body>
+</html>

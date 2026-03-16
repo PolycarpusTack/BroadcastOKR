@@ -3,26 +3,26 @@ import { progressColor, statusIcon, kpiStatus } from '../colors';
 import type { KPI } from '../../types';
 
 describe('progressColor', () => {
-  it('returns green for high progress', () => {
-    expect(progressColor(0.8)).toBe('#10b981');
+  it('returns teal for high progress', () => {
+    expect(progressColor(0.8)).toBe('#2DD4BF');
   });
 
-  it('returns yellow for medium progress', () => {
-    expect(progressColor(0.5)).toBe('#f59e0b');
+  it('returns amber for medium progress', () => {
+    expect(progressColor(0.5)).toBe('#F59E0B');
   });
 
   it('returns red for low progress', () => {
-    expect(progressColor(0.2)).toBe('#ef4444');
+    expect(progressColor(0.2)).toBe('#F87171');
   });
 
   it('handles boundary at 0.7', () => {
-    expect(progressColor(0.7)).toBe('#10b981');
-    expect(progressColor(0.69)).toBe('#f59e0b');
+    expect(progressColor(0.7)).toBe('#2DD4BF');
+    expect(progressColor(0.69)).toBe('#F59E0B');
   });
 
   it('handles boundary at 0.4', () => {
-    expect(progressColor(0.4)).toBe('#f59e0b');
-    expect(progressColor(0.39)).toBe('#ef4444');
+    expect(progressColor(0.4)).toBe('#F59E0B');
+    expect(progressColor(0.39)).toBe('#F87171');
   });
 });
 
@@ -64,12 +64,12 @@ describe('kpiStatus', () => {
   it('handles zero target without crashing', () => {
     const result = kpiStatus(makeKpi(50, 0));
     expect(result.label).toBe('Off');
-    expect(result.color).toBe('#ef4444');
+    expect(result.color).toBe('#F87171');
   });
 
   it('handles zero current for lo direction without crashing', () => {
     const result = kpiStatus(makeKpi(0, 48, 'lo'));
     expect(result.label).toBe('Off');
-    expect(result.color).toBe('#ef4444');
+    expect(result.color).toBe('#F87171');
   });
 });

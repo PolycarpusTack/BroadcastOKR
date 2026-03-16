@@ -45,10 +45,11 @@ describe('getUrgencyBadge', () => {
     expect(badge.text).toBe('3d');
   });
 
-  it('uses dark theme colors when dark=true', () => {
-    const light = getUrgencyBadge(7, false);
-    const dark = getUrgencyBadge(7, true);
-    expect(light.bg).not.toBe(dark.bg);
+  it('returns consistent colors regardless of dark param', () => {
+    const a = getUrgencyBadge(7, false);
+    const b = getUrgencyBadge(7, true);
+    expect(a.bg).toBe(b.bg);
+    expect(a.bg).toBe('#78490A');
   });
 });
 

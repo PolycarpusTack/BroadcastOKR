@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Theme, ActivityEntry } from '../../types';
+import { PRIMARY_COLOR, FONT_HEADING, FONT_MONO } from '../../constants/config';
 
 interface ActivityLogProps {
   log: ActivityEntry[];
@@ -34,11 +35,11 @@ export function ActivityLog({ log, open, onClose, theme }: ActivityLogProps) {
         zIndex: 950,
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '-8px 0 30px rgba(0,0,0,.1)',
+        boxShadow: '-8px 0 30px rgba(0,0,0,.4)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${theme.borderLight}` }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: theme.text, margin: 0 }}>{'\u{1F4CB}'} Activity Log</h3>
+        <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0 }}>{'\u{1F4CB}'} Activity Log</h3>
         <button onClick={onClose} aria-label="Close activity log" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: theme.textFaint }}>{'\u2715'}</button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
@@ -47,10 +48,10 @@ export function ActivityLog({ log, open, onClose, theme }: ActivityLogProps) {
         ) : (
           log.map((entry) => (
             <div key={entry.id} style={{ padding: '10px 0', borderBottom: `1px solid ${theme.borderLight}`, display: 'flex', gap: 10 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: entry.color || '#4f46e5', marginTop: 5, flexShrink: 0 }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: entry.color || PRIMARY_COLOR, marginTop: 5, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: theme.text }}>{entry.text}</div>
-                <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 2, display: 'flex', gap: 8 }}>
+                <div style={{ fontFamily: FONT_MONO, fontSize: '10.5px', color: theme.textFaint, marginTop: 2, display: 'flex', gap: 8 }}>
                   <span>{entry.user}</span>
                   <span>{entry.time}</span>
                 </div>

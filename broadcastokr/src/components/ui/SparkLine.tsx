@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 interface SparkLineProps {
   data: number[];
   color: string;
@@ -5,7 +7,7 @@ interface SparkLineProps {
   h?: number;
 }
 
-export function SparkLine({ data, color, w = 80, h = 28 }: SparkLineProps) {
+export const SparkLine = memo(function SparkLine({ data, color, w = 80, h = 28 }: SparkLineProps) {
   if (data.length === 0) return <svg width={w} height={h} />;
   if (data.length === 1) {
     const cy = h / 2;
@@ -30,4 +32,4 @@ export function SparkLine({ data, color, w = 80, h = 28 }: SparkLineProps) {
       <circle cx={w} cy={lastY} r="3" fill={color} />
     </svg>
   );
-}
+});

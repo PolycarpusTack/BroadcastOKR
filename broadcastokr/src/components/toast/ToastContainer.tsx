@@ -1,4 +1,5 @@
 import { useToast } from '../../context/ToastContext';
+import { COLOR_SUCCESS } from '../../constants/config';
 
 export function ToastContainer() {
   const { toasts } = useToast();
@@ -10,13 +11,14 @@ export function ToastContainer() {
           key={t.id}
           className={t.exiting ? 'toast-exit' : 'toast-enter'}
           style={{
-            background: t.bg || '#10b981',
+            background: t.bg || COLOR_SUCCESS,
             color: '#fff',
             padding: '10px 16px',
             borderRadius: 10,
             fontSize: 13,
             fontWeight: 600,
-            boxShadow: '0 8px 24px rgba(0,0,0,.2)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 12px 32px rgba(0,0,0,.4)',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
