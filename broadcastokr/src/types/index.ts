@@ -12,13 +12,21 @@ export interface User {
   color: string;
   dept: string;
   title: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string;
+  clientIds?: string[];
+  skills?: string[];
 }
 
 export interface Team {
+  id: string;
   name: string;
   members: number[];
   color: string;
   icon: string;
+  leadId?: number;
+  clientIds?: string[];
 }
 
 export interface Channel {
