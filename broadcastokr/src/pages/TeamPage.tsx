@@ -9,6 +9,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { PillBadge } from '../components/ui/PillBadge';
 import { UserModal } from '../components/team/UserModal';
 import { TeamModal } from '../components/team/TeamModal';
+import { MemberInlineDetail } from '../components/team/MemberInlineDetail';
 import {
   PRIMARY_COLOR,
   COLOR_SUCCESS,
@@ -49,6 +50,10 @@ export function TeamPage() {
 
   // Team card expansion
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+
+  // Member card expansion
+  const [expandedMember, setExpandedMember] = useState<number | null>(null);
+  const [memberFilter, setMemberFilter] = useState<'tasks' | 'active' | 'done' | 'overdue' | 'goals'>('tasks');
 
   const now = useMemo(() => new Date(), []);
 
@@ -664,18 +669,385 @@ export function TeamPage() {
         </div>
       )}
 
-      {/* Members view — placeholder */}
+      {/* Members view */}
       {view === 'members' && (
-        <div
-          style={{
-            padding: 40,
-            textAlign: 'center',
-            color: theme.textMuted,
-            fontSize: 14,
-            fontFamily: FONT_BODY,
-          }}
-        >
-          Members view — coming next
+        <div>
+          {/* Header row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
+            }}
+          >
+            <h3
+              style={{
+                fontFamily: FONT_HEADING,
+                fontSize: 15,
+                fontWeight: 700,
+                color: theme.text,
+                margin: 0,
+              }}
+            >
+              Members
+            </h3>
+            {permissions.canCreate && (
+              <button
+                onClick={() => {
+                  setEditingUser(undefined);
+                  setUserModalOpen(true);
+                }}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: PRIMARY_COLOR,
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: FONT_BODY,
+                }}
+              >
+                + Add Member
+              </button>
+            )}
+          </div>
+
+          {users.length === 0 ? (
+            /* Empty state */
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 60,
+                gap: 12,
+                background: theme.bgCard,
+                border: `1px solid ${theme.border}`,
+                borderRadius: 12,
+              }}
+            >
+              <span style={{ fontSize: 36, opacity: 0.6 }}>{'\u{1F464}'}</span>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: theme.text,
+                  fontFamily: FONT_HEADING,
+                }}
+              >
+                No team members
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: theme.textMuted,
+                  textAlign: 'center',
+                  maxWidth: 320,
+                  fontFamily: FONT_BODY,
+                }}
+              >
+                Add your first team member to get started.
+              </div>
+            </div>
+          ) : (
+            /* Member grid */
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: 14,
+              }}
+            >
+              {users.map((user) => {
+                const userTasks = tasksByAssignee.get(user.id) || [];
+                const userGoals = goalsByOwner.get(user.id) || [];
+                const activeTasks = userTasks.filter((t) => t.status === 'in_progress');
+                const doneTasks = userTasks.filter((t) => t.status === 'done');
+                const overdueTasks = userTasks.filter(
+                  (t) => t.status !== 'done' && new Date(t.due) < now,
+                );
+                const userClients = (user.clientIds ?? [])
+                  .map((cid) => clients.find((c) => c.id === cid))
+                  .filter(Boolean);
+                const isExpanded = expandedMember === user.id;
+
+                type StatFilter = 'tasks' | 'active' | 'done' | 'overdue' | 'goals';
+                const stats: { label: string; value: number; color: string; filter: StatFilter }[] = [
+                  { label: 'Tasks', value: userTasks.length, color: theme.textSecondary, filter: 'tasks' },
+                  { label: 'Active', value: activeTasks.length, color: COLOR_WARNING, filter: 'active' },
+                  { label: 'Done', value: doneTasks.length, color: COLOR_SUCCESS, filter: 'done' },
+                  { label: 'Overdue', value: overdueTasks.length, color: COLOR_DANGER, filter: 'overdue' },
+                ];
+
+                return (
+                  <div
+                    key={user.id}
+                    style={{
+                      background: theme.bgCard,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Card body */}
+                    <div style={{ padding: 18 }}>
+                      {/* Avatar + name + role badge + edit */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 10,
+                          marginBottom: 12,
+                        }}
+                      >
+                        <Avatar user={user} size={40} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: theme.text,
+                              fontFamily: FONT_HEADING,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {user.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: theme.textSecondary,
+                              fontFamily: FONT_BODY,
+                              marginTop: 1,
+                            }}
+                          >
+                            {user.title}
+                            {user.dept ? ` · ${user.dept}` : ''}
+                          </div>
+                        </div>
+                        <PillBadge
+                          label={user.role}
+                          color={roleColor(user.role)}
+                        />
+                        {permissions.canEdit && (
+                          <button
+                            onClick={() => {
+                              setEditingUser(user);
+                              setUserModalOpen(true);
+                            }}
+                            title="Edit member"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: 14,
+                              color: theme.textMuted,
+                              padding: '4px 6px',
+                              borderRadius: 6,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {'\u270F\uFE0F'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Skills */}
+                      {(user.skills ?? []).length > 0 && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 4,
+                            marginBottom: 10,
+                          }}
+                        >
+                          {(user.skills ?? []).map((skill) => (
+                            <PillBadge
+                              key={skill}
+                              label={skill}
+                              color={PRIMARY_COLOR}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Client pills */}
+                      {userClients.length > 0 && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 6,
+                            marginBottom: 10,
+                          }}
+                        >
+                          {userClients.map((client) =>
+                            client ? (
+                              <span
+                                key={client.id}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '2px 8px',
+                                  borderRadius: 10,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  fontFamily: FONT_BODY,
+                                  background: client.color + '18',
+                                  color: theme.textSecondary,
+                                  border: `1px solid ${client.color}40`,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: '50%',
+                                    background: client.color,
+                                    display: 'inline-block',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                {client.name}
+                              </span>
+                            ) : null,
+                          )}
+                        </div>
+                      )}
+
+                      {/* Stat cards row */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(4, 1fr)',
+                          gap: 6,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {stats.map((stat) => {
+                          const isActive =
+                            isExpanded && memberFilter === stat.filter;
+                          return (
+                            <button
+                              key={stat.filter}
+                              onClick={() => {
+                                if (isActive) {
+                                  setExpandedMember(null);
+                                } else {
+                                  setExpandedMember(user.id);
+                                  setMemberFilter(stat.filter);
+                                }
+                              }}
+                              style={{
+                                padding: '8px 4px',
+                                borderRadius: 8,
+                                border: `1px solid ${isActive ? stat.color : theme.border}`,
+                                background: isActive
+                                  ? stat.color + '18'
+                                  : theme.bgMuted,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 15,
+                                  fontWeight: 700,
+                                  color: stat.color,
+                                  fontFamily: FONT_HEADING,
+                                  lineHeight: 1,
+                                }}
+                              >
+                                {stat.value}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: theme.textMuted,
+                                  fontFamily: FONT_BODY,
+                                  fontWeight: 600,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                }}
+                              >
+                                {stat.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Goals owned */}
+                      <button
+                        onClick={() => {
+                          const isGoalsActive =
+                            isExpanded && memberFilter === 'goals';
+                          if (isGoalsActive) {
+                            setExpandedMember(null);
+                          } else {
+                            setExpandedMember(user.id);
+                            setMemberFilter('goals');
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          marginTop: 6,
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          border: `1px solid ${isExpanded && memberFilter === 'goals' ? PRIMARY_COLOR : theme.border}`,
+                          background:
+                            isExpanded && memberFilter === 'goals'
+                              ? PRIMARY_COLOR + '12'
+                              : theme.bgMuted,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          fontSize: 11,
+                          fontFamily: FONT_BODY,
+                          color: theme.textSecondary,
+                        }}
+                      >
+                        <span>Goals owned</span>
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color: PRIMARY_COLOR,
+                            fontFamily: FONT_HEADING,
+                            fontSize: 13,
+                          }}
+                        >
+                          {userGoals.length}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Inline detail */}
+                    {isExpanded && (
+                      <MemberInlineDetail
+                        tasks={userTasks}
+                        goals={userGoals}
+                        clients={clients}
+                        filter={memberFilter}
+                        theme={theme}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
