@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
-import { CHANNELS, USERS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../constants';
+import { CHANNELS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../constants';
 import { PRIMARY_COLOR, COLOR_DANGER } from '../constants/config';
 import { safeUser, safeChannel } from '../utils/safeGet';
 import { selectStyle as makeSelectStyle } from '../utils/styles';
@@ -31,6 +31,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
   const addTask = useStore((s) => s.addTask);
   const moveTask = useStore((s) => s.moveTask);
   const clients = useStore((s) => s.clients);
+  const users = useStore((s) => s.users);
 
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [filterChannel, setFilterChannel] = useState('all');
@@ -169,7 +170,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
                 </tr>
               )}
               {filtered.map((task) => {
-                const user = safeUser(USERS, task.assignee);
+                const user = safeUser(users, task.assignee);
                 const days = daysUntil(task.due);
                 const badge = getUrgencyBadge(days, dark);
                 const pri = PRIORITIES[task.priority];

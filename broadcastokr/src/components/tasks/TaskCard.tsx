@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { CHANNELS, USERS, PRIORITIES, TASK_TYPES } from '../../constants';
+import { CHANNELS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { safeUser, safeChannel } from '../../utils/safeGet';
 import { ChannelBadge } from '../ui/ChannelBadge';
 import { PillBadge } from '../ui/PillBadge';
@@ -18,7 +18,8 @@ interface TaskCardProps {
 
 export const TaskCard = memo(function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
   const clients = useStore((s) => s.clients);
-  const user = safeUser(USERS, task.assignee);
+  const users = useStore((s) => s.users);
+  const user = safeUser(users, task.assignee);
   const days = daysUntil(task.due);
   const badge = getUrgencyBadge(days, dark);
   const pri = PRIORITIES[task.priority];

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
-import { CHANNELS, USERS } from '../constants';
+import { CHANNELS } from '../constants';
 import { safeUser, safeChannel } from '../utils/safeGet';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { SparkLine } from '../components/ui/SparkLine';
@@ -41,6 +41,7 @@ export function DashboardPage({
   const goals = useStore((s) => s.goals);
   const tasks = useStore((s) => s.tasks);
   const kpis = useStore((s) => s.kpis);
+  const users = useStore((s) => s.users);
 
   const activeTasks = useMemo(() => tasks.filter((t) => t.status !== 'done'), [tasks]);
   const urgentTasks = useMemo(() =>
@@ -179,7 +180,7 @@ export function DashboardPage({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {urgentTasks.map((t) => {
                 const badge = getUrgencyBadge(t.days, dark);
-                const user = safeUser(USERS, t.assignee);
+                const user = safeUser(users, t.assignee);
                 return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
                     <Avatar user={user} size={24} />

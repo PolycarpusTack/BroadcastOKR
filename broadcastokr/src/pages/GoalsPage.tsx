@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
-import { CHANNELS, USERS } from '../constants';
+import { CHANNELS } from '../constants';
 import { safeUser, safeChannel } from '../utils/safeGet';
 import { selectStyle as makeSelectStyle } from '../utils/styles';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -74,6 +74,7 @@ export function GoalsPage({
   // Template selectors
   const goalTemplates = useStore((s) => s.goalTemplates);
   const clients = useStore((s) => s.clients);
+  const users = useStore((s) => s.users);
   const addGoalTemplate = useStore((s) => s.addGoalTemplate);
   const updateGoalTemplate = useStore((s) => s.updateGoalTemplate);
   const deleteGoalTemplate = useStore((s) => s.deleteGoalTemplate);
@@ -178,7 +179,7 @@ export function GoalsPage({
       return;
     }
     if (newChannel < 0 || newChannel >= CHANNELS.length) return;
-    if (newOwner < 0 || newOwner >= USERS.length) return;
+    if (!users.find((u) => u.id === newOwner)) return;
     const goal: Goal = {
       id: nextGoalId(),
       title: newTitle.trim(),
@@ -584,7 +585,7 @@ export function GoalsPage({
       ) : (
         filtered.map((goal) => {
           const isExpanded = expanded === goal.id;
-          const owner = safeUser(USERS, goal.owner);
+          const owner = safeUser(users, goal.owner);
           const hasLiveKRs = goal.keyResults.some((kr) => kr.liveConfig);
           const isSyncing = syncingGoalId === goal.id;
           const isTemplateBacked = !!goal.templateId;

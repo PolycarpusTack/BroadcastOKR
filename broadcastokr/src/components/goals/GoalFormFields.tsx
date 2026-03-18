@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, type CSSProperties } from 'react';
-import { CHANNELS, USERS } from '../../constants';
+import { CHANNELS } from '../../constants';
+import { useStore } from '../../store/store';
 import type { Theme, LiveKRConfig, Client, ScopedChannelRef } from '../../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../../hooks/useBridge';
 import { PRIMARY_COLOR, COLOR_DANGER, COLOR_INFO, FONT_MONO } from '../../constants/config';
@@ -56,6 +57,7 @@ export function GoalFormFields({
   channelScopeType = 'all', setChannelScopeType,
   selectedChannels = [], setSelectedChannels,
 }: GoalFormFieldsProps) {
+  const users = useStore((s) => s.users);
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
   const krInputStyle = { ...inputStyle, padding: '8px 10px', borderRadius: 6, fontSize: 12 };
   const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: theme.textMuted, display: 'block' as const, marginBottom: 4 };
@@ -374,7 +376,7 @@ export function GoalFormFields({
         <div>
           <label style={labelStyle}>Owner</label>
           <select aria-label="Owner" value={owner} onChange={(e) => setOwner(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
-            {USERS.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </div>
         <div>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useMemo, type ReactNode } from 'react';
 import type { User, RolePermissions } from '../types';
-import { USERS, ROLE_PERMS } from '../constants';
+import { ROLE_PERMS } from '../constants';
+import { useStore } from '../store/store';
 
 interface AuthContextValue {
   currentUser: User;
@@ -11,7 +12,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User>(USERS[0]);
+  const users = useStore((s) => s.users);
+  const [currentUser, setCurrentUser] = useState<User>(users[0]);
   const permissions = ROLE_PERMS[currentUser.role];
 
   const value = useMemo(() => ({ currentUser, setCurrentUser, permissions }), [currentUser, permissions]);

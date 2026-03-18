@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
-import { USERS, TEAMS } from '../constants';
+
+
 import { safeUser } from '../utils/safeGet';
 import { Avatar } from '../components/ui/Avatar';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -14,6 +15,8 @@ export function TeamPage() {
   const navigate = useNavigate();
   const tasks = useStore((s) => s.tasks);
   const goals = useStore((s) => s.goals);
+  const users = useStore((s) => s.users);
+  const teams = useStore((s) => s.teams);
 
   const now = useMemo(() => new Date(), []);
 
@@ -43,8 +46,8 @@ export function TeamPage() {
       <div>
         <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F465}'} Teams</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-          {TEAMS.map((team) => {
-            const memberUsers = team.members.map((id) => safeUser(USERS, id));
+          {teams.map((team) => {
+            const memberUsers = team.members.map((id) => safeUser(users, id));
             const memberTasks = team.members.flatMap((id) => tasksByAssignee.get(id) || []);
             const doneTasks = memberTasks.filter((t) => t.status === 'done').length;
             const progress = memberTasks.length ? doneTasks / memberTasks.length : 0;
@@ -77,7 +80,7 @@ export function TeamPage() {
       <div>
         <h3 style={{ fontFamily: FONT_HEADING, fontSize: 15, fontWeight: 700, color: theme.text, margin: 0, marginBottom: 16 }}>{'\u{1F464}'} Team Members</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
-          {USERS.map((user) => {
+          {users.map((user) => {
             const userTasks = tasksByAssignee.get(user.id) || [];
             const userGoals = goalsByOwner.get(user.id) || [];
             const doneTasks = userTasks.filter((t) => t.status === 'done').length;
