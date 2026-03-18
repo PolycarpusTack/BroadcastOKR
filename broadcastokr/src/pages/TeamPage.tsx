@@ -10,6 +10,8 @@ import { PillBadge } from '../components/ui/PillBadge';
 import { UserModal } from '../components/team/UserModal';
 import { TeamModal } from '../components/team/TeamModal';
 import { MemberInlineDetail } from '../components/team/MemberInlineDetail';
+import { TaskLoadChart } from '../components/team/TaskLoadChart';
+import { ClientCoverageMatrix } from '../components/team/ClientCoverageMatrix';
 import {
   PRIMARY_COLOR,
   COLOR_SUCCESS,
@@ -1051,18 +1053,42 @@ export function TeamPage() {
         </div>
       )}
 
-      {/* Workload view — placeholder */}
+      {/* Workload view */}
       {view === 'workload' && (
-        <div
-          style={{
-            padding: 40,
-            textAlign: 'center',
-            color: theme.textMuted,
-            fontSize: 14,
-            fontFamily: FONT_BODY,
-          }}
-        >
-          Workload view — coming next
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div>
+            <h3
+              style={{
+                fontFamily: FONT_HEADING,
+                fontSize: 15,
+                fontWeight: 700,
+                color: theme.text,
+                margin: '0 0 12px 0',
+              }}
+            >
+              Task Load Balance
+            </h3>
+            <TaskLoadChart users={users} tasks={tasks} theme={theme} />
+          </div>
+          <div>
+            <h3
+              style={{
+                fontFamily: FONT_HEADING,
+                fontSize: 15,
+                fontWeight: 700,
+                color: theme.text,
+                margin: '0 0 12px 0',
+              }}
+            >
+              Client Coverage
+            </h3>
+            <ClientCoverageMatrix
+              users={users}
+              clients={clients}
+              goals={goals}
+              theme={theme}
+            />
+          </div>
         </div>
       )}
 
