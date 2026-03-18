@@ -473,6 +473,25 @@ export const useStore = create<AppStore>()(
     }),
     {
       name: 'broadcastokr-data',
+      storage: {
+        getItem: (name) => {
+          const value = localStorage.getItem(name);
+          return value ? JSON.parse(value) : null;
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch (e) {
+            if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+              console.warn('localStorage quota exceeded — state not persisted');
+              window.dispatchEvent(new CustomEvent('storage-quota-exceeded'));
+            } else {
+              throw e;
+            }
+          }
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.goals = migrateKRIds(state.goals);
