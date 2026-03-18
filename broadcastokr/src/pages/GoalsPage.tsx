@@ -21,7 +21,7 @@ import { MaterializeModal } from '../components/templates/MaterializeModal';
 import { progressColor, statusIcon, goalStatus } from '../utils/colors';
 import { nextGoalId } from '../utils/ids';
 import { resolveScopedChannels } from '../utils/channelScope';
-import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO } from '../constants/config';
+import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO, COLOR_WARNING } from '../constants/config';
 import type { Goal, KeyResult, SyncStatus, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
 
@@ -69,6 +69,7 @@ export function GoalsPage({
   const updateGoal = useStore((s) => s.updateGoal);
   const deleteGoal = useStore((s) => s.deleteGoal);
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
+  const setMonitor = useStore((s) => s.setMonitor);
 
   // Template selectors
   const goalTemplates = useStore((s) => s.goalTemplates);
@@ -101,6 +102,7 @@ export function GoalsPage({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingGoalId, setSyncingGoalId] = useState<string | null>(null);
+  const [monitorOpen, setMonitorOpen] = useState<string | null>(null);
 
   const [checkInTarget, setCheckInTarget] = useState<{ goalId: string; krIndex: number } | null>(null);
 
@@ -586,6 +588,16 @@ export function GoalsPage({
           const hasLiveKRs = goal.keyResults.some((kr) => kr.liveConfig);
           const isSyncing = syncingGoalId === goal.id;
           const isTemplateBacked = !!goal.templateId;
+
+          // Monitoring state
+          const goalMonitorActive = !!goal.monitorUntil && new Date(goal.monitorUntil) > new Date();
+          const monitoringClients = (goal.clientIds ?? [])
+            .map((cid) => clients.find((c) => c.id === cid))
+            .filter((c): c is NonNullable<typeof c> => !!c && !!c.monitorUntil && new Date(c.monitorUntil) > new Date());
+          const clientMonitorActive = !goalMonitorActive && monitoringClients.length > 0;
+
+          const fmtDate = (d: string) =>
+            new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
           const resolvedGoalScopedChannels =
             goal.channelScope?.type === 'selected'
               ? resolveScopedChannels(goal.channelScope, clients)
@@ -676,19 +688,89 @@ export function GoalsPage({
                     <span style={{ fontSize: 11, fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '.05em' }}>
                       Key Results ({goal.keyResults.length})
                     </span>
-                    {hasLiveKRs && bridgeConnected && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); syncGoal(goal.id, goal.keyResults); }}
-                        disabled={isSyncing}
-                        style={{
-                          padding: '3px 10px', borderRadius: 4, border: 'none',
-                          background: COLOR_INFO, color: '#fff', fontSize: 10, fontWeight: 700,
-                          cursor: isSyncing ? 'not-allowed' : 'pointer', opacity: isSyncing ? 0.6 : 1,
-                        }}
-                      >
-                        {isSyncing ? '\u{1F504} Syncing...' : '\u{1F4E1} Sync Live KRs'}
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {hasLiveKRs && bridgeConnected && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); syncGoal(goal.id, goal.keyResults); }}
+                          disabled={isSyncing}
+                          style={{
+                            padding: '3px 10px', borderRadius: 4, border: 'none',
+                            background: COLOR_INFO, color: '#fff', fontSize: 10, fontWeight: 700,
+                            cursor: isSyncing ? 'not-allowed' : 'pointer', opacity: isSyncing ? 0.6 : 1,
+                          }}
+                        >
+                          {isSyncing ? '\u{1F504} Syncing...' : '\u{1F4E1} Sync Live KRs'}
+                        </button>
+                      )}
+                      {permissions.canCheckIn && (
+                        goalMonitorActive ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <PillBadge
+                              label={`Monitoring until ${fmtDate(goal.monitorUntil!)}`}
+                              color={COLOR_WARNING}
+                            />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMonitor('goal', goal.id, null); }}
+                              style={{
+                                padding: '1px 5px', borderRadius: 4, border: `1px solid ${COLOR_WARNING}`,
+                                background: 'transparent', color: COLOR_WARNING, fontSize: 9,
+                                fontWeight: 700, cursor: 'pointer', lineHeight: 1,
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ) : clientMonitorActive ? (
+                          <PillBadge
+                            label={`Monitored via ${
+                              monitoringClients.length === 1
+                                ? monitoringClients[0].name
+                                : monitoringClients.length === 2
+                                ? `${monitoringClients[0].name}, ${monitoringClients[1].name}`
+                                : `${monitoringClients[0].name}, ${monitoringClients[1].name} +${monitoringClients.length - 2} more`
+                            }`}
+                            color={COLOR_WARNING}
+                          />
+                        ) : monitorOpen === goal.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                            {[1, 3, 7, 14].map((d) => (
+                              <button
+                                key={d}
+                                onClick={() => { setMonitor('goal', goal.id, d); setMonitorOpen(null); }}
+                                style={{
+                                  padding: '2px 7px', borderRadius: 4, border: `1px solid ${COLOR_WARNING}`,
+                                  background: 'transparent', color: COLOR_WARNING, fontSize: 10,
+                                  fontWeight: 700, cursor: 'pointer',
+                                }}
+                              >
+                                {d}d
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => setMonitorOpen(null)}
+                              style={{
+                                padding: '2px 6px', borderRadius: 4, border: `1px solid ${theme.border}`,
+                                background: 'transparent', color: theme.textMuted, fontSize: 10,
+                                fontWeight: 600, cursor: 'pointer',
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setMonitorOpen(goal.id); }}
+                            style={{
+                              padding: '2px 8px', borderRadius: 4, border: `1px solid ${theme.border}`,
+                              background: 'transparent', color: theme.textMuted, fontSize: 10,
+                              fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            Monitor
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                   {goal.keyResults.map((kr, ki) => (
                     <div key={ki} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: theme.bgMuted, border: `1px solid ${theme.borderLight}`, marginBottom: 8 }}>
