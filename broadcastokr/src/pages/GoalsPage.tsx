@@ -14,13 +14,15 @@ import { PillBadge } from '../components/ui/PillBadge';
 import { Modal } from '../components/ui/Modal';
 import { GoalFormFields } from '../components/goals/GoalFormFields';
 import type { GoalFormKR } from '../components/goals/GoalFormFields';
+import { CheckInModal } from '../components/goals/CheckInModal';
 import { TemplateCard } from '../components/templates/TemplateCard';
 import { TemplateForm } from '../components/templates/TemplateForm';
 import { MaterializeModal } from '../components/templates/MaterializeModal';
 import { progressColor, statusIcon, goalStatus } from '../utils/colors';
 import { nextGoalId } from '../utils/ids';
-import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO } from '../constants/config';
-import type { Goal, KeyResult, SyncStatus, GoalTemplate } from '../types';
+import { resolveScopedChannels } from '../utils/channelScope';
+import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO, COLOR_WARNING } from '../constants/config';
+import type { Goal, KeyResult, SyncStatus, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
 
 interface GoalsPageProps {
@@ -34,8 +36,6 @@ interface GoalsPageProps {
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   /** Preview SQL query */
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
-  /** Fetch channels for a connection */
-  getChannels?: (connectionId: string) => Promise<Array<{ id: string; name: string; internalValue?: string; channelKind?: string }>>;
   /** Execute batch of KR queries */
   executeBatch?: (queries: Array<{
     goalId: string;
@@ -57,7 +57,7 @@ interface GoalsPageProps {
 
 export function GoalsPage({
   bridgeConnected = false, getConnections,
-  getTables, getColumns, previewQuery, getChannels, executeBatch,
+  getTables, getColumns, previewQuery, executeBatch,
 }: GoalsPageProps) {
   const { theme } = useTheme();
   const { currentUser, permissions } = useAuth();
@@ -65,10 +65,11 @@ export function GoalsPage({
   const { logAction } = useActivityLog();
   const goals = useStore((s) => s.goals);
   const addGoal = useStore((s) => s.addGoal);
-  const checkIn = useStore((s) => s.checkIn);
+  const checkInKR = useStore((s) => s.checkInKR);
   const updateGoal = useStore((s) => s.updateGoal);
   const deleteGoal = useStore((s) => s.deleteGoal);
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
+  const setMonitor = useStore((s) => s.setMonitor);
 
   // Template selectors
   const goalTemplates = useStore((s) => s.goalTemplates);
@@ -101,6 +102,9 @@ export function GoalsPage({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingGoalId, setSyncingGoalId] = useState<string | null>(null);
+  const [monitorOpen, setMonitorOpen] = useState<string | null>(null);
+
+  const [checkInTarget, setCheckInTarget] = useState<{ goalId: string; krIndex: number } | null>(null);
 
   // Template modal state
   const [templateFormOpen, setTemplateFormOpen] = useState(false);
@@ -118,7 +122,7 @@ export function GoalsPage({
   const [newKRs, setNewKRs] = useState<GoalFormKR[]>([{ title: '', start: 0, target: 100 }]);
   const [newClientIds, setNewClientIds] = useState<string[]>([]);
   const [newChannelScopeType, setNewChannelScopeType] = useState<'all' | 'selected'>('all');
-  const [newSelectedChannelIds, setNewSelectedChannelIds] = useState<string[]>([]);
+  const [newSelectedChannels, setNewSelectedChannels] = useState<ScopedChannelRef[]>([]);
 
   // Edit modal state
   const [editGoalId, setEditGoalId] = useState<string | null>(null);
@@ -129,7 +133,7 @@ export function GoalsPage({
   const [editKRs, setEditKRs] = useState<GoalFormKR[]>([]);
   const [editClientIds, setEditClientIds] = useState<string[]>([]);
   const [editChannelScopeType, setEditChannelScopeType] = useState<'all' | 'selected'>('all');
-  const [editSelectedChannelIds, setEditSelectedChannelIds] = useState<string[]>([]);
+  const [editSelectedChannels, setEditSelectedChannels] = useState<ScopedChannelRef[]>([]);
 
   // Re-fetch connections when create/edit modal opens (picks up new connections from KPIConfigModal)
   useEffect(() => {
@@ -169,6 +173,10 @@ export function GoalsPage({
         return;
       }
     }
+    if (newClientIds.length > 0 && newChannelScopeType === 'selected' && newSelectedChannels.length === 0) {
+      toast('Select at least one scoped channel', COLOR_DANGER, '\u26A0\uFE0F');
+      return;
+    }
     if (newChannel < 0 || newChannel >= CHANNELS.length) return;
     if (newOwner < 0 || newOwner >= USERS.length) return;
     const goal: Goal = {
@@ -184,7 +192,7 @@ export function GoalsPage({
         clientIds: newClientIds,
         channelScope: newChannelScopeType === 'all'
           ? { type: 'all' as const }
-          : { type: 'selected' as const, channelIds: newSelectedChannelIds },
+          : { type: 'selected' as const, channels: newSelectedChannels },
       }),
     };
     addGoal(goal);
@@ -195,7 +203,7 @@ export function GoalsPage({
     setNewKRs([{ title: '', start: 0, target: 100 }]);
     setNewClientIds([]);
     setNewChannelScopeType('all');
-    setNewSelectedChannelIds([]);
+    setNewSelectedChannels([]);
 
     // Auto-sync live KRs after creation
     const liveKRs = goal.keyResults
@@ -206,12 +214,6 @@ export function GoalsPage({
     }
   };
 
-  const handleCheckIn = (goalId: string, krIndex: number, goalTitle: string) => {
-    checkIn(goalId, krIndex);
-    toast('Check-in recorded!', COLOR_SUCCESS, '\u{1F4CB}');
-    logAction(`Check-in on "${goalTitle}" KR #${krIndex + 1}`, currentUser.name, COLOR_SUCCESS);
-  };
-
   const openEditModal = (goal: Goal) => {
     setEditGoalId(goal.id);
     setEditTitle(goal.title);
@@ -219,6 +221,7 @@ export function GoalsPage({
     setEditOwner(goal.owner);
     setEditPeriod(goal.period);
     setEditKRs(goal.keyResults.map((kr) => ({
+      id: kr.id,
       title: kr.title,
       start: kr.start,
       target: kr.target,
@@ -227,10 +230,10 @@ export function GoalsPage({
     setEditClientIds(goal.clientIds ?? []);
     if (goal.channelScope?.type === 'selected') {
       setEditChannelScopeType('selected');
-      setEditSelectedChannelIds(goal.channelScope.channelIds);
+      setEditSelectedChannels(goal.channelScope.channels);
     } else {
       setEditChannelScopeType('all');
-      setEditSelectedChannelIds([]);
+      setEditSelectedChannels([]);
     }
   };
 
@@ -238,12 +241,16 @@ export function GoalsPage({
     if (!editGoalId || !editTitle.trim() || editTitle.length > 200) { toast('Please enter a title (max 200 chars)', COLOR_DANGER, '\u26A0\uFE0F'); return; }
     const krs = editKRs.filter((kr) => kr.title.trim());
     if (krs.length === 0) { toast('Add at least one key result', COLOR_DANGER, '\u26A0\uFE0F'); return; }
+    if (editClientIds.length > 0 && editChannelScopeType === 'selected' && editSelectedChannels.length === 0) {
+      toast('Select at least one scoped channel', COLOR_DANGER, '\u26A0\uFE0F');
+      return;
+    }
 
     const existingGoal = goals.find((g) => g.id === editGoalId);
     if (!existingGoal) return;
 
     const updatedKRs: KeyResult[] = krs.map((kr, i) => {
-      const existing = existingGoal.keyResults[i];
+      const existing = kr.id ? existingGoal.keyResults.find((e) => e.id === kr.id) : undefined;
       // If nothing changed on this KR, preserve existing state
       if (existing && existing.title === kr.title && existing.start === kr.start && existing.target === kr.target
         && JSON.stringify(existing.liveConfig) === JSON.stringify(kr.liveConfig)) {
@@ -264,6 +271,7 @@ export function GoalsPage({
         syncStatus: kr.liveConfig ? (existing?.syncStatus || 'pending') : undefined,
         syncError: kr.liveConfig ? existing?.syncError : undefined,
         lastSyncAt: kr.liveConfig ? existing?.lastSyncAt : undefined,
+        history: existing?.history,
       };
     });
 
@@ -277,7 +285,7 @@ export function GoalsPage({
         clientIds: editClientIds,
         channelScope: editChannelScopeType === 'all'
           ? { type: 'all' as const }
-          : { type: 'selected' as const, channelIds: editSelectedChannelIds },
+          : { type: 'selected' as const, channels: editSelectedChannels },
       }),
       ...(editClientIds.length === 0 && {
         clientIds: undefined,
@@ -289,7 +297,7 @@ export function GoalsPage({
     setEditGoalId(null);
     setEditClientIds([]);
     setEditChannelScopeType('all');
-    setEditSelectedChannelIds([]);
+    setEditSelectedChannels([]);
 
     // Auto-sync live KRs after edit (in case SQL or connection changed)
     const liveKRs = updatedKRs.filter((kr) => kr.liveConfig);
@@ -581,6 +589,20 @@ export function GoalsPage({
           const isSyncing = syncingGoalId === goal.id;
           const isTemplateBacked = !!goal.templateId;
 
+          // Monitoring state
+          const goalMonitorActive = !!goal.monitorUntil && new Date(goal.monitorUntil) > new Date();
+          const monitoringClients = (goal.clientIds ?? [])
+            .map((cid) => clients.find((c) => c.id === cid))
+            .filter((c): c is NonNullable<typeof c> => !!c && !!c.monitorUntil && new Date(c.monitorUntil) > new Date());
+          const clientMonitorActive = !goalMonitorActive && monitoringClients.length > 0;
+
+          const fmtDate = (d: string) =>
+            new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const resolvedGoalScopedChannels =
+            goal.channelScope?.type === 'selected'
+              ? resolveScopedChannels(goal.channelScope, clients)
+              : [];
+
           return (
             <div key={goal.id} style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 10, overflow: 'hidden' }}>
               <div onClick={() => setExpanded(isExpanded ? null : goal.id)} style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -600,17 +622,13 @@ export function GoalsPage({
                           color={clients.find((c) => goal.clientIds?.includes(c.id))?.color ?? PRIMARY_COLOR}
                         />
                       ) : (
-                        goal.channelScope.channelIds.map((chId) => {
-                          const ownerClient = clients.find((c) => (c.channels || []).some((ch) => ch.id === chId));
-                          const chInfo = (ownerClient?.channels || []).find((ch) => ch.id === chId);
-                          return chInfo ? (
-                            <PillBadge
-                              key={chId}
-                              label={chInfo.name}
-                              color={chInfo.color ?? ownerClient?.color ?? PRIMARY_COLOR}
-                            />
-                          ) : null;
-                        })
+                        resolvedGoalScopedChannels.map((channel) => (
+                          <PillBadge
+                            key={channel.key}
+                            label={channel.label}
+                            color={channel.color}
+                          />
+                        ))
                       )
                     ) : (
                       <ChannelBadge channel={safeChannel(CHANNELS, goal.channel)} />
@@ -670,19 +688,89 @@ export function GoalsPage({
                     <span style={{ fontSize: 11, fontWeight: 700, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '.05em' }}>
                       Key Results ({goal.keyResults.length})
                     </span>
-                    {hasLiveKRs && bridgeConnected && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); syncGoal(goal.id, goal.keyResults); }}
-                        disabled={isSyncing}
-                        style={{
-                          padding: '3px 10px', borderRadius: 4, border: 'none',
-                          background: COLOR_INFO, color: '#fff', fontSize: 10, fontWeight: 700,
-                          cursor: isSyncing ? 'not-allowed' : 'pointer', opacity: isSyncing ? 0.6 : 1,
-                        }}
-                      >
-                        {isSyncing ? '\u{1F504} Syncing...' : '\u{1F4E1} Sync Live KRs'}
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {hasLiveKRs && bridgeConnected && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); syncGoal(goal.id, goal.keyResults); }}
+                          disabled={isSyncing}
+                          style={{
+                            padding: '3px 10px', borderRadius: 4, border: 'none',
+                            background: COLOR_INFO, color: '#fff', fontSize: 10, fontWeight: 700,
+                            cursor: isSyncing ? 'not-allowed' : 'pointer', opacity: isSyncing ? 0.6 : 1,
+                          }}
+                        >
+                          {isSyncing ? '\u{1F504} Syncing...' : '\u{1F4E1} Sync Live KRs'}
+                        </button>
+                      )}
+                      {permissions.canCheckIn && (
+                        goalMonitorActive ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <PillBadge
+                              label={`Monitoring until ${fmtDate(goal.monitorUntil!)}`}
+                              color={COLOR_WARNING}
+                            />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setMonitor('goal', goal.id, null); }}
+                              style={{
+                                padding: '1px 5px', borderRadius: 4, border: `1px solid ${COLOR_WARNING}`,
+                                background: 'transparent', color: COLOR_WARNING, fontSize: 9,
+                                fontWeight: 700, cursor: 'pointer', lineHeight: 1,
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ) : clientMonitorActive ? (
+                          <PillBadge
+                            label={`Monitored via ${
+                              monitoringClients.length === 1
+                                ? monitoringClients[0].name
+                                : monitoringClients.length === 2
+                                ? `${monitoringClients[0].name}, ${monitoringClients[1].name}`
+                                : `${monitoringClients[0].name}, ${monitoringClients[1].name} +${monitoringClients.length - 2} more`
+                            }`}
+                            color={COLOR_WARNING}
+                          />
+                        ) : monitorOpen === goal.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                            {[1, 3, 7, 14].map((d) => (
+                              <button
+                                key={d}
+                                onClick={() => { setMonitor('goal', goal.id, d); setMonitorOpen(null); }}
+                                style={{
+                                  padding: '2px 7px', borderRadius: 4, border: `1px solid ${COLOR_WARNING}`,
+                                  background: 'transparent', color: COLOR_WARNING, fontSize: 10,
+                                  fontWeight: 700, cursor: 'pointer',
+                                }}
+                              >
+                                {d}d
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => setMonitorOpen(null)}
+                              style={{
+                                padding: '2px 6px', borderRadius: 4, border: `1px solid ${theme.border}`,
+                                background: 'transparent', color: theme.textMuted, fontSize: 10,
+                                fontWeight: 600, cursor: 'pointer',
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setMonitorOpen(goal.id); }}
+                            style={{
+                              padding: '2px 8px', borderRadius: 4, border: `1px solid ${theme.border}`,
+                              background: 'transparent', color: theme.textMuted, fontSize: 10,
+                              fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            Monitor
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                   {goal.keyResults.map((kr, ki) => (
                     <div key={ki} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: theme.bgMuted, border: `1px solid ${theme.borderLight}`, marginBottom: 8 }}>
@@ -710,7 +798,10 @@ export function GoalsPage({
                       <div style={{ width: 80 }}><ProgressBar value={kr.progress} height={5} theme={theme} /></div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(kr.progress), minWidth: 36, textAlign: 'right' }}>{Math.round(kr.progress * 100)}%</span>
                       {permissions.canCheckIn && !kr.liveConfig && (
-                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(goal.id, ki, goal.title); }} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: COLOR_SUCCESS, color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
+                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki }); }} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: COLOR_SUCCESS, color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
+                      )}
+                      {permissions.canCheckIn && kr.liveConfig && (
+                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki }); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLOR_SUCCESS}`, background: 'transparent', color: COLOR_SUCCESS, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
                       )}
                     </div>
                   ))}
@@ -736,7 +827,7 @@ export function GoalsPage({
       )}
 
       {/* Create Goal Modal */}
-      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannelIds([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
+      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannels([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <GoalFormFields
             title={newTitle} setTitle={setNewTitle}
@@ -754,15 +845,15 @@ export function GoalsPage({
             setSelectedClientIds={setNewClientIds}
             channelScopeType={newChannelScopeType}
             setChannelScopeType={setNewChannelScopeType}
-            selectedChannelIds={newSelectedChannelIds}
-            setSelectedChannelIds={setNewSelectedChannelIds}
+            selectedChannels={newSelectedChannels}
+            setSelectedChannels={setNewSelectedChannels}
           />
           <button onClick={handleCreate} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}>Create Goal</button>
         </div>
       </Modal>
 
       {/* Edit Goal Modal */}
-      <Modal open={!!editGoalId} onClose={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannelIds([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
+      <Modal open={!!editGoalId} onClose={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <GoalFormFields
             title={editTitle} setTitle={setEditTitle}
@@ -780,15 +871,38 @@ export function GoalsPage({
             setSelectedClientIds={setEditClientIds}
             channelScopeType={editChannelScopeType}
             setChannelScopeType={setEditChannelScopeType}
-            selectedChannelIds={editSelectedChannelIds}
-            setSelectedChannelIds={setEditSelectedChannelIds}
+            selectedChannels={editSelectedChannels}
+            setSelectedChannels={setEditSelectedChannels}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <button onClick={handleEditSave} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', flex: 1 }}>Save Changes</button>
-            <button onClick={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannelIds([]); }} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
           </div>
         </div>
       </Modal>
+
+      {checkInTarget && (() => {
+        const goal = goals.find(g => g.id === checkInTarget.goalId);
+        const kr = goal?.keyResults[checkInTarget.krIndex];
+        if (!goal || !kr) return null;
+        return (
+          <CheckInModal
+            open={true}
+            onClose={() => setCheckInTarget(null)}
+            onSubmit={(entry) => {
+              checkInKR(checkInTarget.goalId, checkInTarget.krIndex, { ...entry, actor: currentUser.name });
+              toast('Check-in recorded!', COLOR_SUCCESS, '\u{1F4CB}');
+              logAction(`Check-in on "${goal.title}" KR "${kr.title}"`, currentUser.name, COLOR_SUCCESS);
+              setCheckInTarget(null);
+            }}
+            krTitle={kr.title}
+            currentValue={kr.current}
+            krStatus={kr.status}
+            isLive={!!kr.liveConfig}
+            theme={theme}
+          />
+        );
+      })()}
       </>
       )}
 

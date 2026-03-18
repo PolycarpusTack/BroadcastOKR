@@ -58,6 +58,17 @@ export interface LiveKRConfig {
   timeframeDays?: number;
 }
 
+export type Confidence = 'on_track' | 'at_risk' | 'blocked';
+
+export interface KRHistoryEntry {
+  timestamp: string;
+  value: number;
+  confidence?: Confidence;
+  note?: string;
+  actor: string;
+  source: 'check-in' | 'sync';
+}
+
 export interface KeyResult {
   id: string;
   title: string;
@@ -75,6 +86,7 @@ export interface KeyResult {
   /** ISO timestamp of last successful sync */
   lastSyncAt?: string;
   krTemplateId?: string;
+  history?: KRHistoryEntry[];
 }
 
 export interface Goal {
@@ -89,6 +101,7 @@ export interface Goal {
   clientIds?: string[];
   channelScope?: ChannelScope;
   templateId?: string;
+  monitorUntil?: string;
 }
 
 export interface Subtask {
@@ -188,9 +201,14 @@ export interface ClientChannel {
   color?: string;
 }
 
+export interface ScopedChannelRef {
+  clientId: string;
+  channelId: string;
+}
+
 export type ChannelScope =
   | { type: 'all' }
-  | { type: 'selected'; channelIds: string[] };
+  | { type: 'selected'; channels: ScopedChannelRef[] };
 
 export interface Client {
   id: string;
@@ -202,6 +220,7 @@ export interface Client {
   channels: ClientChannel[];
   /** templateId → { krTemplateId → custom SQL } */
   sqlOverrides?: Record<string, Record<string, string>>;
+  monitorUntil?: string;
 }
 
 export interface KRTemplate {

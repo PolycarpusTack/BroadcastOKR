@@ -46,6 +46,11 @@ interface ClientsPageProps {
 
 type HealthStatus = 'untested' | 'ok' | 'failed' | 'pending';
 
+function toConnectionInput({ id, ...connection }: DBConnection): Omit<DBConnection, 'id'> {
+  void id;
+  return connection;
+}
+
 function HealthDot({ status }: { status: HealthStatus }) {
   const color =
     status === 'ok'
@@ -165,6 +170,8 @@ interface ClientRowProps {
   connections: DBConnection[];
   goalCount: number;
   bridgeConnected: boolean;
+  canCheckIn: boolean;
+  setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
   testConnection?: (conn: Omit<DBConnection, 'id'>) => Promise<{ ok: boolean; message: string }>;
   getChannels?: (connectionId: string) => Promise<Array<{ id: string; name: string; internalValue?: string; channelKind?: string }>>;
   onEdit: (client: Client) => void;
@@ -180,6 +187,8 @@ function ClientRow({
   connections,
   goalCount,
   bridgeConnected,
+  canCheckIn,
+  setMonitor,
   testConnection,
   getChannels,
   onEdit,
@@ -190,6 +199,7 @@ function ClientRow({
 }: ClientRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [channelLoading, setChannelLoading] = useState(false);
+  const [monitorOpen, setMonitorOpen] = useState(false);
   const { toast } = useToast();
 
   const connection = connections.find((c) => c.id === client.connectionId);
@@ -218,8 +228,7 @@ function ClientRow({
     if (!testConnection || !connection) return;
     onHealthUpdate(client.id, 'pending');
     try {
-      const { id: _id, ...connWithoutId } = connection;
-      const result = await testConnection(connWithoutId);
+      const result = await testConnection(toConnectionInput(connection));
       onHealthUpdate(client.id, result.ok ? 'ok' : 'failed');
     } catch {
       onHealthUpdate(client.id, 'failed');
@@ -443,6 +452,78 @@ function ClientRow({
             )}
           </div>
 
+          {/* Monitoring subsection */}
+          {canCheckIn && (() => {
+            const monitorActive = !!client.monitorUntil && new Date(client.monitorUntil) > new Date();
+            const fmtDate = (d: string) =>
+              new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '9.5px', fontFamily: FONT_MONO, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '1px', color: theme.textMuted,
+                }}>
+                  Monitoring
+                </span>
+                {monitorActive ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <PillBadge
+                      label={`Monitoring all goals until ${fmtDate(client.monitorUntil!)}`}
+                      color={COLOR_WARNING}
+                    />
+                    <button
+                      onClick={() => setMonitor('client', client.id, null)}
+                      style={{
+                        padding: '1px 5px', borderRadius: 4, border: `1px solid ${COLOR_WARNING}`,
+                        background: 'transparent', color: COLOR_WARNING, fontSize: 9,
+                        fontWeight: 700, cursor: 'pointer', lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ) : monitorOpen ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {[1, 3, 7, 14].map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => { setMonitor('client', client.id, d); setMonitorOpen(false); }}
+                        style={{
+                          padding: '2px 7px', borderRadius: 4, border: `1px solid ${COLOR_WARNING}`,
+                          background: 'transparent', color: COLOR_WARNING, fontSize: 10,
+                          fontWeight: 700, cursor: 'pointer', fontFamily: FONT_MONO,
+                        }}
+                      >
+                        {d}d
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setMonitorOpen(false)}
+                      style={{
+                        padding: '2px 6px', borderRadius: 4, border: `1px solid ${theme.border}`,
+                        background: 'transparent', color: theme.textMuted, fontSize: 10,
+                        fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setMonitorOpen(true)}
+                    style={{
+                      padding: '2px 8px', borderRadius: 4, border: `1px solid ${theme.border}`,
+                      background: 'transparent', color: theme.textMuted, fontSize: 10,
+                      fontWeight: 600, cursor: 'pointer', fontFamily: FONT_BODY,
+                    }}
+                  >
+                    Monitor
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Channels subsection */}
           <div>
             <div
@@ -573,13 +654,14 @@ export function ClientsPage({
   const { theme } = useTheme();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
-  const { currentUser } = useAuth();
+  const { currentUser, permissions } = useAuth();
   const clients = useStore((s) => s.clients);
   const goalTemplates = useStore((s) => s.goalTemplates);
   const goals = useStore((s) => s.goals);
   const addClient = useStore((s) => s.addClient);
   const updateClient = useStore((s) => s.updateClient);
   const deleteClient = useStore((s) => s.deleteClient);
+  const setMonitor = useStore((s) => s.setMonitor);
 
   const [connections, setConnections] = useState<DBConnection[]>([]);
   const [health, setHealth] = useState<Record<string, HealthStatus>>({});
@@ -617,8 +699,7 @@ export function ClientsPage({
           return;
         }
         try {
-          const { id: _id, ...connWithoutId } = conn;
-          const result = await testConnection(connWithoutId);
+          const result = await testConnection(toConnectionInput(conn));
           results[client.id] = result.ok ? 'ok' : 'failed';
         } catch {
           results[client.id] = 'failed';
@@ -629,10 +710,11 @@ export function ClientsPage({
   }, [bridgeConnected, testConnection, clients, connections]);
 
   useEffect(() => {
-    testClientHealth();
-    // Only run when connections list or bridge status changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connections, bridgeConnected]);
+    const timeoutId = window.setTimeout(() => {
+      void testClientHealth();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [testClientHealth]);
 
   function goalCountFor(clientId: string) {
     return goals.filter((g) => g.clientIds?.includes(clientId)).length;
@@ -650,11 +732,13 @@ export function ClientsPage({
 
   function handleSaveClient(client: Client) {
     if (editingClient) {
+      const connectionChanged = editingClient.connectionId !== client.connectionId;
       updateClient(client.id, {
         name: client.name,
         color: client.color,
         connectionId: client.connectionId,
         tags: client.tags,
+        channels: connectionChanged ? [] : client.channels,
         sqlOverrides: client.sqlOverrides,
       });
       toast(`Client "${client.name}" updated`);
@@ -845,6 +929,8 @@ export function ClientsPage({
                 connections={connections}
                 goalCount={goalCountFor(client.id)}
                 bridgeConnected={bridgeConnected}
+                canCheckIn={permissions.canCheckIn}
+                setMonitor={setMonitor}
                 testConnection={testConnection}
                 getChannels={getChannels}
                 onEdit={handleEditClient}
@@ -869,6 +955,11 @@ export function ClientsPage({
         onSave={handleSaveClient}
         saveConnection={saveConnection}
         testConnection={testConnection}
+        onConnectionCreated={() => {
+          if (getConnections) {
+            getConnections().then(setConnections).catch(() => {});
+          }
+        }}
       />
 
       {/* Delete confirmation modal */}
