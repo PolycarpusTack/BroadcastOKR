@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type CSSProperties } from 'react';
-import { CHANNELS, USERS, PRIORITIES, TASK_TYPES } from '../../constants';
+import { CHANNELS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { Modal } from '../ui/Modal';
 import { nextTaskId } from '../../utils/ids';
 import { useStore } from '../../store/store';
@@ -20,6 +20,7 @@ interface CreateTaskModalProps {
 
 export function CreateTaskModal({ open, onClose, onCreated, onError, theme, selectStyle }: CreateTaskModalProps) {
   const clients = useStore((s) => s.clients);
+  const users = useStore((s) => s.users);
 
   const [title, setTitle] = useState('');
   const [channel, setChannel] = useState(0);
@@ -110,7 +111,7 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
   const handleCreate = () => {
     if (!title.trim() || title.length > 200) { onError?.('Please enter a title (max 200 chars)'); return; }
     if (!clientsSelected && (channel < 0 || channel >= CHANNELS.length)) return;
-    if (assignee < 0 || assignee >= USERS.length) return;
+    if (!users.find((u) => u.id === assignee)) return;
     if (!due) { onError?.('Please select a due date'); return; }
     if (clientsSelected && channelScopeType === 'selected' && selectedChannels.length === 0) {
       onError?.('Select at least one scoped channel');
@@ -350,7 +351,7 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
           <div>
             <label style={labelStyle}>Assignee</label>
             <select aria-label="Assignee" value={assignee} onChange={(e) => setAssignee(Number(e.target.value))} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
-              {USERS.map((u) => (
+              {users.map((u) => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>

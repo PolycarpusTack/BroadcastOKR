@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { CHANNELS, USERS } from '../constants';
+import { CHANNELS } from '../constants';
+import { useStore } from '../store/store';
 import { nextGoalId, nextTaskId } from './ids';
 import type { Goal, Task, KPI, KeyResult, TaskStatus, Priority, Client, GoalTemplate } from '../types';
 import { goalStatus } from './colors';
@@ -15,13 +16,14 @@ function findChannelIndex(name: string): number {
 }
 
 function findUserIndex(name: string): number {
-  if (!name) return 0;
+  const users = useStore.getState().users;
+  if (!name) return users[0]?.id ?? 0;
   const lower = name.toLowerCase().trim();
-  const idx = USERS.findIndex((u) => u.name.toLowerCase() === lower);
-  if (idx >= 0) return idx;
+  const exact = users.find((u) => u.name.toLowerCase() === lower);
+  if (exact) return exact.id;
   // partial match (first or last name)
-  const partial = USERS.findIndex((u) => u.name.toLowerCase().includes(lower));
-  return partial >= 0 ? partial : 0;
+  const partial = users.find((u) => u.name.toLowerCase().includes(lower));
+  return partial ? partial.id : (users[0]?.id ?? 0);
 }
 
 const VALID_PRIORITIES: Priority[] = ['critical', 'high', 'medium', 'low'];
@@ -392,7 +394,7 @@ export function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients
   const goalRows = goals.map((g) => ({
     Title: g.title,
     Channel: CHANNELS[g.channel]?.name || '',
-    Owner: USERS[g.owner]?.name || '',
+    Owner: useStore.getState().users.find((u) => u.id === g.owner)?.name || '',
     Period: g.period,
     Progress: `${Math.round(g.progress * 100)}%`,
     Status: g.status.replace(/_/g, ' '),
@@ -412,7 +414,7 @@ export function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients
     Status: t.status.replace(/_/g, ' '),
     Priority: t.priority,
     Channel: CHANNELS[t.channel]?.name || '',
-    Assignee: USERS[t.assignee]?.name || '',
+    Assignee: useStore.getState().users.find((u) => u.id === t.assignee)?.name || '',
     'Due Date': t.due,
     Type: t.taskType,
     Subtasks: t.subtasks.map((s) => s.text).join('; '),
@@ -445,7 +447,7 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
     const rows = goals.map((g) => ({
       Title: g.title,
       Channel: CHANNELS[g.channel]?.name || '',
-      Owner: USERS[g.owner]?.name || '',
+      Owner: useStore.getState().users.find((u) => u.id === g.owner)?.name || '',
       Period: g.period,
       Progress: `${Math.round(g.progress * 100)}%`,
       Status: g.status.replace(/_/g, ' '),
@@ -463,7 +465,7 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
       Status: t.status.replace(/_/g, ' '),
       Priority: t.priority,
       Channel: CHANNELS[t.channel]?.name || '',
-      Assignee: USERS[t.assignee]?.name || '',
+      Assignee: useStore.getState().users.find((u) => u.id === t.assignee)?.name || '',
       'Due Date': t.due,
       Type: t.taskType,
       Subtasks: t.subtasks.map((s) => s.text).join('; '),
@@ -485,7 +487,8 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
 }
 
 export function exportToJSON(goals: Goal[], tasks: Task[], kpis: KPI[], clients: Client[] = [], goalTemplates: GoalTemplate[] = []): void {
-  const data = { goals, tasks, kpis, clients, goalTemplates };
+  const { users, teams } = useStore.getState();
+  const data = { goals, tasks, kpis, clients, goalTemplates, users, teams };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

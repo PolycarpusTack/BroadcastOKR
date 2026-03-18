@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { CHANNELS, USERS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../../constants';
+import { CHANNELS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { safeUser, safeChannel } from '../../utils/safeGet';
 import { ChannelBadge } from '../ui/ChannelBadge';
 import { PillBadge } from '../ui/PillBadge';
@@ -7,7 +7,7 @@ import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { daysUntil, getUrgencyBadge } from '../../utils/dates';
 import { useStore } from '../../store/store';
-import type { Task, TaskStatus, Theme, RolePermissions, Priority, ChannelScope, Client, ScopedChannelRef } from '../../types';
+import type { Task, TaskStatus, Theme, RolePermissions, Priority, ChannelScope, Client, User, ScopedChannelRef } from '../../types';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, FONT_MONO, FONT_BODY } from '../../constants/config';
 import { isScopedChannelSelected, pruneScopedChannels, resolveScopedChannels, scopedChannelKey } from '../../utils/channelScope';
 
@@ -31,6 +31,7 @@ export function TaskDetailModal({ taskId, onClose, onMove, onDeleted, onUpdated,
   const updateTask = useStore((s) => s.updateTask);
   const deleteTask = useStore((s) => s.deleteTask);
   const clients: Client[] = useStore((s) => s.clients);
+  const users = useStore((s) => s.users);
 
   return (
     <Modal open={!!task} onClose={onClose} title={task?.title || ''} theme={theme} width={560}>
@@ -38,6 +39,7 @@ export function TaskDetailModal({ taskId, onClose, onMove, onDeleted, onUpdated,
         <TaskDetailContent
           task={task}
           clients={clients}
+          users={users}
           onMove={onMove}
           toggleSubtask={toggleSubtask}
           updateTask={updateTask}
@@ -55,9 +57,10 @@ export function TaskDetailModal({ taskId, onClose, onMove, onDeleted, onUpdated,
   );
 }
 
-function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, deleteTask, onDeleted, onUpdated, onError, onClose, permissions, theme, dark }: {
+function TaskDetailContent({ task, clients, users, onMove, toggleSubtask, updateTask, deleteTask, onDeleted, onUpdated, onError, onClose, permissions, theme, dark }: {
   task: Task;
   clients: Client[];
+  users: User[];
   onMove: (taskId: string, status: TaskStatus) => void;
   toggleSubtask: (taskId: string, subtaskIndex: number) => void;
   updateTask: (id: string, updates: Partial<Omit<Task, 'id'>>) => void;
@@ -142,7 +145,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
     onClose();
   };
 
-  const user = safeUser(USERS, task.assignee);
+  const user = safeUser(users, task.assignee);
   const pri = PRIORITIES[task.priority];
   const tt = TASK_TYPES.find((t) => t.key === task.taskType);
   const days = daysUntil(task.due);
@@ -311,7 +314,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
           <div>
             <div style={labelStyle}>Assignee</div>
             <select value={editAssignee} onChange={(e) => setEditAssignee(Number(e.target.value))} style={selectStyle}>
-              {USERS.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
         </div>

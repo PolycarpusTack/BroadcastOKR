@@ -8,3 +8,7 @@ export const USERS: User[] = [
   { id: 4, name: 'Niels Janssen', role: 'manager', av: 'NJ', color: '#A78BFA', dept: 'Content & Rights', title: 'Rights Manager' },
   { id: 5, name: 'Ava Mertens', role: 'member', av: 'AM', color: '#60A5FA', dept: 'EPG & Metadata', title: 'EPG Coordinator' },
 ];
+
+export function createInitialUsers(): User[] {
+  return USERS.map(u => ({ ...u }));
+}

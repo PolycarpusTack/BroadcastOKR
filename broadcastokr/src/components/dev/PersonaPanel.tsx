@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Theme, User } from '../../types';
-import { USERS, ROLE_PERMS } from '../../constants';
+import { ROLE_PERMS } from '../../constants';
+import { useStore } from '../../store/store';
 import { Avatar } from '../ui/Avatar';
 import { roleColor } from '../../utils/colors';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, PRIMARY_GRADIENT, FONT_HEADING, FONT_MONO } from '../../constants/config';
@@ -13,6 +14,7 @@ interface PersonaPanelProps {
 }
 
 export function PersonaPanel({ currentUser, setCurrentUser, theme, onStress }: PersonaPanelProps) {
+  const users = useStore((s) => s.users);
   const [open, setOpen] = useState(false);
   const perms = ROLE_PERMS[currentUser.role];
 
@@ -35,7 +37,7 @@ export function PersonaPanel({ currentUser, setCurrentUser, theme, onStress }: P
           <div style={{ fontFamily: FONT_HEADING, fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 12 }}>Prototype Control Panel</div>
 
           <div style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.05em' }}>Switch Persona</div>
-          {USERS.map((u) => {
+          {users.map((u) => {
             const active = currentUser.id === u.id;
             return (
               <button

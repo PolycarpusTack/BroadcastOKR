@@ -2,10 +2,10 @@ import type { User, Channel } from '../types';
 
 const FALLBACK_USER: User = {
   id: -1,
-  name: 'Unknown',
+  name: 'Unassigned',
   role: 'member',
-  av: '?',
-  color: '#94a3b8',
+  av: '—',
+  color: '#888',
   dept: '',
   title: '',
 };

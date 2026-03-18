@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Goal, Task, KPI, SyncStatus, Client, GoalTemplate, Confidence } from '../types';
+import type { Goal, Task, KPI, SyncStatus, Client, GoalTemplate, Confidence, User, Team } from '../types';
 import { createInitialGoals, createInitialTasks, createInitialKPIs } from '../constants/seedData';
+import { createInitialUsers } from '../constants/users';
+import { createInitialTeams } from '../constants/teams';
 import { goalStatus } from '../utils/colors';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
@@ -52,6 +54,16 @@ interface AppStore {
   updateClient: (id: string, updates: Partial<Omit<Client, 'id'>>) => void;
   deleteClient: (id: string, cascade: boolean) => void;
 
+  // Users & Teams
+  users: User[];
+  teams: Team[];
+  addUser: (user: User) => void;
+  updateUser: (id: number, updates: Partial<Omit<User, 'id'>>) => void;
+  deleteUser: (id: number, reassignTo: number | null) => void;
+  addTeam: (team: Team) => void;
+  updateTeam: (id: string, updates: Partial<Omit<Team, 'id'>>) => void;
+  deleteTeam: (id: string) => void;
+
   // Goal Templates
   goalTemplates: GoalTemplate[];
   addGoalTemplate: (template: GoalTemplate) => void;
@@ -68,6 +80,8 @@ export const useStore = create<AppStore>()(
       tasks: createInitialTasks(),
       kpis: createInitialKPIs(),
       clients: [],
+      users: createInitialUsers(),
+      teams: createInitialTeams(),
       goalTemplates: [],
 
       addGoal: (goal) => set((s) => ({ goals: [goal, ...s.goals] })),
@@ -334,6 +348,54 @@ export const useStore = create<AppStore>()(
                   ? { ...t, clientIds: undefined, channelScope: undefined }
                   : { ...t, clientIds: remaining };
               }),
+          users: s.users.map((u) => u.clientIds?.includes(id)
+            ? { ...u, clientIds: u.clientIds.filter((cid) => cid !== id) }
+            : u),
+          teams: s.teams.map((t) => t.clientIds?.includes(id)
+            ? { ...t, clientIds: t.clientIds.filter((cid) => cid !== id) }
+            : t),
+        })),
+
+      addUser: (user) => set((s) => ({ users: [...s.users, user] })),
+
+      updateUser: (id, updates) =>
+        set((s) => ({
+          users: s.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
+        })),
+
+      deleteUser: (id, reassignTo) =>
+        set((s) => {
+          if (s.users.length <= 1) return {};
+          const target = reassignTo ?? -1;
+          return {
+            users: s.users.filter((u) => u.id !== id),
+            tasks: s.tasks.map((t) => (t.assignee === id ? { ...t, assignee: target } : t)),
+            goals: s.goals.map((g) => (g.owner === id ? { ...g, owner: target } : g)),
+            teams: s.teams.map((t) => ({
+              ...t,
+              members: t.members.filter((m) => m !== id),
+              leadId: t.leadId === id ? undefined : t.leadId,
+            })),
+          };
+        }),
+
+      addTeam: (team) => set((s) => ({ teams: [...s.teams, team] })),
+
+      updateTeam: (id, updates) =>
+        set((s) => ({
+          teams: s.teams.map((t) => {
+            if (t.id !== id) return t;
+            const updated = { ...t, ...updates };
+            if (updated.leadId !== undefined && !updated.members.includes(updated.leadId)) {
+              updated.leadId = undefined;
+            }
+            return updated;
+          }),
+        })),
+
+      deleteTeam: (id) =>
+        set((s) => ({
+          teams: s.teams.filter((t) => t.id !== id),
         })),
 
       addGoalTemplate: (template) => set((s) => ({ goalTemplates: [...s.goalTemplates, template] })),
@@ -498,6 +560,12 @@ export const useStore = create<AppStore>()(
           const migrated = migrateClientChannelScopes(state.goals, state.tasks, state.clients);
           state.goals = migrated.goals;
           state.tasks = migrated.tasks;
+          if (!state.users || state.users.length === 0) {
+            state.users = createInitialUsers();
+          }
+          if (!state.teams || state.teams.length === 0) {
+            state.teams = createInitialTeams();
+          }
         }
       },
     },
