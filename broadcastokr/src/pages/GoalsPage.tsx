@@ -225,6 +225,7 @@ export function GoalsPage({
     setEditOwner(goal.owner);
     setEditPeriod(goal.period);
     setEditKRs(goal.keyResults.map((kr) => ({
+      id: kr.id,
       title: kr.title,
       start: kr.start,
       target: kr.target,
@@ -253,7 +254,7 @@ export function GoalsPage({
     if (!existingGoal) return;
 
     const updatedKRs: KeyResult[] = krs.map((kr, i) => {
-      const existing = existingGoal.keyResults[i];
+      const existing = kr.id ? existingGoal.keyResults.find((e) => e.id === kr.id) : undefined;
       // If nothing changed on this KR, preserve existing state
       if (existing && existing.title === kr.title && existing.start === kr.start && existing.target === kr.target
         && JSON.stringify(existing.liveConfig) === JSON.stringify(kr.liveConfig)) {
@@ -274,6 +275,7 @@ export function GoalsPage({
         syncStatus: kr.liveConfig ? (existing?.syncStatus || 'pending') : undefined,
         syncError: kr.liveConfig ? existing?.syncError : undefined,
         lastSyncAt: kr.liveConfig ? existing?.lastSyncAt : undefined,
+        history: existing?.history,
       };
     });
 

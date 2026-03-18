@@ -1,10 +1,12 @@
 import { useState, useMemo, useRef, useEffect, type CSSProperties } from 'react';
 import { CHANNELS, USERS } from '../../constants';
-import type { Theme, LiveKRConfig, Client, ClientChannel } from '../../types';
+import type { Theme, LiveKRConfig, Client, ScopedChannelRef } from '../../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../../hooks/useBridge';
 import { PRIMARY_COLOR, COLOR_DANGER, COLOR_INFO, FONT_MONO } from '../../constants/config';
+import { isScopedChannelSelected, pruneScopedChannels, scopedChannelKey } from '../../utils/channelScope';
 
 export interface GoalFormKR {
+  id?: string;
   title: string;
   start: number;
   target: number;
@@ -39,8 +41,8 @@ interface GoalFormFieldsProps {
   setSelectedClientIds?: (v: string[]) => void;
   channelScopeType?: 'all' | 'selected';
   setChannelScopeType?: (v: 'all' | 'selected') => void;
-  selectedChannelIds?: string[];
-  setSelectedChannelIds?: (v: string[]) => void;
+  selectedChannels?: ScopedChannelRef[];
+  setSelectedChannels?: (v: ScopedChannelRef[]) => void;
 }
 
 const PERIODS = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Annual 2026'];
@@ -52,7 +54,7 @@ export function GoalFormFields({
   clients = [],
   selectedClientIds = [], setSelectedClientIds,
   channelScopeType = 'all', setChannelScopeType,
-  selectedChannelIds = [], setSelectedChannelIds,
+  selectedChannels = [], setSelectedChannels,
 }: GoalFormFieldsProps) {
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
   const krInputStyle = { ...inputStyle, padding: '8px 10px', borderRadius: 6, fontSize: 12 };
@@ -113,7 +115,9 @@ export function GoalFormFields({
   const toggleClient = (id: string) => {
     if (!setSelectedClientIds) return;
     if (selectedClientIds.includes(id)) {
-      setSelectedClientIds(selectedClientIds.filter((c) => c !== id));
+      const nextClientIds = selectedClientIds.filter((c) => c !== id);
+      setSelectedClientIds(nextClientIds);
+      setSelectedChannels?.(pruneScopedChannels(selectedChannels, nextClientIds));
     } else {
       setSelectedClientIds([...selectedClientIds, id]);
     }
@@ -121,7 +125,9 @@ export function GoalFormFields({
 
   const removeClient = (id: string) => {
     if (!setSelectedClientIds) return;
-    setSelectedClientIds(selectedClientIds.filter((c) => c !== id));
+    const nextClientIds = selectedClientIds.filter((c) => c !== id);
+    setSelectedClientIds(nextClientIds);
+    setSelectedChannels?.(pruneScopedChannels(selectedChannels, nextClientIds));
   };
 
   const filteredClients = useMemo(
@@ -145,26 +151,44 @@ export function GoalFormFields({
     [allScopedChannels, channelSearch],
   );
 
-  const toggleChannel = (id: string) => {
-    if (!setSelectedChannelIds) return;
-    if (selectedChannelIds.includes(id)) {
-      setSelectedChannelIds(selectedChannelIds.filter((c) => c !== id));
+  const toggleChannel = (clientId: string, channelId: string) => {
+    if (!setSelectedChannels) return;
+    const candidate = { clientId, channelId };
+    const key = scopedChannelKey(candidate);
+    if (selectedChannels.some((channel) => scopedChannelKey(channel) === key)) {
+      setSelectedChannels(selectedChannels.filter((channel) => scopedChannelKey(channel) !== key));
     } else {
-      setSelectedChannelIds([...selectedChannelIds, id]);
+      setSelectedChannels([...selectedChannels, candidate]);
     }
   };
 
   const selectAllChannels = () => {
-    if (!setSelectedChannelIds) return;
-    setSelectedChannelIds(filteredScopedChannels.map((ch) => ch.id));
+    if (!setSelectedChannels) return;
+    setSelectedChannels(
+      filteredScopedChannels.map((channel) => ({
+        clientId: channel.clientId,
+        channelId: channel.id,
+      })),
+    );
   };
 
   const deselectAllChannels = () => {
-    if (!setSelectedChannelIds) return;
-    setSelectedChannelIds([]);
+    if (!setSelectedChannels) return;
+    setSelectedChannels([]);
   };
 
-  const selectedChannelCount = selectedChannelIds.length;
+  useEffect(() => {
+    if (!setSelectedChannels) return;
+    const allowedKeys = new Set(
+      allScopedChannels.map((channel) => scopedChannelKey({ clientId: channel.clientId, channelId: channel.id })),
+    );
+    const nextSelected = selectedChannels.filter((channel) => allowedKeys.has(scopedChannelKey(channel)));
+    if (nextSelected.length !== selectedChannels.length) {
+      setSelectedChannels(nextSelected);
+    }
+  }, [allScopedChannels, selectedChannels, setSelectedChannels]);
+
+  const selectedChannelCount = selectedChannels.length;
   const totalChannelCount = allScopedChannels.length;
 
   return (
@@ -425,7 +449,7 @@ export function GoalFormFields({
                         gap: 8,
                         padding: '7px 12px 7px 20px',
                         cursor: 'pointer',
-                        background: selectedChannelIds.includes(ch.id) ? PRIMARY_COLOR + '10' : 'transparent',
+                        background: isScopedChannelSelected(selectedChannels, client.id, ch.id) ? PRIMARY_COLOR + '10' : 'transparent',
                         borderBottom: `1px solid ${theme.borderLight}`,
                         fontSize: 12,
                         color: theme.text,
@@ -433,8 +457,8 @@ export function GoalFormFields({
                     >
                       <input
                         type="checkbox"
-                        checked={selectedChannelIds.includes(ch.id)}
-                        onChange={() => toggleChannel(ch.id)}
+                        checked={isScopedChannelSelected(selectedChannels, client.id, ch.id)}
+                        onChange={() => toggleChannel(client.id, ch.id)}
                         style={{ accentColor: PRIMARY_COLOR, width: 13, height: 13 }}
                       />
                       <span style={{
