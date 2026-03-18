@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../store/store';
@@ -11,6 +11,9 @@ import { kpiStatus } from '../utils/colors';
 import { cardStyle as makeCardStyle } from '../utils/styles';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_COBALT_MID, FONT_HEADING } from '../constants/config';
 import type { Priority } from '../types';
+import { ClientReportView } from '../components/reports/ClientReportView';
+import { GoalReportView } from '../components/reports/GoalReportView';
+import { KRTemplateReportView } from '../components/reports/KRTemplateReportView';
 
 export function ReportsPage() {
   const { theme } = useTheme();
@@ -18,6 +21,11 @@ export function ReportsPage() {
   const tasks = useStore((s) => s.tasks);
   const goals = useStore((s) => s.goals);
   const kpis = useStore((s) => s.kpis);
+  const clients = useStore((s) => s.clients);
+  const goalTemplates = useStore((s) => s.goalTemplates);
+
+  const [reportView, setReportView] = useState<'tasks' | 'client-goals'>('tasks');
+  const [subView, setSubView] = useState<'client' | 'goal' | 'template'>('client');
 
   const taskStats = useMemo(() => {
     const now = new Date();
@@ -85,6 +93,27 @@ export function ReportsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Top-level toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20 }}>
+        {(['tasks', 'client-goals'] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setReportView(v)}
+            style={{
+              padding: '6px 16px', borderRadius: 8,
+              border: `1px solid ${reportView === v ? PRIMARY_COLOR : theme.border}`,
+              background: reportView === v ? PRIMARY_COLOR : 'transparent',
+              color: reportView === v ? '#fff' : theme.textSecondary,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            {v === 'tasks' ? 'Tasks' : 'Client Goals'}
+          </button>
+        ))}
+      </div>
+
+      {reportView === 'tasks' && (
+        <>
       {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         {[
@@ -178,6 +207,39 @@ export function ReportsPage() {
           ))}
         </div>
       </div>
+        </>
+      )}
+
+      {reportView === 'client-goals' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Sub-navigation */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {([
+              { key: 'client' as const, label: 'By Client' },
+              { key: 'goal' as const, label: 'By Goal' },
+              { key: 'template' as const, label: 'By KR Template' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSubView(key)}
+                style={{
+                  padding: '5px 14px', borderRadius: 6,
+                  border: `1px solid ${subView === key ? PRIMARY_COLOR : theme.border}`,
+                  background: subView === key ? `${PRIMARY_COLOR}18` : 'transparent',
+                  color: subView === key ? PRIMARY_COLOR : theme.textSecondary,
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {subView === 'client' && <ClientReportView goals={goals} clients={clients} theme={theme} />}
+          {subView === 'goal' && <GoalReportView goals={goals} clients={clients} theme={theme} />}
+          {subView === 'template' && <KRTemplateReportView goals={goals} clients={clients} goalTemplates={goalTemplates} theme={theme} />}
+        </div>
+      )}
     </div>
   );
 }
