@@ -179,38 +179,4 @@ describe('useStore', () => {
     });
   });
 
-  describe('checkIn', () => {
-    it('increases key result progress', () => {
-      const goal = useStore.getState().goals.find((g) => g.keyResults.length > 0);
-      if (!goal) return;
-
-      const krBefore = goal.keyResults[0].progress;
-      useStore.getState().checkIn(goal.id, 0);
-      const goalAfter = useStore.getState().goals.find((g) => g.id === goal.id);
-      expect(goalAfter!.keyResults[0].progress).toBeGreaterThanOrEqual(krBefore);
-    });
-
-    it('updates goal-level progress after check-in', () => {
-      const goal = useStore.getState().goals.find((g) => g.keyResults.length > 0);
-      if (!goal) return;
-
-      const goalBefore = goal.progress;
-      useStore.getState().checkIn(goal.id, 0);
-      const goalAfter = useStore.getState().goals.find((g) => g.id === goal.id);
-      expect(goalAfter!.progress).toBeGreaterThanOrEqual(goalBefore);
-    });
-
-    it('sets correct status based on progress', () => {
-      const goal = useStore.getState().goals.find((g) => g.keyResults.length > 0);
-      if (!goal) return;
-
-      for (let i = 0; i < 10; i++) {
-        useStore.getState().checkIn(goal.id, 0);
-      }
-      const goalAfter = useStore.getState().goals.find((g) => g.id === goal.id);
-      const kr = goalAfter!.keyResults[0];
-      expect(kr.progress).toBeGreaterThanOrEqual(0.7);
-      expect(kr.status).toBe('on_track');
-    });
-  });
 });

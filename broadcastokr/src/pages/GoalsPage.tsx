@@ -19,8 +19,9 @@ import { TemplateForm } from '../components/templates/TemplateForm';
 import { MaterializeModal } from '../components/templates/MaterializeModal';
 import { progressColor, statusIcon, goalStatus } from '../utils/colors';
 import { nextGoalId } from '../utils/ids';
+import { resolveScopedChannels } from '../utils/channelScope';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO } from '../constants/config';
-import type { Goal, KeyResult, SyncStatus, GoalTemplate } from '../types';
+import type { Goal, KeyResult, SyncStatus, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
 
 interface GoalsPageProps {
@@ -34,8 +35,6 @@ interface GoalsPageProps {
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   /** Preview SQL query */
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
-  /** Fetch channels for a connection */
-  getChannels?: (connectionId: string) => Promise<Array<{ id: string; name: string; internalValue?: string; channelKind?: string }>>;
   /** Execute batch of KR queries */
   executeBatch?: (queries: Array<{
     goalId: string;
@@ -57,7 +56,7 @@ interface GoalsPageProps {
 
 export function GoalsPage({
   bridgeConnected = false, getConnections,
-  getTables, getColumns, previewQuery, getChannels, executeBatch,
+  getTables, getColumns, previewQuery, executeBatch,
 }: GoalsPageProps) {
   const { theme } = useTheme();
   const { currentUser, permissions } = useAuth();
@@ -65,7 +64,7 @@ export function GoalsPage({
   const { logAction } = useActivityLog();
   const goals = useStore((s) => s.goals);
   const addGoal = useStore((s) => s.addGoal);
-  const checkIn = useStore((s) => s.checkIn);
+  const checkInKR = useStore((s) => s.checkInKR);
   const updateGoal = useStore((s) => s.updateGoal);
   const deleteGoal = useStore((s) => s.deleteGoal);
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
@@ -118,7 +117,7 @@ export function GoalsPage({
   const [newKRs, setNewKRs] = useState<GoalFormKR[]>([{ title: '', start: 0, target: 100 }]);
   const [newClientIds, setNewClientIds] = useState<string[]>([]);
   const [newChannelScopeType, setNewChannelScopeType] = useState<'all' | 'selected'>('all');
-  const [newSelectedChannelIds, setNewSelectedChannelIds] = useState<string[]>([]);
+  const [newSelectedChannels, setNewSelectedChannels] = useState<ScopedChannelRef[]>([]);
 
   // Edit modal state
   const [editGoalId, setEditGoalId] = useState<string | null>(null);
@@ -129,7 +128,7 @@ export function GoalsPage({
   const [editKRs, setEditKRs] = useState<GoalFormKR[]>([]);
   const [editClientIds, setEditClientIds] = useState<string[]>([]);
   const [editChannelScopeType, setEditChannelScopeType] = useState<'all' | 'selected'>('all');
-  const [editSelectedChannelIds, setEditSelectedChannelIds] = useState<string[]>([]);
+  const [editSelectedChannels, setEditSelectedChannels] = useState<ScopedChannelRef[]>([]);
 
   // Re-fetch connections when create/edit modal opens (picks up new connections from KPIConfigModal)
   useEffect(() => {
@@ -169,6 +168,10 @@ export function GoalsPage({
         return;
       }
     }
+    if (newClientIds.length > 0 && newChannelScopeType === 'selected' && newSelectedChannels.length === 0) {
+      toast('Select at least one scoped channel', COLOR_DANGER, '\u26A0\uFE0F');
+      return;
+    }
     if (newChannel < 0 || newChannel >= CHANNELS.length) return;
     if (newOwner < 0 || newOwner >= USERS.length) return;
     const goal: Goal = {
@@ -184,7 +187,7 @@ export function GoalsPage({
         clientIds: newClientIds,
         channelScope: newChannelScopeType === 'all'
           ? { type: 'all' as const }
-          : { type: 'selected' as const, channelIds: newSelectedChannelIds },
+          : { type: 'selected' as const, channels: newSelectedChannels },
       }),
     };
     addGoal(goal);
@@ -195,7 +198,7 @@ export function GoalsPage({
     setNewKRs([{ title: '', start: 0, target: 100 }]);
     setNewClientIds([]);
     setNewChannelScopeType('all');
-    setNewSelectedChannelIds([]);
+    setNewSelectedChannels([]);
 
     // Auto-sync live KRs after creation
     const liveKRs = goal.keyResults
@@ -207,7 +210,10 @@ export function GoalsPage({
   };
 
   const handleCheckIn = (goalId: string, krIndex: number, goalTitle: string) => {
-    checkIn(goalId, krIndex);
+    const goal = goals.find((g) => g.id === goalId);
+    const kr = goal?.keyResults[krIndex];
+    if (!kr) return;
+    checkInKR(goalId, krIndex, { value: kr.current, actor: currentUser.name });
     toast('Check-in recorded!', COLOR_SUCCESS, '\u{1F4CB}');
     logAction(`Check-in on "${goalTitle}" KR #${krIndex + 1}`, currentUser.name, COLOR_SUCCESS);
   };
@@ -227,10 +233,10 @@ export function GoalsPage({
     setEditClientIds(goal.clientIds ?? []);
     if (goal.channelScope?.type === 'selected') {
       setEditChannelScopeType('selected');
-      setEditSelectedChannelIds(goal.channelScope.channelIds);
+      setEditSelectedChannels(goal.channelScope.channels);
     } else {
       setEditChannelScopeType('all');
-      setEditSelectedChannelIds([]);
+      setEditSelectedChannels([]);
     }
   };
 
@@ -238,6 +244,10 @@ export function GoalsPage({
     if (!editGoalId || !editTitle.trim() || editTitle.length > 200) { toast('Please enter a title (max 200 chars)', COLOR_DANGER, '\u26A0\uFE0F'); return; }
     const krs = editKRs.filter((kr) => kr.title.trim());
     if (krs.length === 0) { toast('Add at least one key result', COLOR_DANGER, '\u26A0\uFE0F'); return; }
+    if (editClientIds.length > 0 && editChannelScopeType === 'selected' && editSelectedChannels.length === 0) {
+      toast('Select at least one scoped channel', COLOR_DANGER, '\u26A0\uFE0F');
+      return;
+    }
 
     const existingGoal = goals.find((g) => g.id === editGoalId);
     if (!existingGoal) return;
@@ -277,7 +287,7 @@ export function GoalsPage({
         clientIds: editClientIds,
         channelScope: editChannelScopeType === 'all'
           ? { type: 'all' as const }
-          : { type: 'selected' as const, channelIds: editSelectedChannelIds },
+          : { type: 'selected' as const, channels: editSelectedChannels },
       }),
       ...(editClientIds.length === 0 && {
         clientIds: undefined,
@@ -289,7 +299,7 @@ export function GoalsPage({
     setEditGoalId(null);
     setEditClientIds([]);
     setEditChannelScopeType('all');
-    setEditSelectedChannelIds([]);
+    setEditSelectedChannels([]);
 
     // Auto-sync live KRs after edit (in case SQL or connection changed)
     const liveKRs = updatedKRs.filter((kr) => kr.liveConfig);
@@ -580,6 +590,10 @@ export function GoalsPage({
           const hasLiveKRs = goal.keyResults.some((kr) => kr.liveConfig);
           const isSyncing = syncingGoalId === goal.id;
           const isTemplateBacked = !!goal.templateId;
+          const resolvedGoalScopedChannels =
+            goal.channelScope?.type === 'selected'
+              ? resolveScopedChannels(goal.channelScope, clients)
+              : [];
 
           return (
             <div key={goal.id} style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 10, overflow: 'hidden' }}>
@@ -600,17 +614,13 @@ export function GoalsPage({
                           color={clients.find((c) => goal.clientIds?.includes(c.id))?.color ?? PRIMARY_COLOR}
                         />
                       ) : (
-                        goal.channelScope.channelIds.map((chId) => {
-                          const ownerClient = clients.find((c) => (c.channels || []).some((ch) => ch.id === chId));
-                          const chInfo = (ownerClient?.channels || []).find((ch) => ch.id === chId);
-                          return chInfo ? (
-                            <PillBadge
-                              key={chId}
-                              label={chInfo.name}
-                              color={chInfo.color ?? ownerClient?.color ?? PRIMARY_COLOR}
-                            />
-                          ) : null;
-                        })
+                        resolvedGoalScopedChannels.map((channel) => (
+                          <PillBadge
+                            key={channel.key}
+                            label={channel.label}
+                            color={channel.color}
+                          />
+                        ))
                       )
                     ) : (
                       <ChannelBadge channel={safeChannel(CHANNELS, goal.channel)} />
@@ -736,7 +746,7 @@ export function GoalsPage({
       )}
 
       {/* Create Goal Modal */}
-      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannelIds([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
+      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannels([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <GoalFormFields
             title={newTitle} setTitle={setNewTitle}
@@ -754,15 +764,15 @@ export function GoalsPage({
             setSelectedClientIds={setNewClientIds}
             channelScopeType={newChannelScopeType}
             setChannelScopeType={setNewChannelScopeType}
-            selectedChannelIds={newSelectedChannelIds}
-            setSelectedChannelIds={setNewSelectedChannelIds}
+            selectedChannels={newSelectedChannels}
+            setSelectedChannels={setNewSelectedChannels}
           />
           <button onClick={handleCreate} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}>Create Goal</button>
         </div>
       </Modal>
 
       {/* Edit Goal Modal */}
-      <Modal open={!!editGoalId} onClose={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannelIds([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
+      <Modal open={!!editGoalId} onClose={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <GoalFormFields
             title={editTitle} setTitle={setEditTitle}
@@ -780,12 +790,12 @@ export function GoalsPage({
             setSelectedClientIds={setEditClientIds}
             channelScopeType={editChannelScopeType}
             setChannelScopeType={setEditChannelScopeType}
-            selectedChannelIds={editSelectedChannelIds}
-            setSelectedChannelIds={setEditSelectedChannelIds}
+            selectedChannels={editSelectedChannels}
+            setSelectedChannels={setEditSelectedChannels}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <button onClick={handleEditSave} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', flex: 1 }}>Save Changes</button>
-            <button onClick={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannelIds([]); }} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
           </div>
         </div>
       </Modal>

@@ -1,15 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Goal, Task, KPI, SyncStatus, Client, GoalTemplate } from '../types';
+import type { Goal, Task, KPI, SyncStatus, Client, GoalTemplate, Confidence } from '../types';
 import { createInitialGoals, createInitialTasks, createInitialKPIs } from '../constants/seedData';
 import { goalStatus } from '../utils/colors';
-import { migrateKRIds } from './migration';
+import { migrateClientChannelScopes, migrateKRIds } from './migration';
+import { pruneHistory } from '../utils/history';
 
 /** Recalculate goal progress and status from its KRs */
 function recalcGoal(goal: Goal): Goal {
   if (goal.keyResults.length === 0) return goal;
   const progress = goal.keyResults.reduce((sum, k) => sum + k.progress, 0) / goal.keyResults.length;
   return { ...goal, progress, status: goalStatus(progress) };
+}
+
+function isMonitorActive(until?: string): boolean {
+  return !!until && new Date(until) > new Date();
 }
 
 interface AppStore {
@@ -20,7 +25,8 @@ interface AppStore {
   // Goals
   addGoal: (goal: Goal) => void;
   setGoals: (goals: Goal[]) => void;
-  checkIn: (goalId: string, krIndex: number) => void;
+  checkInKR: (goalId: string, krIndex: number, entry: { value: number; confidence?: Confidence; note?: string; actor: string }) => void;
+  setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
   updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => void;
   deleteGoal: (id: string) => void;
 
@@ -67,29 +73,58 @@ export const useStore = create<AppStore>()(
       addGoal: (goal) => set((s) => ({ goals: [goal, ...s.goals] })),
       setGoals: (goals) => set({ goals }),
 
-      checkIn: (goalId, krIndex) =>
+      checkInKR: (goalId, krIndex, entry) =>
         set((s) => {
           const goals = structuredClone(s.goals);
           const goalIdx = goals.findIndex((g) => g.id === goalId);
           if (goalIdx === -1) return {};
           const kr = goals[goalIdx].keyResults[krIndex];
-          const range = Math.abs(kr.target - kr.start);
+          if (!kr) return {};
 
-          if (range === 0) {
-            kr.progress = 1;
-            kr.current = kr.target;
-          } else {
-            const inc = range * 0.1;
-            kr.current = kr.target > kr.start
-              ? Math.min(kr.current + inc, kr.target)
-              : Math.max(kr.current - inc, kr.target);
-            kr.progress = Math.min(Math.abs(kr.current - kr.start) / range, 1);
+          if (!kr.history) kr.history = [];
+          kr.history.push({
+            timestamp: new Date().toISOString(),
+            value: entry.value,
+            confidence: entry.confidence,
+            note: entry.note,
+            actor: entry.actor,
+            source: 'check-in',
+          });
+
+          if (!kr.liveConfig) {
+            kr.current = entry.value;
           }
 
+          const range = Math.abs(kr.target - kr.start);
+          kr.progress = range === 0
+            ? (kr.current === kr.target ? 1 : 0)
+            : Math.min(Math.abs(kr.current - kr.start) / range, 1);
           kr.status = goalStatus(kr.progress);
+
+          kr.history = pruneHistory(kr.history);
           goals[goalIdx] = recalcGoal(goals[goalIdx]);
 
           return { goals };
+        }),
+
+      setMonitor: (type, id, days) =>
+        set((s) => {
+          const monitorUntil = days === null
+            ? undefined
+            : new Date(Date.now() + days * 86400000).toISOString();
+
+          if (type === 'goal') {
+            return {
+              goals: s.goals.map((g) =>
+                g.id === id ? { ...g, monitorUntil } : g,
+              ),
+            };
+          }
+          return {
+            clients: s.clients.map((c) =>
+              c.id === id ? { ...c, monitorUntil } : c,
+            ),
+          };
         }),
 
       syncLiveKR: (goalId, krIndex, current) =>
@@ -97,7 +132,8 @@ export const useStore = create<AppStore>()(
           const goals = structuredClone(s.goals);
           const goalIdx = goals.findIndex((g) => g.id === goalId);
           if (goalIdx === -1) return {};
-          const kr = goals[goalIdx].keyResults[krIndex];
+          const goal = goals[goalIdx];
+          const kr = goal.keyResults[krIndex];
           if (!kr) return {};
 
           kr.current = current;
@@ -108,7 +144,20 @@ export const useStore = create<AppStore>()(
           kr.syncError = undefined;
           kr.lastSyncAt = new Date().toISOString();
 
-          goals[goalIdx] = recalcGoal(goals[goalIdx]);
+          const shouldRecord = isMonitorActive(goal.monitorUntil)
+            || goal.clientIds?.some((cid) => isMonitorActive(s.clients.find((c) => c.id === cid)?.monitorUntil));
+          if (shouldRecord) {
+            if (!kr.history) kr.history = [];
+            kr.history.push({
+              timestamp: new Date().toISOString(),
+              value: current,
+              actor: 'system',
+              source: 'sync',
+            });
+            kr.history = pruneHistory(kr.history);
+          }
+
+          goals[goalIdx] = recalcGoal(goal);
           return { goals };
         }),
 
@@ -134,7 +183,8 @@ export const useStore = create<AppStore>()(
           for (const r of results) {
             const goalIdx = goalIndexMap.get(r.goalId) ?? -1;
             if (goalIdx === -1) continue;
-            const kr = goals[goalIdx].keyResults[r.krIndex];
+            const goal = goals[goalIdx];
+            const kr = goal.keyResults[r.krIndex];
             if (!kr) continue;
 
             if (r.status === 'ok' && r.current !== undefined) {
@@ -144,6 +194,19 @@ export const useStore = create<AppStore>()(
               kr.status = goalStatus(kr.progress);
               kr.syncError = undefined;
               kr.lastSyncAt = new Date().toISOString();
+
+              const shouldRecord = isMonitorActive(goal.monitorUntil)
+                || goal.clientIds?.some((cid) => isMonitorActive(s.clients.find((c) => c.id === cid)?.monitorUntil));
+              if (shouldRecord) {
+                if (!kr.history) kr.history = [];
+                kr.history.push({
+                  timestamp: new Date().toISOString(),
+                  value: r.current,
+                  actor: 'system',
+                  source: 'sync',
+                });
+                kr.history = pruneHistory(kr.history);
+              }
             } else {
               kr.syncError = r.error;
             }
@@ -206,9 +269,49 @@ export const useStore = create<AppStore>()(
       addClient: (client) => set((s) => ({ clients: [...s.clients, client] })),
 
       updateClient: (id, updates) =>
-        set((s) => ({
-          clients: s.clients.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-        })),
+        set((s) => {
+          const oldClient = s.clients.find((c) => c.id === id);
+          const connectionChanged = updates.connectionId !== undefined && oldClient && oldClient.connectionId !== updates.connectionId;
+          const nextConnectionId = typeof updates.connectionId === 'string' ? updates.connectionId : undefined;
+          const updatedClients = s.clients.map((c) => {
+            if (c.id !== id) return c;
+            return {
+              ...c,
+              ...updates,
+              ...(connectionChanged ? { channels: [] } : {}),
+            };
+          });
+          // If connectionId changed, rebind existing live KRs for this client's goals
+          if (connectionChanged && oldClient && nextConnectionId) {
+            const goals = structuredClone(s.goals);
+            const tasks = structuredClone(s.tasks);
+            for (const goal of goals) {
+              if (!goal.clientIds?.includes(id)) continue;
+              for (const kr of goal.keyResults) {
+                if (kr.liveConfig && kr.liveConfig.connectionId === oldClient.connectionId) {
+                  kr.liveConfig.connectionId = nextConnectionId;
+                  kr.syncStatus = 'pending';
+                  kr.syncError = undefined;
+                }
+              }
+              if (goal.channelScope?.type === 'selected') {
+                goal.channelScope.channels = goal.channelScope.channels.filter((channel) => channel.clientId !== id);
+                if (goal.channelScope.channels.length === 0) {
+                  goal.channelScope = { type: 'all' };
+                }
+              }
+            }
+            for (const task of tasks) {
+              if (!task.clientIds?.includes(id) || task.channelScope?.type !== 'selected') continue;
+              task.channelScope.channels = task.channelScope.channels.filter((channel) => channel.clientId !== id);
+              if (task.channelScope.channels.length === 0) {
+                task.channelScope = { type: 'all' };
+              }
+            }
+            return { clients: updatedClients, goals, tasks };
+          }
+          return { clients: updatedClients };
+        }),
 
       deleteClient: (id, cascade) =>
         set((s) => ({
@@ -313,9 +416,26 @@ export const useStore = create<AppStore>()(
             for (const krt of template.krTemplates) {
               const existing = goal.keyResults.find((kr) => kr.krTemplateId === krt.id);
               if (existing) {
-                if (!overrides[krt.id] && existing.liveConfig) {
-                  existing.liveConfig.sql = krt.sql;
+                // Sync all template-managed fields
+                existing.title = krt.title;
+                existing.start = krt.start;
+                existing.target = krt.target;
+                if (existing.liveConfig) {
+                  existing.liveConfig.sql = overrides[krt.id] || krt.sql;
+                  existing.liveConfig.unit = krt.unit;
+                  existing.liveConfig.direction = krt.direction;
+                  existing.liveConfig.timeframeDays = krt.timeframeDays;
+                  // Rebind to current client connection
+                  if (client?.connectionId) {
+                    existing.liveConfig.connectionId = client.connectionId;
+                  }
                 }
+                // Recalc progress with potentially new start/target
+                const range = Math.abs(existing.target - existing.start);
+                existing.progress = range === 0
+                  ? (existing.current === existing.target ? 1 : 0)
+                  : Math.min(Math.abs(existing.current - existing.start) / range, 1);
+                existing.status = goalStatus(existing.progress);
               } else {
                 goal.keyResults.push({
                   id: crypto.randomUUID(),
@@ -342,6 +462,11 @@ export const useStore = create<AppStore>()(
             goal.keyResults = goal.keyResults.filter(
               (kr) => !kr.krTemplateId || templateKRIds.has(kr.krTemplateId),
             );
+
+            // Recalculate goal-level progress after KR changes
+            const updated = recalcGoal(goal);
+            goal.progress = updated.progress;
+            goal.status = updated.status;
           }
           return { goals };
         }),
@@ -351,6 +476,9 @@ export const useStore = create<AppStore>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.goals = migrateKRIds(state.goals);
+          const migrated = migrateClientChannelScopes(state.goals, state.tasks, state.clients);
+          state.goals = migrated.goals;
+          state.tasks = migrated.tasks;
         }
       },
     },
