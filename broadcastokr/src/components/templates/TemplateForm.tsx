@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
 import { PRIMARY_COLOR, COLOR_DANGER, FONT_BODY, FONT_MONO } from '../../constants/config';
@@ -36,37 +36,55 @@ function emptyKRRow(): KRFormRow {
   };
 }
 
-export function TemplateForm({ open, onClose, theme, template, onSave }: TemplateFormProps) {
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Health Check');
-  const [period, setPeriod] = useState('Q1 2026');
-  const [krs, setKRs] = useState<KRFormRow[]>([emptyKRRow()]);
+function buildFormRows(template?: GoalTemplate): KRFormRow[] {
+  if (!template) return [emptyKRRow()];
 
-  // Populate when editing
-  useEffect(() => {
-    if (open && template) {
-      setTitle(template.title);
-      setCategory(template.category);
-      setPeriod(template.period);
-      setKRs(
-        template.krTemplates.map((krt) => ({
-          id: krt.id,
-          title: krt.title,
-          sql: krt.sql,
-          unit: krt.unit,
-          direction: krt.direction,
-          start: krt.start,
-          target: krt.target,
-          timeframeDays: krt.timeframeDays !== undefined ? String(krt.timeframeDays) : '',
-        }))
-      );
-    } else if (open && !template) {
-      setTitle('');
-      setCategory('Health Check');
-      setPeriod('Q1 2026');
-      setKRs([emptyKRRow()]);
-    }
-  }, [open, template]);
+  return template.krTemplates.map((krt) => ({
+    id: krt.id,
+    title: krt.title,
+    sql: krt.sql,
+    unit: krt.unit,
+    direction: krt.direction,
+    start: krt.start,
+    target: krt.target,
+    timeframeDays: krt.timeframeDays !== undefined ? String(krt.timeframeDays) : '',
+  }));
+}
+
+export function TemplateForm({ open, onClose, theme, template, onSave }: TemplateFormProps) {
+  const formKey = template?.id ?? 'new';
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={template ? '\u270E Edit Template' : '\u{1F4CB} New Template'}
+      theme={theme}
+      width={680}
+    >
+      {open && (
+        <TemplateFormContent
+          key={formKey}
+          theme={theme}
+          template={template}
+          onClose={onClose}
+          onSave={onSave}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function TemplateFormContent({
+  theme,
+  template,
+  onClose,
+  onSave,
+}: Pick<TemplateFormProps, 'theme' | 'template' | 'onClose' | 'onSave'>) {
+  const [title, setTitle] = useState(() => template?.title ?? '');
+  const [category, setCategory] = useState(() => template?.category ?? 'Health Check');
+  const [period, setPeriod] = useState(() => template?.period ?? 'Q1 2026');
+  const [krs, setKRs] = useState<KRFormRow[]>(() => buildFormRows(template));
 
   const updateKR = <K extends keyof KRFormRow>(idx: number, key: K, value: KRFormRow[K]) => {
     setKRs((prev) => prev.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
@@ -92,6 +110,7 @@ export function TemplateForm({ open, onClose, theme, template, onSave }: Templat
         target: Number(row.target),
         timeframeDays: row.timeframeDays !== '' ? Number(row.timeframeDays) : undefined,
       }));
+    if (krTemplates.length === 0) return;
 
     const result: GoalTemplate = {
       id: template?.id ?? crypto.randomUUID(),
@@ -106,16 +125,10 @@ export function TemplateForm({ open, onClose, theme, template, onSave }: Templat
 
   const inp = inputStyle(theme);
   const lbl = labelStyle(theme);
+  const canSave = title.trim().length > 0 && krs.some((row) => row.title.trim());
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={template ? '\u270E Edit Template' : '\u{1F4CB} New Template'}
-      theme={theme}
-      width={680}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: FONT_BODY }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: FONT_BODY }}>
         {/* Title */}
         <div>
           <label style={lbl}>Title</label>
@@ -297,8 +310,8 @@ export function TemplateForm({ open, onClose, theme, template, onSave }: Templat
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <button
             onClick={handleSave}
-            disabled={!title.trim()}
-            style={{ ...buttonStyle(PRIMARY_COLOR, !title.trim()), flex: 1 }}
+            disabled={!canSave}
+            style={{ ...buttonStyle(PRIMARY_COLOR, !canSave), flex: 1 }}
           >
             {template ? 'Save Changes' : 'Create Template'}
           </button>
@@ -320,6 +333,5 @@ export function TemplateForm({ open, onClose, theme, template, onSave }: Templat
           </button>
         </div>
       </div>
-    </Modal>
   );
 }

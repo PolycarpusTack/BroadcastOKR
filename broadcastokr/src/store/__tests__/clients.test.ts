@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
-import type { Client, GoalTemplate } from '../../types';
+import type { Client, GoalTemplate, Task } from '../../types';
 
 const testClient: Client = {
   id: 'test-vrt', name: 'VRT', connectionId: 'conn-1',
-  color: '#3805E3', tags: ['tier-1'], channels: [],
+  color: '#3805E3', tags: ['tier-1'], channels: [
+    { id: 'main', name: 'Main' },
+  ],
 };
 
 const testTemplate: GoalTemplate = {
@@ -17,7 +19,7 @@ const testTemplate: GoalTemplate = {
 };
 
 beforeEach(() => {
-  useStore.setState({ clients: [], goalTemplates: [], goals: [] });
+  useStore.setState({ clients: [], goalTemplates: [], goals: [], tasks: [] });
 });
 
 describe('client actions', () => {
@@ -31,6 +33,70 @@ describe('client actions', () => {
     useStore.getState().addClient(testClient);
     useStore.getState().updateClient('test-vrt', { name: 'VRT Updated' });
     expect(useStore.getState().clients[0].name).toBe('VRT Updated');
+  });
+
+  it('updateClient rebinds live KRs and resets scoped channels when connection changes', () => {
+    const scopedGoal = {
+      id: 'goal-1',
+      title: 'Scoped goal',
+      status: 'behind' as const,
+      progress: 0,
+      owner: 0,
+      channel: 0,
+      period: 'Q1 2026',
+      clientIds: ['test-vrt'],
+      channelScope: {
+        type: 'selected' as const,
+        channels: [{ clientId: 'test-vrt', channelId: 'main' }],
+      },
+      keyResults: [{
+        id: 'kr-1',
+        title: 'Live KR',
+        start: 0,
+        target: 100,
+        current: 0,
+        progress: 0,
+        status: 'behind' as const,
+        liveConfig: {
+          connectionId: 'conn-1',
+          sql: 'SELECT 1',
+          unit: 'count',
+          direction: 'hi' as const,
+        },
+        syncStatus: 'pending' as const,
+      }],
+    };
+    const scopedTask: Task = {
+      id: 'task-1',
+      title: 'Scoped task',
+      status: 'todo',
+      priority: 'medium',
+      assignee: 0,
+      channel: 0,
+      due: '2026-04-01',
+      taskType: 'task',
+      subtasks: [],
+      clientIds: ['test-vrt'],
+      channelScope: {
+        type: 'selected',
+        channels: [{ clientId: 'test-vrt', channelId: 'main' }],
+      },
+    };
+
+    useStore.setState({ goals: [scopedGoal], tasks: [scopedTask] });
+    useStore.getState().addClient(testClient);
+
+    useStore.getState().updateClient('test-vrt', { connectionId: 'conn-2' });
+
+    const updatedClient = useStore.getState().clients[0];
+    const updatedGoal = useStore.getState().goals.find((goal) => goal.clientIds?.includes('test-vrt'));
+    const updatedTask = useStore.getState().tasks[0];
+
+    expect(updatedClient.connectionId).toBe('conn-2');
+    expect(updatedClient.channels).toEqual([]);
+    expect(updatedGoal?.keyResults[0].liveConfig?.connectionId).toBe('conn-2');
+    expect(updatedGoal?.channelScope).toEqual({ type: 'all' });
+    expect(updatedTask.channelScope).toEqual({ type: 'all' });
   });
 
   it('deleteClient with cascade removes client and its goals', () => {

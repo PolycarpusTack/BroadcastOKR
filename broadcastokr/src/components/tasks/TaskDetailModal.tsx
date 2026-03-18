@@ -7,8 +7,9 @@ import { Avatar } from '../ui/Avatar';
 import { Modal } from '../ui/Modal';
 import { daysUntil, getUrgencyBadge } from '../../utils/dates';
 import { useStore } from '../../store/store';
-import type { Task, TaskStatus, Theme, RolePermissions, Priority, ChannelScope, Client } from '../../types';
+import type { Task, TaskStatus, Theme, RolePermissions, Priority, ChannelScope, Client, ScopedChannelRef } from '../../types';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, FONT_MONO, FONT_BODY } from '../../constants/config';
+import { isScopedChannelSelected, pruneScopedChannels, resolveScopedChannels, scopedChannelKey } from '../../utils/channelScope';
 
 const PRIORITY_KEYS: Priority[] = ['critical', 'high', 'medium', 'low'];
 
@@ -82,7 +83,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
   const [editDue, setEditDue] = useState('');
   const [editClientIds, setEditClientIds] = useState<string[]>([]);
   const [editChannelScopeType, setEditChannelScopeType] = useState<'all' | 'selected'>('all');
-  const [editSelectedChannelIds, setEditSelectedChannelIds] = useState<string[]>([]);
+  const [editSelectedChannels, setEditSelectedChannels] = useState<ScopedChannelRef[]>([]);
 
   const startEdit = () => {
     setEditTitle(task.title);
@@ -94,7 +95,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
     setEditDue(task.due);
     setEditClientIds(task.clientIds ?? []);
     setEditChannelScopeType(task.channelScope?.type ?? 'all');
-    setEditSelectedChannelIds(task.channelScope?.type === 'selected' ? task.channelScope.channelIds : []);
+    setEditSelectedChannels(task.channelScope?.type === 'selected' ? task.channelScope.channels : []);
     setEditing(true);
   };
 
@@ -107,11 +108,15 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
     if (!editDue) { onError?.('Please select a due date'); return; }
 
     const editClientsSelected = editClientIds.length > 0;
+    if (editClientsSelected && editChannelScopeType === 'selected' && editSelectedChannels.length === 0) {
+      onError?.('Select at least one scoped channel');
+      return;
+    }
     let channelScope: ChannelScope | undefined;
     if (editClientsSelected) {
       channelScope = editChannelScopeType === 'all'
         ? { type: 'all' }
-        : { type: 'selected', channelIds: editSelectedChannelIds };
+        : { type: 'selected', channels: editSelectedChannels };
     }
 
     const updates: Partial<Omit<Task, 'id'>> = {
@@ -158,19 +163,28 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
     [editSelectedClientsData],
   );
 
+  const resolvedTaskScopedChannels = useMemo(
+    () => task.channelScope?.type === 'selected' ? resolveScopedChannels(task.channelScope, clients) : [],
+    [clients, task.channelScope],
+  );
+
   const toggleEditClient = (id: string) => {
     if (editClientIds.includes(id)) {
-      setEditClientIds(editClientIds.filter((c) => c !== id));
+      const nextClientIds = editClientIds.filter((c) => c !== id);
+      setEditClientIds(nextClientIds);
+      setEditSelectedChannels((prev) => pruneScopedChannels(prev, nextClientIds));
     } else {
       setEditClientIds([...editClientIds, id]);
     }
   };
 
-  const toggleEditChannel = (id: string) => {
-    if (editSelectedChannelIds.includes(id)) {
-      setEditSelectedChannelIds(editSelectedChannelIds.filter((c) => c !== id));
+  const toggleEditChannel = (clientId: string, channelId: string) => {
+    const candidate = { clientId, channelId };
+    const key = scopedChannelKey(candidate);
+    if (editSelectedChannels.some((channel) => scopedChannelKey(channel) === key)) {
+      setEditSelectedChannels(editSelectedChannels.filter((channel) => scopedChannelKey(channel) !== key));
     } else {
-      setEditSelectedChannelIds([...editSelectedChannelIds, id]);
+      setEditSelectedChannels([...editSelectedChannels, candidate]);
     }
   };
 
@@ -334,7 +348,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
                           gap: 8,
                           padding: '6px 12px 6px 18px',
                           cursor: 'pointer',
-                          background: editSelectedChannelIds.includes(ch.id) ? PRIMARY_COLOR + '10' : 'transparent',
+                          background: isScopedChannelSelected(editSelectedChannels, client.id, ch.id) ? PRIMARY_COLOR + '10' : 'transparent',
                           borderBottom: `1px solid ${theme.borderLight}`,
                           fontSize: 12,
                           color: theme.text,
@@ -342,8 +356,8 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
                       >
                         <input
                           type="checkbox"
-                          checked={editSelectedChannelIds.includes(ch.id)}
-                          onChange={() => toggleEditChannel(ch.id)}
+                          checked={isScopedChannelSelected(editSelectedChannels, client.id, ch.id)}
+                          onChange={() => toggleEditChannel(client.id, ch.id)}
                           style={{ accentColor: PRIMARY_COLOR, width: 13, height: 13 }}
                         />
                         <span style={{
@@ -365,7 +379,7 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
               )}
             </div>
             <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 4 }}>
-              {editSelectedChannelIds.length} of {editAllScopedChannels.length} selected
+              {editSelectedChannels.length} of {editAllScopedChannels.length} selected
             </div>
           </div>
         )}
@@ -409,11 +423,15 @@ function TaskDetailContent({ task, clients, onMove, toggleSubtask, updateTask, d
               </span>
             ))}
             {task.channelScope && (
-              <span style={{ fontSize: 11, color: theme.textMuted, padding: '2px 6px', borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
-                {task.channelScope.type === 'all'
-                  ? 'All Channels'
-                  : `${task.channelScope.channelIds.length} channel${task.channelScope.channelIds.length !== 1 ? 's' : ''}`}
-              </span>
+              task.channelScope.type === 'all' ? (
+                <span style={{ fontSize: 11, color: theme.textMuted, padding: '2px 6px', borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
+                  All Channels
+                </span>
+              ) : (
+                resolvedTaskScopedChannels.map((channel) => (
+                  <PillBadge key={channel.key} label={channel.label} color={channel.color} />
+                ))
+              )
             )}
           </div>
         ) : (

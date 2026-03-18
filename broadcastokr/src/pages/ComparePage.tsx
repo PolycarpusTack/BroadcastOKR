@@ -8,8 +8,6 @@ import {
   PRIMARY_COLOR,
   COLOR_WARNING,
   COLOR_DANGER,
-  COLOR_SUCCESS,
-  FONT_HEADING,
   FONT_BODY,
   FONT_MONO,
 } from '../constants/config';

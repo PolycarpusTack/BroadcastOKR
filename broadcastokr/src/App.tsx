@@ -18,18 +18,42 @@ export default function App() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [kpiConfigOpen, setKpiConfigOpen] = useState(false);
   const bridge = useBridge();
+  const {
+    connected,
+    bridgeRunning,
+    syncing,
+    liveKPIs,
+    drivers,
+    startBridge,
+    stopBridge,
+    syncNow,
+    startKRAutoSync,
+    testConnection,
+    getConnections,
+    getChannels,
+    saveConnection,
+    executeBatch,
+    getTables,
+    getColumns,
+    previewQuery,
+    getTemplates,
+    saveKPI,
+    deleteKPI,
+    getKPIDefinitions,
+    deleteConnection,
+  } = bridge;
   const { theme } = useTheme();
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
 
   // Start periodic auto-sync for live KRs when bridge is connected
   useEffect(() => {
-    if (bridge.connected) {
-      bridge.startKRAutoSync(
+    if (connected) {
+      startKRAutoSync(
         () => useStore.getState().goals,
         syncLiveKRBatch,
       );
     }
-  }, [bridge.connected, bridge.startKRAutoSync, syncLiveKRBatch]);
+  }, [connected, startKRAutoSync, syncLiveKRBatch]);
 
   return (
     <AppShell onCreateTask={() => setCreateTaskOpen(true)}>
@@ -39,32 +63,31 @@ export default function App() {
           <Route path="/dashboard" element={
             <DashboardPage
               onOpenKPIConfig={() => setKpiConfigOpen(true)}
-              bridgeConnected={bridge.connected}
-              bridgeRunning={bridge.bridgeRunning}
-              bridgeSyncing={bridge.syncing}
-              liveKPIs={bridge.liveKPIs}
-              drivers={bridge.drivers}
-              onStartBridge={bridge.startBridge}
-              onStopBridge={bridge.stopBridge}
-              onSyncNow={bridge.syncNow}
+              bridgeConnected={connected}
+              bridgeRunning={bridgeRunning}
+              bridgeSyncing={syncing}
+              liveKPIs={liveKPIs}
+              drivers={drivers}
+              onStartBridge={startBridge}
+              onStopBridge={stopBridge}
+              onSyncNow={syncNow}
             />
           } />
           <Route path="/goals" element={
             <GoalsPage
-              bridgeConnected={bridge.connected}
-              getConnections={bridge.getConnections}
-              getTables={bridge.getTables}
-              getColumns={bridge.getColumns}
-              previewQuery={bridge.previewQuery}
-              getChannels={bridge.getChannels}
-              executeBatch={bridge.executeBatch}
+              bridgeConnected={connected}
+              getConnections={getConnections}
+              getTables={getTables}
+              getColumns={getColumns}
+              previewQuery={previewQuery}
+              executeBatch={executeBatch}
             />
           } />
           <Route path="/clients" element={
-            <ClientsPage bridgeConnected={bridge.connected} bridgeRunning={bridge.bridgeRunning} testConnection={bridge.testConnection} getConnections={bridge.getConnections} getChannels={bridge.getChannels} saveConnection={bridge.saveConnection} onStartBridge={bridge.startBridge} onStopBridge={bridge.stopBridge} />
+            <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
           } />
           <Route path="/compare" element={
-            <ComparePage bridgeConnected={bridge.connected} executeBatch={bridge.executeBatch} />
+            <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
           } />
           <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
           <Route path="/team" element={<TeamPage />} />
@@ -76,18 +99,18 @@ export default function App() {
         open={kpiConfigOpen}
         onClose={() => setKpiConfigOpen(false)}
         theme={theme}
-        connected={bridge.connected}
-        testConnection={bridge.testConnection}
-        getTables={bridge.getTables}
-        getColumns={bridge.getColumns}
-        previewQuery={bridge.previewQuery}
-        getTemplates={bridge.getTemplates}
-        saveKPI={bridge.saveKPI}
-        deleteKPI={bridge.deleteKPI}
-        getKPIDefinitions={bridge.getKPIDefinitions}
-        getConnections={bridge.getConnections}
-        saveConnection={bridge.saveConnection}
-        deleteConnection={bridge.deleteConnection}
+        connected={connected}
+        testConnection={testConnection}
+        getTables={getTables}
+        getColumns={getColumns}
+        previewQuery={previewQuery}
+        getTemplates={getTemplates}
+        saveKPI={saveKPI}
+        deleteKPI={deleteKPI}
+        getKPIDefinitions={getKPIDefinitions}
+        getConnections={getConnections}
+        saveConnection={saveConnection}
+        deleteConnection={deleteConnection}
       />
     </AppShell>
   );

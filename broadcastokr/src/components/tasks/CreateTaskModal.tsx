@@ -3,8 +3,9 @@ import { CHANNELS, USERS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { Modal } from '../ui/Modal';
 import { nextTaskId } from '../../utils/ids';
 import { useStore } from '../../store/store';
-import type { Task, Theme, Priority, ChannelScope } from '../../types';
+import type { Task, Theme, Priority, ChannelScope, ScopedChannelRef } from '../../types';
 import { PRIMARY_COLOR } from '../../constants/config';
+import { isScopedChannelSelected, pruneScopedChannels, scopedChannelKey } from '../../utils/channelScope';
 
 const PRIORITY_KEYS: Priority[] = ['critical', 'high', 'medium', 'low'];
 
@@ -36,7 +37,7 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
   // Client + channel scope state
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [channelScopeType, setChannelScopeType] = useState<'all' | 'selected'>('all');
-  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
+  const [selectedChannels, setSelectedChannels] = useState<ScopedChannelRef[]>([]);
 
   // Client dropdown state
   const [clientDropOpen, setClientDropOpen] = useState(false);
@@ -57,7 +58,7 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
   const resetClientState = () => {
     setSelectedClientIds([]);
     setChannelScopeType('all');
-    setSelectedChannelIds([]);
+    setSelectedChannels([]);
     setClientDropOpen(false);
     setClientSearch('');
   };
@@ -82,21 +83,27 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
 
   const toggleClient = (id: string) => {
     if (selectedClientIds.includes(id)) {
-      setSelectedClientIds(selectedClientIds.filter((c) => c !== id));
+      const nextClientIds = selectedClientIds.filter((c) => c !== id);
+      setSelectedClientIds(nextClientIds);
+      setSelectedChannels((prev) => pruneScopedChannels(prev, nextClientIds));
     } else {
       setSelectedClientIds([...selectedClientIds, id]);
     }
   };
 
   const removeClient = (id: string) => {
-    setSelectedClientIds(selectedClientIds.filter((c) => c !== id));
+    const nextClientIds = selectedClientIds.filter((c) => c !== id);
+    setSelectedClientIds(nextClientIds);
+    setSelectedChannels((prev) => pruneScopedChannels(prev, nextClientIds));
   };
 
-  const toggleChannel = (id: string) => {
-    if (selectedChannelIds.includes(id)) {
-      setSelectedChannelIds(selectedChannelIds.filter((c) => c !== id));
+  const toggleChannel = (clientId: string, channelId: string) => {
+    const candidate = { clientId, channelId };
+    const key = scopedChannelKey(candidate);
+    if (selectedChannels.some((channelRef) => scopedChannelKey(channelRef) === key)) {
+      setSelectedChannels(selectedChannels.filter((channelRef) => scopedChannelKey(channelRef) !== key));
     } else {
-      setSelectedChannelIds([...selectedChannelIds, id]);
+      setSelectedChannels([...selectedChannels, candidate]);
     }
   };
 
@@ -105,12 +112,16 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
     if (!clientsSelected && (channel < 0 || channel >= CHANNELS.length)) return;
     if (assignee < 0 || assignee >= USERS.length) return;
     if (!due) { onError?.('Please select a due date'); return; }
+    if (clientsSelected && channelScopeType === 'selected' && selectedChannels.length === 0) {
+      onError?.('Select at least one scoped channel');
+      return;
+    }
 
     let channelScope: ChannelScope | undefined;
     if (clientsSelected) {
       channelScope = channelScopeType === 'all'
         ? { type: 'all' }
-        : { type: 'selected', channelIds: selectedChannelIds };
+        : { type: 'selected', channels: selectedChannels };
     }
 
     const task: Task = {
@@ -379,7 +390,7 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
                           gap: 8,
                           padding: '6px 12px 6px 18px',
                           cursor: 'pointer',
-                          background: selectedChannelIds.includes(ch.id) ? PRIMARY_COLOR + '10' : 'transparent',
+                          background: isScopedChannelSelected(selectedChannels, client.id, ch.id) ? PRIMARY_COLOR + '10' : 'transparent',
                           borderBottom: `1px solid ${theme.borderLight}`,
                           fontSize: 12,
                           color: theme.text,
@@ -387,8 +398,8 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
                       >
                         <input
                           type="checkbox"
-                          checked={selectedChannelIds.includes(ch.id)}
-                          onChange={() => toggleChannel(ch.id)}
+                          checked={isScopedChannelSelected(selectedChannels, client.id, ch.id)}
+                          onChange={() => toggleChannel(client.id, ch.id)}
                           style={{ accentColor: PRIMARY_COLOR, width: 13, height: 13 }}
                         />
                         <span style={{
@@ -410,8 +421,13 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
               )}
             </div>
             <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 4 }}>
-              {selectedChannelIds.length} of {allScopedChannels.length} channels selected
+              {selectedChannels.length} of {allScopedChannels.length} channels selected
             </div>
+            {selectedChannels.length === 0 && (
+              <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 2 }}>
+                Select at least one channel when using scoped selection.
+              </div>
+            )}
           </div>
         )}
 

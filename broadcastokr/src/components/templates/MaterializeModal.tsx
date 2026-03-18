@@ -48,10 +48,10 @@ export function MaterializeModal({
     });
   }, [clients, search, tagFilter]);
 
-  const newSelectable = filtered.filter((c) => !existingSet.has(c.id));
+  const newSelectable = filtered.filter((c) => !existingSet.has(c.id) && !!c.connectionId);
 
   const toggle = (id: string) => {
-    if (existingSet.has(id)) return; // already active — not toggleable
+    if (existingSet.has(id) || !filtered.find((c) => c.id === id)?.connectionId) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -187,6 +187,8 @@ export function MaterializeModal({
           {filtered.map((client) => {
             const isExisting = existingSet.has(client.id);
             const isSelected = selectedIds.has(client.id);
+            const noConnection = !client.connectionId;
+            const isDisabled = isExisting || noConnection;
             const hasOverride =
               client.sqlOverrides?.[template.id] &&
               Object.keys(client.sqlOverrides[template.id]).length > 0;
@@ -194,6 +196,7 @@ export function MaterializeModal({
             return (
               <label
                 key={client.id}
+                title={noConnection ? 'Configure a database connection for this client first' : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -212,14 +215,14 @@ export function MaterializeModal({
                       ? `${PRIMARY_COLOR}40`
                       : theme.borderLight
                   }`,
-                  cursor: isExisting ? 'default' : 'pointer',
-                  opacity: isExisting ? 0.75 : 1,
+                  cursor: isDisabled ? 'default' : 'pointer',
+                  opacity: isDisabled ? 0.55 : 1,
                 }}
               >
                 <input
                   type="checkbox"
                   checked={isExisting || isSelected}
-                  disabled={isExisting}
+                  disabled={isDisabled}
                   onChange={() => toggle(client.id)}
                   style={{ width: 14, height: 14, accentColor: PRIMARY_COLOR, flexShrink: 0 }}
                 />

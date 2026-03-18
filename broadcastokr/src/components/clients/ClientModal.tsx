@@ -36,6 +36,7 @@ interface ClientModalProps {
   onSave: (client: Client) => void;
   saveConnection?: (conn: DBConnection) => Promise<{ ok: boolean; connection: DBConnection }>;
   testConnection?: (conn: Omit<DBConnection, 'id'>) => Promise<{ ok: boolean; message: string }>;
+  onConnectionCreated?: () => void;
 }
 
 function emptyOverrides(templates: GoalTemplate[]): Record<string, Record<string, string>> {
@@ -46,7 +47,7 @@ function emptyOverrides(templates: GoalTemplate[]): Record<string, Record<string
   return overrides;
 }
 
-export function ClientModal({ open, onClose, theme, client, connections, templates, onSave, saveConnection, testConnection }: ClientModalProps) {
+export function ClientModal({ open, onClose, theme, client, connections, templates, onSave, saveConnection, testConnection, onConnectionCreated }: ClientModalProps) {
   const isEdit = !!client;
 
   const [name, setName] = useState('');
@@ -172,6 +173,7 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
         };
         await saveConnection(newConn);
         finalConnectionId = connId;
+        onConnectionCreated?.();
       }
 
       const tags = tagsRaw
