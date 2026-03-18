@@ -14,6 +14,7 @@ import { PillBadge } from '../components/ui/PillBadge';
 import { Modal } from '../components/ui/Modal';
 import { GoalFormFields } from '../components/goals/GoalFormFields';
 import type { GoalFormKR } from '../components/goals/GoalFormFields';
+import { CheckInModal } from '../components/goals/CheckInModal';
 import { TemplateCard } from '../components/templates/TemplateCard';
 import { TemplateForm } from '../components/templates/TemplateForm';
 import { MaterializeModal } from '../components/templates/MaterializeModal';
@@ -100,6 +101,8 @@ export function GoalsPage({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingGoalId, setSyncingGoalId] = useState<string | null>(null);
+
+  const [checkInTarget, setCheckInTarget] = useState<{ goalId: string; krIndex: number } | null>(null);
 
   // Template modal state
   const [templateFormOpen, setTemplateFormOpen] = useState(false);
@@ -207,15 +210,6 @@ export function GoalsPage({
     if (liveKRs.length > 0 && executeBatch) {
       syncGoal(goal.id, goal.keyResults);
     }
-  };
-
-  const handleCheckIn = (goalId: string, krIndex: number, goalTitle: string) => {
-    const goal = goals.find((g) => g.id === goalId);
-    const kr = goal?.keyResults[krIndex];
-    if (!kr) return;
-    checkInKR(goalId, krIndex, { value: kr.current, actor: currentUser.name });
-    toast('Check-in recorded!', COLOR_SUCCESS, '\u{1F4CB}');
-    logAction(`Check-in on "${goalTitle}" KR #${krIndex + 1}`, currentUser.name, COLOR_SUCCESS);
   };
 
   const openEditModal = (goal: Goal) => {
@@ -722,7 +716,10 @@ export function GoalsPage({
                       <div style={{ width: 80 }}><ProgressBar value={kr.progress} height={5} theme={theme} /></div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(kr.progress), minWidth: 36, textAlign: 'right' }}>{Math.round(kr.progress * 100)}%</span>
                       {permissions.canCheckIn && !kr.liveConfig && (
-                        <button onClick={(e) => { e.stopPropagation(); handleCheckIn(goal.id, ki, goal.title); }} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: COLOR_SUCCESS, color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
+                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki }); }} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: COLOR_SUCCESS, color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
+                      )}
+                      {permissions.canCheckIn && kr.liveConfig && (
+                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki }); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLOR_SUCCESS}`, background: 'transparent', color: COLOR_SUCCESS, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
                       )}
                     </div>
                   ))}
@@ -801,6 +798,29 @@ export function GoalsPage({
           </div>
         </div>
       </Modal>
+
+      {checkInTarget && (() => {
+        const goal = goals.find(g => g.id === checkInTarget.goalId);
+        const kr = goal?.keyResults[checkInTarget.krIndex];
+        if (!goal || !kr) return null;
+        return (
+          <CheckInModal
+            open={true}
+            onClose={() => setCheckInTarget(null)}
+            onSubmit={(entry) => {
+              checkInKR(checkInTarget.goalId, checkInTarget.krIndex, { ...entry, actor: currentUser.name });
+              toast('Check-in recorded!', COLOR_SUCCESS, '\u{1F4CB}');
+              logAction(`Check-in on "${goal.title}" KR "${kr.title}"`, currentUser.name, COLOR_SUCCESS);
+              setCheckInTarget(null);
+            }}
+            krTitle={kr.title}
+            currentValue={kr.current}
+            krStatus={kr.status}
+            isLive={!!kr.liveConfig}
+            theme={theme}
+          />
+        );
+      })()}
       </>
       )}
 
