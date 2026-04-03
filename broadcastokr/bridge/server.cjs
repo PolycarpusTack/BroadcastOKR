@@ -24,6 +24,8 @@ const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,
 app.use(cors({ origin: CORS_ORIGINS }));
 app.use(express.json());
 
+const { atomicWriteJSON } = require('./utils/atomicWrite.cjs');
+
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 
 const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
@@ -46,7 +48,7 @@ function loadConfig() {
 }
 
 function saveConfig(config) {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  atomicWriteJSON(CONFIG_PATH, config);
 }
 
 function loadHistory() {
@@ -55,7 +57,7 @@ function loadHistory() {
 }
 
 function saveHistory(history) {
-  fs.writeFileSync(HISTORY_PATH, JSON.stringify(history, null, 2));
+  atomicWriteJSON(HISTORY_PATH, history);
 }
 
 // ── Connection Pools ──
