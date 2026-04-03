@@ -12,7 +12,9 @@ import { ComparePage } from './pages/ComparePage';
 import { KPIConfigModal } from './components/kpi/KPIConfigModal';
 import { useBridge } from './hooks/useBridge';
 import { useTheme } from './context/ThemeContext';
+import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
+import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
 import { fetchState, fetchChanges } from './store/bridgeSync';
 
 export default function App() {
@@ -44,6 +46,7 @@ export default function App() {
     deleteConnection,
   } = bridge;
   const { theme } = useTheme();
+  const { toast } = useToast();
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
 
   // Start periodic auto-sync for live KRs when bridge is connected
@@ -79,6 +82,37 @@ export default function App() {
 
     return () => clearInterval(pollInterval);
   }, [connected]);
+
+  // Global error handlers
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      const msg = event.reason?.message || String(event.reason);
+      // Don't toast bridge fetch errors — they're expected when offline
+      if (!msg.includes('Failed to fetch') && !msg.includes('AbortError')) {
+        toast(`Error: ${msg}`, COLOR_DANGER, '⚠️');
+      }
+    };
+
+    const handleError = (event: ErrorEvent) => {
+      console.error('Uncaught error:', event.error);
+      toast(`Error: ${event.message}`, COLOR_DANGER, '⚠️');
+    };
+
+    const handleStorageQuota = () => {
+      toast('Storage is full. Export your data to free space.', COLOR_WARNING, '⚠️');
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('error', handleError);
+    window.addEventListener('storage-quota-exceeded', handleStorageQuota);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('storage-quota-exceeded', handleStorageQuota);
+    };
+  }, [toast]);
 
   return (
     <AppShell onCreateTask={() => setCreateTaskOpen(true)}>
