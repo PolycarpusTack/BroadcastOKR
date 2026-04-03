@@ -23,20 +23,47 @@ export interface BridgeChanges {
   timestamp?: string;
 }
 
-/** Fetch wrapper with auth header, mirroring useBridge's apiFetch */
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 2000, 4000];
+
+async function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** Fetch wrapper with auth header, retry with exponential backoff */
 export async function bridgeFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const authHeaders: Record<string, string> = BRIDGE_API_KEY
     ? { Authorization: `Bearer ${BRIDGE_API_KEY}` }
     : {};
-  const res = await fetch(`${BRIDGE_URL}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(`${BRIDGE_URL}${path}`, {
+        ...options,
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < MAX_RETRIES) {
+        await delay(RETRY_DELAYS[attempt]);
+      }
+    }
   }
-  return res.json();
+
+  throw lastError!;
 }
 
 /** GET /api/sync/state — full state snapshot */
