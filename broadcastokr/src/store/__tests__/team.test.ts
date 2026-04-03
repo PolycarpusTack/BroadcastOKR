@@ -68,11 +68,12 @@ describe('user actions', () => {
     expect(state.teams.find(t => t.id === 't1')!.leadId).toBeUndefined();
   });
 
-  it('deleteUser with reassignTo=null sets assignee/owner to -1', () => {
+  it('deleteUser with reassignTo=null reassigns to first remaining user', () => {
+    // beforeEach sets users [1, 2, 3]; after deleting 1, remaining[0] is user 2
     useStore.getState().deleteUser(1, null);
     const state = useStore.getState();
-    expect(state.tasks.find(t => t.id === 'tk1')!.assignee).toBe(-1);
-    expect(state.goals.find(g => g.id === 'g1')!.owner).toBe(-1);
+    expect(state.tasks.find(t => t.id === 'tk1')!.assignee).toBe(2);
+    expect(state.goals.find(g => g.id === 'g1')!.owner).toBe(2);
   });
 
   it('deleteUser blocked for last user', () => {
