@@ -262,7 +262,12 @@ app.post('/api/config', (req, res) => {
     }));
   }
 
-  saveConfig({ ...config, ...incoming });
+  const ALLOWED_KEYS = ['connections', 'kpiDefinitions', 'pollIntervalMs'];
+  const filtered = {};
+  for (const key of ALLOWED_KEYS) {
+    if (key in incoming) filtered[key] = incoming[key];
+  }
+  saveConfig({ ...config, ...filtered });
   res.json({ ok: true });
 });
 
@@ -498,7 +503,12 @@ app.get('/api/kpi/poll', async (req, res) => {
       continue;
     }
     try {
-      const rows = await runQuery(connConfig, kpi.sql, buildBinds(kpi));
+      const TIMEOUT_MS = 15000;
+      const queryPromise = runQuery(connConfig, kpi.sql, buildBinds(kpi));
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timed out')), TIMEOUT_MS)
+      );
+      const rows = await Promise.race([queryPromise, timeoutPromise]);
       const value = rows[0] ? Number(Object.values(rows[0])[0]) : 0;
 
       if (!history[kpi.id]) history[kpi.id] = [];
@@ -720,6 +730,9 @@ app.get('/api/kpi/templates', (req, res) => {
 
   res.json(templates);
 });
+
+const { globalErrorHandler } = require('./middleware/errorHandler.cjs');
+app.use(globalErrorHandler);
 
 // ── Start Server ──
 
