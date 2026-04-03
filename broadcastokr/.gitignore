@@ -15,6 +15,11 @@ installer
 bridge/config.json
 bridge/kpi-history.json
 
+# Bridge environment
+bridge/.env
+bridge/logs/
+bridge/backups/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,3 +1,5 @@
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
 /**
  * BroadcastOKR Bridge Service
  * Connects to WHATS'ON Oracle and/or PostgreSQL databases (read-only)
@@ -16,7 +18,10 @@ let pg;
 try { pg = require('pg'); } catch { pg = null; }
 
 const app = express();
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000', 'null'] }));
+const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+  .split(',')
+  .map(s => s.trim());
+app.use(cors({ origin: CORS_ORIGINS }));
 app.use(express.json());
 
 // ── Config ──
@@ -53,7 +58,8 @@ async function getOraclePool(connConfig) {
   if (oraclePools.has(key)) return oraclePools.get(key);
 
   try {
-    oracledb.initOracleClient({ libDir: connConfig.clientDir || undefined });
+    const clientDir = process.env.ORACLE_CLIENT_DIR || connConfig.clientDir || undefined;
+    oracledb.initOracleClient({ libDir: clientDir });
   } catch { /* already initialized */ }
 
   const pool = await oracledb.createPool({
@@ -95,6 +101,11 @@ function assertSelectOnly(sql) {
     .replace(/--[^\n]*/g, '');
   if (!stripped.trim().toUpperCase().startsWith('SELECT')) {
     throw new Error('Only SELECT queries are allowed');
+  }
+  // Block stacked statements (semicolons outside of string literals)
+  const noStrings = stripped.replace(/'[^']*'/g, '');
+  if (/;/.test(noStrings)) {
+    throw new Error('Multiple statements are not allowed');
   }
 }
 
@@ -398,6 +409,7 @@ app.post('/api/preview-query', async (req, res) => {
   if (!connConfig) return res.status(400).json({ error: 'Connection not found' });
 
   try {
+    assertSelectOnly(sql);
     const safeSql = wrapPreviewQuery(connConfig, sql);
     const rows = await runQuery(connConfig, safeSql);
     res.json(rows);
@@ -701,11 +713,11 @@ app.get('/api/kpi/templates', (req, res) => {
 // ── Start Server ──
 
 const PORT = process.env.BRIDGE_PORT || 3001;
-
-app.listen(PORT, '127.0.0.1', () => {
+const HOST = process.env.BRIDGE_HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
   console.log(`\n  BroadcastOKR Bridge Service`);
   console.log(`  ──────────────────────────`);
-  console.log(`  Running on http://localhost:${PORT}`);
+  console.log(`  Running on http://${HOST}:${PORT}`);
   console.log(`  Drivers: Oracle=${oracledb ? 'yes' : 'no'}, PostgreSQL=${pg ? 'yes' : 'no'}`);
   console.log(`  Config: ${CONFIG_PATH}`);
   console.log(`  History: ${HISTORY_PATH}\n`);

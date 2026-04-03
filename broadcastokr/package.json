@@ -72,6 +72,7 @@
   "dependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.59.0",
     "cors": "^2.8.6",
+    "dotenv": "^17.4.0",
     "express": "^5.2.1",
     "oracledb": "^6.10.0",
     "pg": "^8.20.0",
