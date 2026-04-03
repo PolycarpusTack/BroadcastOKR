@@ -38,6 +38,18 @@ runMigrations(db, MIGRATIONS_DIR);
 const { createGoalsRouter } = require('./routes/goals.cjs');
 app.use('/api/goals', createGoalsRouter(db));
 
+const { createTasksRouter } = require('./routes/tasks.cjs');
+const { createClientsRouter } = require('./routes/clients.cjs');
+const { createTemplatesRouter } = require('./routes/templates.cjs');
+const { createUsersRouter } = require('./routes/users.cjs');
+const { createTeamsRouter } = require('./routes/teams.cjs');
+
+app.use('/api/tasks', createTasksRouter(db));
+app.use('/api/clients', createClientsRouter(db));
+app.use('/api/templates', createTemplatesRouter(db));
+app.use('/api/users', createUsersRouter(db));
+app.use('/api/teams', createTeamsRouter(db));
+
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 
 const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
