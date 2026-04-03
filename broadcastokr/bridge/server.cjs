@@ -35,6 +35,9 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 const db = createDB(DB_PATH);
 runMigrations(db, MIGRATIONS_DIR);
 
+const { createGoalsRouter } = require('./routes/goals.cjs');
+app.use('/api/goals', createGoalsRouter(db));
+
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 
 const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
