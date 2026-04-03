@@ -16,9 +16,11 @@ import { COLOR_DANGER, FONT_BODY } from '../../constants/config';
 interface AppShellProps {
   children: ReactNode;
   onCreateTask?: () => void;
+  connected?: boolean;
+  bridgeRunning?: boolean;
 }
 
-export function AppShell({ children, onCreateTask }: AppShellProps) {
+export function AppShell({ children, onCreateTask, connected, bridgeRunning }: AppShellProps) {
   const { theme } = useTheme();
   const { currentUser, setCurrentUser, permissions } = useAuth();
   const { toast } = useToast();
@@ -97,6 +99,8 @@ export function AppShell({ children, onCreateTask }: AppShellProps) {
           onCreateTask={onCreateTask || (() => {})}
           onMobileMenu={() => setMobileSidebarOpen(true)}
           onImportExport={() => setImportExportOpen(true)}
+          connected={connected}
+          bridgeRunning={bridgeRunning}
         />
         <div className="main-content" style={{ padding: 28, flex: 1 }}>{children}</div>
       </main>

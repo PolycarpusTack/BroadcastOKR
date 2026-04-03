@@ -115,7 +115,7 @@ export default function App() {
   }, [toast]);
 
   return (
-    <AppShell onCreateTask={() => setCreateTaskOpen(true)}>
+    <AppShell onCreateTask={() => setCreateTaskOpen(true)} connected={connected} bridgeRunning={bridgeRunning}>
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

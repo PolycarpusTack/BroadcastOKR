@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Theme, RolePermissions } from '../../types';
 import { PRIMARY_COLOR, FONT_HEADING, FONT_MONO } from '../../constants/config';
+import { ConnectionIndicator } from './ConnectionIndicator';
 
 function currentQuarter(): string {
   const now = new Date();
@@ -25,9 +26,11 @@ interface HeaderProps {
   onCreateTask: () => void;
   onMobileMenu?: () => void;
   onImportExport?: () => void;
+  connected?: boolean;
+  bridgeRunning?: boolean;
 }
 
-export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu, onImportExport }: HeaderProps) {
+export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu, onImportExport, connected, bridgeRunning }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const page = PAGE_INFO[location.pathname] || PAGE_INFO['/dashboard'];
@@ -65,6 +68,9 @@ export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu, on
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {connected !== undefined && (
+          <ConnectionIndicator connected={connected} bridgeRunning={bridgeRunning ?? false} />
+        )}
         <span style={{ padding: '4px 10px', borderRadius: 6, background: theme.bgMuted, border: `1px solid ${theme.border}`, fontSize: 11, color: theme.textMuted }}>
           {currentQuarter()}
         </span>
