@@ -5,7 +5,8 @@ export const PRIMARY_COLOR = '#3805E3';
 export const PRIMARY_GRADIENT = 'linear-gradient(135deg, #3805E3 0%, #5B33F0 100%)';
 
 /** Bridge service defaults */
-export const BRIDGE_URL = 'http://localhost:3001';
+export const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://localhost:3001';
+export const BRIDGE_API_KEY = import.meta.env.VITE_BRIDGE_API_KEY || '';
 export const BRIDGE_POLL_INTERVAL_MS = 900_000; // 15 minutes
 
 /** Status colors */

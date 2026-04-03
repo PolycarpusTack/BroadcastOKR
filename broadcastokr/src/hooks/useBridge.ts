@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BRIDGE_URL, BRIDGE_POLL_INTERVAL_MS } from '../constants/config';
+import { BRIDGE_URL, BRIDGE_POLL_INTERVAL_MS, BRIDGE_API_KEY } from '../constants/config';
 import type { Goal, SyncStatus } from '../types';
 
 // Electron API type (available when running in Electron)
@@ -78,9 +78,12 @@ export interface ColumnInfo {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const authHeaders: Record<string, string> = BRIDGE_API_KEY
+    ? { Authorization: `Bearer ${BRIDGE_API_KEY}` }
+    : {};
   const res = await fetch(`${BRIDGE_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -154,16 +157,17 @@ export function useBridge() {
   /** Auto-sync all live KRs by reading goals from the store and calling execute-batch */
   const autoSyncLiveKRs = useCallback(async (
     getGoals: () => Goal[],
-    onResults: (results: Array<{ goalId: string; krIndex: number; current?: number; error?: string; status: SyncStatus }>) => void,
+    onResults: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void,
   ) => {
     const goals = getGoals();
-    const queries: Array<{ goalId: string; krIndex: number; connectionId: string; sql: string; timeframeDays?: number }> = [];
+    const queries: Array<{ goalId: string; krIndex: number; krId: string; connectionId: string; sql: string; timeframeDays?: number }> = [];
     for (const goal of goals) {
       goal.keyResults.forEach((kr, krIndex) => {
         if (kr.liveConfig) {
           queries.push({
             goalId: goal.id,
             krIndex,
+            krId: kr.id,
             connectionId: kr.liveConfig.connectionId,
             sql: kr.liveConfig.sql,
             timeframeDays: kr.liveConfig.timeframeDays,
@@ -179,7 +183,7 @@ export function useBridge() {
         method: 'POST',
         body: JSON.stringify({ queries }),
       });
-      onResults(results.map((r) => ({ ...r, status: r.status as SyncStatus })));
+      onResults(results.map((r, i) => ({ ...r, krId: queries[i]?.krId ?? '', status: r.status as SyncStatus })));
     } catch {
       // Bridge might be down — skip this cycle
     }
@@ -188,7 +192,7 @@ export function useBridge() {
   /** Start periodic auto-sync for live KRs */
   const startKRAutoSync = useCallback((
     getGoals: () => Goal[],
-    onResults: (results: Array<{ goalId: string; krIndex: number; current?: number; error?: string; status: SyncStatus }>) => void,
+    onResults: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void,
     intervalMs = BRIDGE_POLL_INTERVAL_MS,
   ) => {
     if (krSyncRef.current) clearInterval(krSyncRef.current);
