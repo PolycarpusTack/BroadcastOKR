@@ -24,6 +24,14 @@ const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,
 app.use(cors({ origin: CORS_ORIGINS }));
 app.use(express.json());
 
+const { createAuthMiddleware } = require('./middleware/auth.cjs');
+
+const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
+if (!BRIDGE_API_KEY) {
+  console.warn('  WARNING: BRIDGE_API_KEY not set — auth disabled. Set it in .env for production.');
+}
+app.use(createAuthMiddleware(BRIDGE_API_KEY));
+
 // ── Config ──
 
 const CONFIG_PATH = path.join(__dirname, 'config.json');
