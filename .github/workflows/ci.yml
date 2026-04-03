@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: broadcastokr/package-lock.json
+
+      - name: Install dependencies
+        working-directory: broadcastokr
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: broadcastokr
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        working-directory: broadcastokr
+        run: npx vitest run
+
+      - name: Run bridge tests
+        working-directory: broadcastokr
+        run: node --test bridge/__tests__/*.test.cjs
+
+      - name: Build
+        working-directory: broadcastokr
+        run: npx vite build
