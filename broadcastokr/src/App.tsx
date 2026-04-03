@@ -13,6 +13,7 @@ import { KPIConfigModal } from './components/kpi/KPIConfigModal';
 import { useBridge } from './hooks/useBridge';
 import { useTheme } from './context/ThemeContext';
 import { useStore } from './store/store';
+import { fetchState, fetchChanges } from './store/bridgeSync';
 
 export default function App() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -54,6 +55,30 @@ export default function App() {
       );
     }
   }, [connected, startKRAutoSync, syncLiveKRBatch]);
+
+  // Fetch full state from bridge on connect, then poll for changes
+  useEffect(() => {
+    if (!connected) return;
+
+    let lastSync = new Date().toISOString();
+    fetchState()
+      .then((state) => {
+        useStore.getState()._initFromBridge(state);
+        lastSync = state.timestamp || lastSync;
+      })
+      .catch(console.error);
+
+    const pollInterval = setInterval(() => {
+      fetchChanges(lastSync)
+        .then((changes) => {
+          useStore.getState()._mergeChanges(changes);
+          if (changes.timestamp) lastSync = changes.timestamp;
+        })
+        .catch(() => {}); // silent — bridge might be down
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [connected]);
 
   return (
     <AppShell onCreateTask={() => setCreateTaskOpen(true)}>

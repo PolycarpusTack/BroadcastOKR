@@ -7,6 +7,7 @@ import { createInitialTeams } from '../constants/teams';
 import { goalStatus } from '../utils/colors';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
+import { bridgePost, bridgePut, bridgeDelete } from './bridgeSync';
 
 /** Recalculate goal progress and status from its KRs */
 function recalcGoal(goal: Goal): Goal {
@@ -27,15 +28,15 @@ interface AppStore {
   // Goals
   addGoal: (goal: Goal) => void;
   setGoals: (goals: Goal[]) => void;
-  checkInKR: (goalId: string, krIndex: number, entry: { value: number; confidence?: Confidence; note?: string; actor: string }) => void;
+  checkInKR: (goalId: string, krId: string, entry: { value: number; confidence?: Confidence; note?: string; actor: string }) => void;
   setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
   updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => void;
   deleteGoal: (id: string) => void;
 
   // Live KR sync
-  syncLiveKR: (goalId: string, krIndex: number, current: number) => void;
-  syncLiveKRError: (goalId: string, krIndex: number, error: string, status?: SyncStatus) => void;
-  syncLiveKRBatch: (results: Array<{ goalId: string; krIndex: number; current?: number; error?: string; status: SyncStatus }>) => void;
+  syncLiveKR: (goalId: string, krId: string, current: number) => void;
+  syncLiveKRError: (goalId: string, krId: string, error: string, status?: SyncStatus) => void;
+  syncLiveKRBatch: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void;
 
   setKPIs: (kpis: KPI[]) => void;
 
@@ -71,11 +72,15 @@ interface AppStore {
   deleteGoalTemplate: (id: string, cascade: boolean) => void;
   materializeTemplate: (templateId: string, clientIds: string[], ownerIndex?: number) => void;
   syncTemplateToGoals: (templateId: string) => void;
+
+  // Bridge sync
+  _initFromBridge: (state: { goals: Goal[]; tasks: Task[]; clients: Client[]; goalTemplates: GoalTemplate[]; users: User[]; teams: Team[]; kpis: KPI[] }) => void;
+  _mergeChanges: (changes: { goals?: Goal[]; tasks?: Task[]; clients?: Client[]; goalTemplates?: GoalTemplate[]; users?: User[]; teams?: Team[]; kpis?: KPI[] }) => void;
 }
 
 export const useStore = create<AppStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       goals: createInitialGoals(),
       tasks: createInitialTasks(),
       kpis: createInitialKPIs(),
@@ -84,15 +89,18 @@ export const useStore = create<AppStore>()(
       teams: createInitialTeams(),
       goalTemplates: [],
 
-      addGoal: (goal) => set((s) => ({ goals: [goal, ...s.goals] })),
+      addGoal: (goal) => {
+        set((s) => ({ goals: [goal, ...s.goals] }));
+        bridgePost('/api/goals', goal).catch(console.error);
+      },
       setGoals: (goals) => set({ goals }),
 
-      checkInKR: (goalId, krIndex, entry) =>
+      checkInKR: (goalId, krId, entry) => {
         set((s) => {
           const goals = structuredClone(s.goals);
           const goalIdx = goals.findIndex((g) => g.id === goalId);
           if (goalIdx === -1) return {};
-          const kr = goals[goalIdx].keyResults[krIndex];
+          const kr = goals[goalIdx].keyResults.find((k) => k.id === krId);
           if (!kr) return {};
 
           if (!kr.history) kr.history = [];
@@ -107,19 +115,20 @@ export const useStore = create<AppStore>()(
 
           if (!kr.liveConfig) {
             kr.current = entry.value;
+            const range = Math.abs(kr.target - kr.start);
+            kr.progress = range === 0
+              ? (kr.current === kr.target ? 1 : 0)
+              : Math.min(Math.abs(kr.current - kr.start) / range, 1);
+            kr.status = goalStatus(kr.progress);
           }
-
-          const range = Math.abs(kr.target - kr.start);
-          kr.progress = range === 0
-            ? (kr.current === kr.target ? 1 : 0)
-            : Math.min(Math.abs(kr.current - kr.start) / range, 1);
-          kr.status = goalStatus(kr.progress);
 
           kr.history = pruneHistory(kr.history);
           goals[goalIdx] = recalcGoal(goals[goalIdx]);
 
           return { goals };
-        }),
+        });
+        bridgePost(`/api/goals/${goalId}/check-in`, { krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor }).catch(console.error);
+      },
 
       setMonitor: (type, id, days) =>
         set((s) => {
@@ -141,13 +150,13 @@ export const useStore = create<AppStore>()(
           };
         }),
 
-      syncLiveKR: (goalId, krIndex, current) =>
+      syncLiveKR: (goalId, krId, current) =>
         set((s) => {
           const goals = structuredClone(s.goals);
           const goalIdx = goals.findIndex((g) => g.id === goalId);
           if (goalIdx === -1) return {};
           const goal = goals[goalIdx];
-          const kr = goal.keyResults[krIndex];
+          const kr = goal.keyResults.find((k) => k.id === krId);
           if (!kr) return {};
 
           kr.current = current;
@@ -175,12 +184,12 @@ export const useStore = create<AppStore>()(
           return { goals };
         }),
 
-      syncLiveKRError: (goalId, krIndex, error, status = 'error') =>
+      syncLiveKRError: (goalId, krId, error, status = 'error') =>
         set((s) => {
           const goals = structuredClone(s.goals);
           const goalIdx = goals.findIndex((g) => g.id === goalId);
           if (goalIdx === -1) return {};
-          const kr = goals[goalIdx].keyResults[krIndex];
+          const kr = goals[goalIdx].keyResults.find((k) => k.id === krId);
           if (!kr) return {};
 
           kr.syncStatus = status;
@@ -198,7 +207,7 @@ export const useStore = create<AppStore>()(
             const goalIdx = goalIndexMap.get(r.goalId) ?? -1;
             if (goalIdx === -1) continue;
             const goal = goals[goalIdx];
-            const kr = goal.keyResults[r.krIndex];
+            const kr = goal.keyResults.find((k) => k.id === r.krId);
             if (!kr) continue;
 
             if (r.status === 'ok' && r.current !== undefined) {
@@ -236,13 +245,19 @@ export const useStore = create<AppStore>()(
 
       setKPIs: (kpis) => set({ kpis }),
 
-      addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
+      addTask: (task) => {
+        set((s) => ({ tasks: [task, ...s.tasks] }));
+        bridgePost('/api/tasks', task).catch(console.error);
+      },
       setTasks: (tasks) => set({ tasks }),
 
-      moveTask: (id, status) =>
+      moveTask: (id, status) => {
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)),
-        })),
+        }));
+        const full = get().tasks.find((t) => t.id === id);
+        if (full) bridgePut(`/api/tasks/${id}`, full).catch(console.error);
+      },
 
       toggleSubtask: (taskId, subtaskIndex) =>
         set((s) => ({
@@ -256,33 +271,46 @@ export const useStore = create<AppStore>()(
 
       addBulkTasks: (newTasks) => set((s) => ({ tasks: [...newTasks, ...s.tasks] })),
 
-      updateTask: (id, updates) =>
+      updateTask: (id, updates) => {
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-        })),
+        }));
+        const full = get().tasks.find((t) => t.id === id);
+        if (full) bridgePut(`/api/tasks/${id}`, full).catch(console.error);
+      },
 
-      deleteTask: (id) =>
+      deleteTask: (id) => {
         set((s) => ({
           tasks: s.tasks.filter((t) => t.id !== id),
-        })),
+        }));
+        bridgeDelete(`/api/tasks/${id}`).catch(console.error);
+      },
 
-      updateGoal: (id, updates) =>
+      updateGoal: (id, updates) => {
         set((s) => {
           const goals = structuredClone(s.goals);
           const idx = goals.findIndex((g) => g.id === id);
           if (idx === -1) return {};
           goals[idx] = recalcGoal({ ...goals[idx], ...updates });
           return { goals };
-        }),
+        });
+        const full = get().goals.find((g) => g.id === id);
+        if (full) bridgePut(`/api/goals/${id}`, full).catch(console.error);
+      },
 
-      deleteGoal: (id) =>
+      deleteGoal: (id) => {
         set((s) => ({
           goals: s.goals.filter((g) => g.id !== id),
-        })),
+        }));
+        bridgeDelete(`/api/goals/${id}`).catch(console.error);
+      },
 
-      addClient: (client) => set((s) => ({ clients: [...s.clients, client] })),
+      addClient: (client) => {
+        set((s) => ({ clients: [...s.clients, client] }));
+        bridgePost('/api/clients', client).catch(console.error);
+      },
 
-      updateClient: (id, updates) =>
+      updateClient: (id, updates) => {
         set((s) => {
           const oldClient = s.clients.find((c) => c.id === id);
           const connectionChanged = updates.connectionId !== undefined && oldClient && oldClient.connectionId !== updates.connectionId;
@@ -296,14 +324,14 @@ export const useStore = create<AppStore>()(
             };
           });
           // If connectionId changed, rebind existing live KRs for this client's goals
-          if (connectionChanged && oldClient && nextConnectionId) {
+          if (connectionChanged && oldClient) {
             const goals = structuredClone(s.goals);
             const tasks = structuredClone(s.tasks);
             for (const goal of goals) {
               if (!goal.clientIds?.includes(id)) continue;
               for (const kr of goal.keyResults) {
                 if (kr.liveConfig && kr.liveConfig.connectionId === oldClient.connectionId) {
-                  kr.liveConfig.connectionId = nextConnectionId;
+                  kr.liveConfig.connectionId = nextConnectionId ?? '';
                   kr.syncStatus = 'pending';
                   kr.syncError = undefined;
                 }
@@ -325,9 +353,12 @@ export const useStore = create<AppStore>()(
             return { clients: updatedClients, goals, tasks };
           }
           return { clients: updatedClients };
-        }),
+        });
+        const full = get().clients.find((c) => c.id === id);
+        if (full) bridgePut(`/api/clients/${id}`, full).catch(console.error);
+      },
 
-      deleteClient: (id, cascade) =>
+      deleteClient: (id, cascade) => {
         set((s) => ({
           clients: s.clients.filter((c) => c.id !== id),
           goals: cascade
@@ -354,19 +385,28 @@ export const useStore = create<AppStore>()(
           teams: s.teams.map((t) => t.clientIds?.includes(id)
             ? { ...t, clientIds: t.clientIds.filter((cid) => cid !== id) }
             : t),
-        })),
+        }));
+        bridgeDelete(`/api/clients/${id}`).catch(console.error);
+      },
 
-      addUser: (user) => set((s) => ({ users: [...s.users, user] })),
+      addUser: (user) => {
+        set((s) => ({ users: [...s.users, user] }));
+        bridgePost('/api/users', user).catch(console.error);
+      },
 
-      updateUser: (id, updates) =>
+      updateUser: (id, updates) => {
         set((s) => ({
           users: s.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
-        })),
+        }));
+        const full = get().users.find((u) => u.id === id);
+        if (full) bridgePut(`/api/users/${id}`, full).catch(console.error);
+      },
 
-      deleteUser: (id, reassignTo) =>
+      deleteUser: (id, reassignTo) => {
         set((s) => {
           if (s.users.length <= 1) return {};
-          const target = reassignTo ?? -1;
+          const remaining = s.users.filter((u) => u.id !== id);
+          const target = reassignTo ?? remaining[0]?.id;
           return {
             users: s.users.filter((u) => u.id !== id),
             tasks: s.tasks.map((t) => (t.assignee === id ? { ...t, assignee: target } : t)),
@@ -377,11 +417,16 @@ export const useStore = create<AppStore>()(
               leadId: t.leadId === id ? undefined : t.leadId,
             })),
           };
-        }),
+        });
+        bridgeDelete(`/api/users/${id}`).catch(console.error);
+      },
 
-      addTeam: (team) => set((s) => ({ teams: [...s.teams, team] })),
+      addTeam: (team) => {
+        set((s) => ({ teams: [...s.teams, team] }));
+        bridgePost('/api/teams', team).catch(console.error);
+      },
 
-      updateTeam: (id, updates) =>
+      updateTeam: (id, updates) => {
         set((s) => ({
           teams: s.teams.map((t) => {
             if (t.id !== id) return t;
@@ -391,29 +436,42 @@ export const useStore = create<AppStore>()(
             }
             return updated;
           }),
-        })),
+        }));
+        const full = get().teams.find((t) => t.id === id);
+        if (full) bridgePut(`/api/teams/${id}`, full).catch(console.error);
+      },
 
-      deleteTeam: (id) =>
+      deleteTeam: (id) => {
         set((s) => ({
           teams: s.teams.filter((t) => t.id !== id),
-        })),
+        }));
+        bridgeDelete(`/api/teams/${id}`).catch(console.error);
+      },
 
-      addGoalTemplate: (template) => set((s) => ({ goalTemplates: [...s.goalTemplates, template] })),
+      addGoalTemplate: (template) => {
+        set((s) => ({ goalTemplates: [...s.goalTemplates, template] }));
+        bridgePost('/api/goal-templates', template).catch(console.error);
+      },
 
-      updateGoalTemplate: (id, updates) =>
+      updateGoalTemplate: (id, updates) => {
         set((s) => ({
           goalTemplates: s.goalTemplates.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-        })),
+        }));
+        const full = get().goalTemplates.find((t) => t.id === id);
+        if (full) bridgePut(`/api/goal-templates/${id}`, full).catch(console.error);
+      },
 
-      deleteGoalTemplate: (id, cascade) =>
+      deleteGoalTemplate: (id, cascade) => {
         set((s) => ({
           goalTemplates: s.goalTemplates.filter((t) => t.id !== id),
           goals: cascade
             ? s.goals.filter((g) => g.templateId !== id)
             : s.goals.map((g) => g.templateId === id ? { ...g, templateId: undefined } : g),
-        })),
+        }));
+        bridgeDelete(`/api/goal-templates/${id}`).catch(console.error);
+      },
 
-      materializeTemplate: (templateId, clientIds, ownerIndex = 0) =>
+      materializeTemplate: (templateId, clientIds, ownerIndex = 0) => {
         set((s) => {
           const template = s.goalTemplates.find((t) => t.id === templateId);
           if (!template) return {};
@@ -460,9 +518,11 @@ export const useStore = create<AppStore>()(
             });
           }
           return { goals: [...newGoals, ...s.goals] };
-        }),
+        });
+        bridgePost(`/api/goal-templates/${templateId}/materialize`, { clientIds, ownerIndex }).catch(console.error);
+      },
 
-      syncTemplateToGoals: (templateId) =>
+      syncTemplateToGoals: (templateId) => {
         set((s) => {
           const template = s.goalTemplates.find((t) => t.id === templateId);
           if (!template) return {};
@@ -531,10 +591,100 @@ export const useStore = create<AppStore>()(
             goal.status = updated.status;
           }
           return { goals };
-        }),
+        });
+        bridgePost(`/api/goal-templates/${templateId}/sync`, {}).catch(console.error);
+      },
+
+      // Bridge sync actions
+      _initFromBridge: (state) => set(() => ({
+        goals: state.goals ?? [],
+        tasks: state.tasks ?? [],
+        kpis: state.kpis ?? [],
+        clients: state.clients ?? [],
+        users: state.users ?? [],
+        teams: state.teams ?? [],
+        goalTemplates: state.goalTemplates ?? [],
+      })),
+
+      _mergeChanges: (changes) => set((s) => {
+        const result: Partial<Pick<AppStore, 'goals' | 'tasks' | 'kpis' | 'clients' | 'users' | 'teams' | 'goalTemplates'>> = {};
+
+        if (changes.goals) {
+          const changedMap = new Map(changes.goals.map((g) => [g.id, g]));
+          const merged = s.goals.map((g) => changedMap.get(g.id) ?? g);
+          const existingIds = new Set(s.goals.map((g) => g.id));
+          for (const g of changes.goals) {
+            if (!existingIds.has(g.id)) merged.push(g);
+          }
+          result.goals = merged;
+        }
+
+        if (changes.tasks) {
+          const changedMap = new Map(changes.tasks.map((t) => [t.id, t]));
+          const merged = s.tasks.map((t) => changedMap.get(t.id) ?? t);
+          const existingIds = new Set(s.tasks.map((t) => t.id));
+          for (const t of changes.tasks) {
+            if (!existingIds.has(t.id)) merged.push(t);
+          }
+          result.tasks = merged;
+        }
+
+        if (changes.kpis) {
+          const changedMap = new Map(changes.kpis.map((k) => [k.name, k]));
+          const merged = s.kpis.map((k) => changedMap.get(k.name) ?? k);
+          const existingNames = new Set(s.kpis.map((k) => k.name));
+          for (const k of changes.kpis) {
+            if (!existingNames.has(k.name)) merged.push(k);
+          }
+          result.kpis = merged;
+        }
+
+        if (changes.clients) {
+          const changedMap = new Map(changes.clients.map((c) => [c.id, c]));
+          const merged = s.clients.map((c) => changedMap.get(c.id) ?? c);
+          const existingIds = new Set(s.clients.map((c) => c.id));
+          for (const c of changes.clients) {
+            if (!existingIds.has(c.id)) merged.push(c);
+          }
+          result.clients = merged;
+        }
+
+        if (changes.users) {
+          const changedMap = new Map(changes.users.map((u) => [u.id, u]));
+          const merged = s.users.map((u) => changedMap.get(u.id) ?? u);
+          const existingIds = new Set(s.users.map((u) => u.id));
+          for (const u of changes.users) {
+            if (!existingIds.has(u.id)) merged.push(u);
+          }
+          result.users = merged;
+        }
+
+        if (changes.teams) {
+          const changedMap = new Map(changes.teams.map((t) => [t.id, t]));
+          const merged = s.teams.map((t) => changedMap.get(t.id) ?? t);
+          const existingIds = new Set(s.teams.map((t) => t.id));
+          for (const t of changes.teams) {
+            if (!existingIds.has(t.id)) merged.push(t);
+          }
+          result.teams = merged;
+        }
+
+        if (changes.goalTemplates) {
+          const changedMap = new Map(changes.goalTemplates.map((t) => [t.id, t]));
+          const merged = s.goalTemplates.map((t) => changedMap.get(t.id) ?? t);
+          const existingIds = new Set(s.goalTemplates.map((t) => t.id));
+          for (const t of changes.goalTemplates) {
+            if (!existingIds.has(t.id)) merged.push(t);
+          }
+          result.goalTemplates = merged;
+        }
+
+        return result;
+      }),
     }),
     {
       name: 'broadcastokr-data',
+      version: 1,
       storage: {
         getItem: (name) => {
           const value = localStorage.getItem(name);
