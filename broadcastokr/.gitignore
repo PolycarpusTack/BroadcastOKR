@@ -30,3 +30,8 @@ bridge/backups/
 *.njsproj
 *.sln
 *.sw?
+
+# Bridge SQLite database
+bridge/broadcastokr.db
+bridge/broadcastokr.db-wal
+bridge/broadcastokr.db-shm

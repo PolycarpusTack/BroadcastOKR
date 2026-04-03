@@ -27,6 +27,14 @@ app.use(express.json());
 const { atomicWriteJSON } = require('./utils/atomicWrite.cjs');
 const { encrypt, decrypt } = require('./utils/crypto.cjs');
 
+const { createDB } = require('./db/connection.cjs');
+const { runMigrations } = require('./db/migrate.cjs');
+
+const DB_PATH = process.env.BRIDGE_DB_PATH || path.join(__dirname, 'broadcastokr.db');
+const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
+const db = createDB(DB_PATH);
+runMigrations(db, MIGRATIONS_DIR);
+
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 
 const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
