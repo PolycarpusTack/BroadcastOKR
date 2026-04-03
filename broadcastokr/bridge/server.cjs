@@ -25,6 +25,7 @@ app.use(cors({ origin: CORS_ORIGINS }));
 app.use(express.json());
 
 const { atomicWriteJSON } = require('./utils/atomicWrite.cjs');
+const { encrypt, decrypt } = require('./utils/crypto.cjs');
 
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 
@@ -75,9 +76,10 @@ async function getOraclePool(connConfig) {
     oracledb.initOracleClient({ libDir: clientDir });
   } catch { /* already initialized */ }
 
+  const password = BRIDGE_API_KEY ? decrypt(connConfig.password, BRIDGE_API_KEY) : connConfig.password;
   const pool = await oracledb.createPool({
     user: connConfig.user,
-    password: connConfig.password,
+    password,
     connectString: `${connConfig.host}:${connConfig.port}/${connConfig.service}`,
     poolMin: 1,
     poolMax: 4,
@@ -92,12 +94,13 @@ function getPgPool(connConfig) {
   const key = `pg:${connConfig.host}:${connConfig.port}/${connConfig.service}`;
   if (pgPools.has(key)) return pgPools.get(key);
 
+  const password = BRIDGE_API_KEY ? decrypt(connConfig.password, BRIDGE_API_KEY) : connConfig.password;
   const pool = new pg.Pool({
     host: connConfig.host,
     port: connConfig.port,
     database: connConfig.service,
     user: connConfig.user,
-    password: connConfig.password,
+    password,
     max: 4,
     idleTimeoutMillis: 30000,
   });
@@ -277,11 +280,12 @@ app.post('/api/config', (req, res) => {
 app.post('/api/test-connection', async (req, res) => {
   const { type, host, port, service, user, password, clientDir } = req.body;
   const dbType = type || 'oracle';
+  const decryptedPassword = BRIDGE_API_KEY ? decrypt(password, BRIDGE_API_KEY) : password;
 
   try {
     if (dbType === 'postgres') {
       if (!pg) return res.json({ ok: false, message: 'pg driver not installed. Run: npm install pg' });
-      const client = new pg.Client({ host, port, database: service, user, password });
+      const client = new pg.Client({ host, port, database: service, user, password: decryptedPassword });
       await client.connect();
       await client.query('SELECT 1 AS test');
       await client.end();
@@ -289,7 +293,7 @@ app.post('/api/test-connection', async (req, res) => {
       if (!oracledb) return res.json({ ok: false, message: 'oracledb driver not installed. Run: npm install oracledb' });
       try { oracledb.initOracleClient({ libDir: clientDir || undefined }); } catch {}
       const conn = await oracledb.getConnection({
-        user, password,
+        user, password: decryptedPassword,
         connectString: `${host}:${port}/${service}`,
       });
       await conn.execute(getTestQuery({ type: 'oracle' }));
@@ -310,9 +314,14 @@ app.post('/api/connections', (req, res) => {
   const idx = (config.connections || []).findIndex(c => c.id === conn.id);
   if (idx >= 0) {
     // Preserve password if masked
-    if (conn.password === '***') conn.password = config.connections[idx].password;
+    if (conn.password === '***') {
+      conn.password = config.connections[idx].password;
+    } else {
+      conn.password = BRIDGE_API_KEY ? encrypt(conn.password, BRIDGE_API_KEY) : conn.password;
+    }
     config.connections[idx] = conn;
   } else {
+    conn.password = BRIDGE_API_KEY ? encrypt(conn.password, BRIDGE_API_KEY) : conn.password;
     config.connections = [...(config.connections || []), conn];
   }
   saveConfig(config);
