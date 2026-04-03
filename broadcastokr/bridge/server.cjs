@@ -50,6 +50,9 @@ app.use('/api/templates', createTemplatesRouter(db));
 app.use('/api/users', createUsersRouter(db));
 app.use('/api/teams', createTeamsRouter(db));
 
+const { createSyncRouter } = require('./routes/sync.cjs');
+app.use('/api/sync', createSyncRouter(db, DB_PATH));
+
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 
 const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
