@@ -32,6 +32,9 @@ if (!BRIDGE_API_KEY) {
 }
 app.use(createAuthMiddleware(BRIDGE_API_KEY));
 
+const { createLoggingMiddleware } = require('./middleware/logging.cjs');
+app.use(createLoggingMiddleware());
+
 // ── Config ──
 
 const CONFIG_PATH = path.join(__dirname, 'config.json');

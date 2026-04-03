@@ -74,11 +74,13 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.0",
     "express": "^5.2.1",
+    "morgan": "^1.10.1",
     "oracledb": "^6.10.0",
     "pg": "^8.20.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.1",
+    "rotating-file-stream": "^3.2.9",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.11"
   },
