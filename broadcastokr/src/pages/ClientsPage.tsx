@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../store/store';
+import { useShallow } from 'zustand/react/shallow';
 import { ClientModal } from '../components/clients/ClientModal';
 import { Modal } from '../components/ui/Modal';
 import { PillBadge } from '../components/ui/PillBadge';
@@ -659,13 +660,20 @@ export function ClientsPage({
   const { toast } = useToast();
   const { logAction } = useActivityLog();
   const { currentUser, permissions } = useAuth();
-  const clients = useStore((s) => s.clients);
-  const goalTemplates = useStore((s) => s.goalTemplates);
-  const goals = useStore((s) => s.goals);
-  const addClient = useStore((s) => s.addClient);
-  const updateClient = useStore((s) => s.updateClient);
-  const deleteClient = useStore((s) => s.deleteClient);
-  const setMonitor = useStore((s) => s.setMonitor);
+  const {
+    clients, goalTemplates, goals,
+    addClient, updateClient, deleteClient, setMonitor,
+  } = useStore(
+    useShallow((s) => ({
+      clients: s.clients,
+      goalTemplates: s.goalTemplates,
+      goals: s.goals,
+      addClient: s.addClient,
+      updateClient: s.updateClient,
+      deleteClient: s.deleteClient,
+      setMonitor: s.setMonitor,
+    })),
+  );
 
   const [connections, setConnections] = useState<DBConnection[]>([]);
   const [health, setHealth] = useState<Record<string, HealthStatus>>({});

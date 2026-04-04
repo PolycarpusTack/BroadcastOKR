@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
+import { useShallow } from 'zustand/react/shallow';
 import { CHANNELS, STATUS_FLOW, STATUS_LABELS, STATUS_COLORS, PRIORITIES, TASK_TYPES } from '../constants';
 import { PRIMARY_COLOR, COLOR_DANGER } from '../constants/config';
 import { safeUser, safeChannel } from '../utils/safeGet';
@@ -27,11 +28,15 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
   const { currentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
-  const tasks = useStore((s) => s.tasks);
-  const addTask = useStore((s) => s.addTask);
-  const moveTask = useStore((s) => s.moveTask);
-  const clients = useStore((s) => s.clients);
-  const users = useStore((s) => s.users);
+  const { tasks, addTask, moveTask, clients, users } = useStore(
+    useShallow((s) => ({
+      tasks: s.tasks,
+      addTask: s.addTask,
+      moveTask: s.moveTask,
+      clients: s.clients,
+      users: s.users,
+    })),
+  );
 
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [filterChannel, setFilterChannel] = useState('all');

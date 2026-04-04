@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
 import { useStore } from '../store/store';
+import { useShallow } from 'zustand/react/shallow';
 import { CHANNELS } from '../constants';
 import { safeUser, safeChannel } from '../utils/safeGet';
 import { selectStyle as makeSelectStyle } from '../utils/styles';
@@ -63,23 +64,30 @@ export function GoalsPage({
   const { currentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
-  const goals = useStore((s) => s.goals);
-  const addGoal = useStore((s) => s.addGoal);
-  const checkInKR = useStore((s) => s.checkInKR);
-  const updateGoal = useStore((s) => s.updateGoal);
-  const deleteGoal = useStore((s) => s.deleteGoal);
-  const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
-  const setMonitor = useStore((s) => s.setMonitor);
-
-  // Template selectors
-  const goalTemplates = useStore((s) => s.goalTemplates);
-  const clients = useStore((s) => s.clients);
-  const users = useStore((s) => s.users);
-  const addGoalTemplate = useStore((s) => s.addGoalTemplate);
-  const updateGoalTemplate = useStore((s) => s.updateGoalTemplate);
-  const deleteGoalTemplate = useStore((s) => s.deleteGoalTemplate);
-  const materializeTemplate = useStore((s) => s.materializeTemplate);
-  const syncTemplateToGoals = useStore((s) => s.syncTemplateToGoals);
+  const {
+    goals, addGoal, checkInKR, updateGoal, deleteGoal, syncLiveKRBatch, setMonitor,
+    goalTemplates, clients, users,
+    addGoalTemplate, updateGoalTemplate, deleteGoalTemplate,
+    materializeTemplate, syncTemplateToGoals,
+  } = useStore(
+    useShallow((s) => ({
+      goals: s.goals,
+      addGoal: s.addGoal,
+      checkInKR: s.checkInKR,
+      updateGoal: s.updateGoal,
+      deleteGoal: s.deleteGoal,
+      syncLiveKRBatch: s.syncLiveKRBatch,
+      setMonitor: s.setMonitor,
+      goalTemplates: s.goalTemplates,
+      clients: s.clients,
+      users: s.users,
+      addGoalTemplate: s.addGoalTemplate,
+      updateGoalTemplate: s.updateGoalTemplate,
+      deleteGoalTemplate: s.deleteGoalTemplate,
+      materializeTemplate: s.materializeTemplate,
+      syncTemplateToGoals: s.syncTemplateToGoals,
+    })),
+  );
 
   const [connections, setConnections] = useState<DBConnection[]>([]);
 
@@ -105,7 +113,7 @@ export function GoalsPage({
   const [syncingGoalId, setSyncingGoalId] = useState<string | null>(null);
   const [monitorOpen, setMonitorOpen] = useState<string | null>(null);
 
-  const [checkInTarget, setCheckInTarget] = useState<{ goalId: string; krIndex: number } | null>(null);
+  const [checkInTarget, setCheckInTarget] = useState<{ goalId: string; krIndex: number; krId: string } | null>(null);
 
   // Template modal state
   const [templateFormOpen, setTemplateFormOpen] = useState(false);
@@ -143,7 +151,7 @@ export function GoalsPage({
 
   const filtered = useMemo(() => goals.filter((g) => {
     if (filterChannel !== 'all' && g.channel !== Number(filterChannel)) return false;
-    if (filterStatus !== 'all' && g.status !== filterStatus) return false;
+    if (filterStatus !== 'all' && goalStatus(g.progress) !== filterStatus) return false;
     if (filterClient !== 'all' && !(g.clientIds?.includes(filterClient))) return false;
     return true;
   }), [goals, filterChannel, filterStatus, filterClient]);
@@ -319,11 +327,11 @@ export function GoalsPage({
   const syncGoal = useCallback(async (goalId: string, keyResults: KeyResult[]) => {
     if (!executeBatch) return;
     const queries = keyResults
-      .map((kr, idx) => ({ kr, idx }))
-      .filter(({ kr }) => kr.liveConfig)
-      .map(({ kr, idx }) => ({
+      .filter((kr) => kr.liveConfig)
+      .map((kr, idx) => ({
         goalId,
         krIndex: idx,
+        krId: kr.id,
         connectionId: kr.liveConfig!.connectionId,
         sql: kr.liveConfig!.sql,
         timeframeDays: kr.liveConfig!.timeframeDays,
@@ -334,8 +342,9 @@ export function GoalsPage({
     setSyncingGoalId(goalId);
     try {
       const { results } = await executeBatch(queries);
-      syncLiveKRBatch(results.map((r) => ({
+      syncLiveKRBatch(results.map((r, i) => ({
         ...r,
+        krId: queries[i]?.krId ?? '',
         status: r.status as SyncStatus,
       })));
       const ok = results.filter((r) => r.status === 'ok').length;
@@ -358,6 +367,7 @@ export function GoalsPage({
     const queries: Array<{
       goalId: string;
       krIndex: number;
+      krId: string;
       connectionId: string;
       sql: string;
       timeframeDays?: number;
@@ -369,6 +379,7 @@ export function GoalsPage({
           queries.push({
             goalId: goal.id,
             krIndex: i,
+            krId: kr.id,
             connectionId: kr.liveConfig.connectionId,
             sql: kr.liveConfig.sql,
             timeframeDays: kr.liveConfig.timeframeDays,
@@ -381,8 +392,9 @@ export function GoalsPage({
     setSyncingGoalId('all');
     try {
       const { results } = await executeBatch(queries);
-      syncLiveKRBatch(results.map((r) => ({
+      syncLiveKRBatch(results.map((r, i) => ({
         ...r,
+        krId: queries[i]?.krId ?? '',
         status: r.status as SyncStatus,
       })));
       const ok = results.filter((r) => r.status === 'ok').length;
@@ -520,6 +532,7 @@ export function GoalsPage({
                   template={tpl}
                   theme={theme}
                   clientCount={clientCount}
+                  permissions={permissions}
                   onEdit={() => { setEditingTemplate(tpl); setTemplateFormOpen(true); }}
                   onMaterialize={() => setMaterializeTemplateId(tpl.id)}
                   onDelete={() => { setDeleteTemplateId(tpl.id); setDeleteTemplateCascade(false); }}
@@ -799,10 +812,10 @@ export function GoalsPage({
                       <div style={{ width: 80 }}><ProgressBar value={kr.progress} height={5} theme={theme} /></div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: progressColor(kr.progress), minWidth: 36, textAlign: 'right' }}>{Math.round(kr.progress * 100)}%</span>
                       {permissions.canCheckIn && !kr.liveConfig && (
-                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki }); }} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: COLOR_SUCCESS, color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
+                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki, krId: kr.id }); }} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: COLOR_SUCCESS, color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
                       )}
                       {permissions.canCheckIn && kr.liveConfig && (
-                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki }); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLOR_SUCCESS}`, background: 'transparent', color: COLOR_SUCCESS, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
+                        <button onClick={(e) => { e.stopPropagation(); setCheckInTarget({ goalId: goal.id, krIndex: ki, krId: kr.id }); }} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${COLOR_SUCCESS}`, background: 'transparent', color: COLOR_SUCCESS, fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Check In</button>
                       )}
                     </div>
                   ))}
@@ -891,7 +904,7 @@ export function GoalsPage({
             open={true}
             onClose={() => setCheckInTarget(null)}
             onSubmit={(entry) => {
-              checkInKR(checkInTarget.goalId, checkInTarget.krIndex, { ...entry, actor: currentUser.name });
+              checkInKR(checkInTarget.goalId, checkInTarget.krId, { ...entry, actor: currentUser.name });
               toast('Check-in recorded!', COLOR_SUCCESS, '\u{1F4CB}');
               logAction(`Check-in on "${goal.title}" KR "${kr.title}"`, currentUser.name, COLOR_SUCCESS);
               setCheckInTarget(null);

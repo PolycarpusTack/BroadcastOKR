@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../store/store';
+import { useShallow } from 'zustand/react/shallow';
 import { safeUser } from '../utils/safeGet';
 import { roleColor } from '../utils/colors';
 import { Avatar } from '../components/ui/Avatar';
@@ -29,17 +30,25 @@ export function TeamPage() {
   const { permissions } = useAuth();
 
   // Store selectors
-  const users = useStore((s) => s.users);
-  const teams = useStore((s) => s.teams);
-  const clients = useStore((s) => s.clients);
-  const goals = useStore((s) => s.goals);
-  const tasks = useStore((s) => s.tasks);
-  const addUser = useStore((s) => s.addUser);
-  const updateUser = useStore((s) => s.updateUser);
-  const deleteUser = useStore((s) => s.deleteUser);
-  const addTeam = useStore((s) => s.addTeam);
-  const updateTeam = useStore((s) => s.updateTeam);
-  const deleteTeam = useStore((s) => s.deleteTeam);
+  const {
+    users, teams, clients, goals, tasks,
+    addUser, updateUser, deleteUser,
+    addTeam, updateTeam, deleteTeam,
+  } = useStore(
+    useShallow((s) => ({
+      users: s.users,
+      teams: s.teams,
+      clients: s.clients,
+      goals: s.goals,
+      tasks: s.tasks,
+      addUser: s.addUser,
+      updateUser: s.updateUser,
+      deleteUser: s.deleteUser,
+      addTeam: s.addTeam,
+      updateTeam: s.updateTeam,
+      deleteTeam: s.deleteTeam,
+    })),
+  );
 
   // View toggle
   const [view, setView] = useState<'teams' | 'members' | 'workload'>('teams');

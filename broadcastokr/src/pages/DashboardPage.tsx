@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
+import { useShallow } from 'zustand/react/shallow';
 import { CHANNELS } from '../constants';
 import { safeUser, safeChannel } from '../utils/safeGet';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -38,10 +39,14 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const { theme, dark } = useTheme();
   const navigate = useNavigate();
-  const goals = useStore((s) => s.goals);
-  const tasks = useStore((s) => s.tasks);
-  const kpis = useStore((s) => s.kpis);
-  const users = useStore((s) => s.users);
+  const { goals, tasks, kpis, users } = useStore(
+    useShallow((s) => ({
+      goals: s.goals,
+      tasks: s.tasks,
+      kpis: s.kpis,
+      users: s.users,
+    })),
+  );
 
   const activeTasks = useMemo(() => tasks.filter((t) => t.status !== 'done'), [tasks]);
   const urgentTasks = useMemo(() =>

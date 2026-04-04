@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
+import { useShallow } from 'zustand/react/shallow';
 import { PillBadge } from '../components/ui/PillBadge';
 import { goalStatus, progressColor } from '../utils/colors';
 import {
@@ -62,10 +63,14 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
   const { theme } = useTheme();
   const navigate = useNavigate();
 
-  const goalTemplates = useStore((s) => s.goalTemplates);
-  const clients = useStore((s) => s.clients);
-  const goals = useStore((s) => s.goals);
-  const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
+  const { goalTemplates, clients, goals, syncLiveKRBatch } = useStore(
+    useShallow((s) => ({
+      goalTemplates: s.goalTemplates,
+      clients: s.clients,
+      goals: s.goals,
+      syncLiveKRBatch: s.syncLiveKRBatch,
+    })),
+  );
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [sortKrId, setSortKrId] = useState<string | null>(null);
@@ -167,13 +172,14 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
 
   const handleSyncAll = useCallback(async () => {
     if (!executeBatch || !selectedTemplate) return;
-    const queries: ExecuteBatchQuery[] = [];
+    const queries: (ExecuteBatchQuery & { krId: string })[] = [];
     for (const row of filteredRows) {
       row.goal.keyResults.forEach((kr, krIndex) => {
         if (kr.liveConfig) {
           queries.push({
             goalId: row.goal.id,
             krIndex,
+            krId: kr.id,
             connectionId: kr.liveConfig.connectionId,
             sql: kr.liveConfig.sql,
             timeframeDays: kr.liveConfig.timeframeDays,
@@ -186,9 +192,9 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
     try {
       const { results } = await executeBatch(queries);
       syncLiveKRBatch(
-        results.map((r) => ({
+        results.map((r, i) => ({
           goalId: r.goalId,
-          krIndex: r.krIndex,
+          krId: queries[i]?.krId ?? '',
           current: r.current,
           error: r.error,
           status: r.status,
