@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
@@ -171,6 +171,7 @@ interface ClientRowProps {
   goalCount: number;
   bridgeConnected: boolean;
   canCheckIn: boolean;
+  canDelete: boolean;
   setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
   testConnection?: (conn: Omit<DBConnection, 'id'>) => Promise<{ ok: boolean; message: string }>;
   getChannels?: (connectionId: string) => Promise<Array<{ id: string; name: string; internalValue?: string; channelKind?: string }>>;
@@ -181,13 +182,14 @@ interface ClientRowProps {
   theme: ReturnType<typeof useTheme>['theme'];
 }
 
-function ClientRow({
+const ClientRow = memo(function ClientRow({
   client,
   health,
   connections,
   goalCount,
   bridgeConnected,
   canCheckIn,
+  canDelete,
   setMonitor,
   testConnection,
   getChannels,
@@ -615,28 +617,30 @@ function ClientRow({
                 ? `${goalCount} materialized goal${goalCount !== 1 ? 's' : ''}`
                 : 'No goals yet'}
             </span>
-            <button
-              onClick={() => onDelete(client)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: `1px solid ${COLOR_DANGER}40`,
-                background: `${COLOR_DANGER}12`,
-                color: COLOR_DANGER,
-                fontSize: 11,
-                fontFamily: FONT_BODY,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Delete Client
-            </button>
+            {canDelete && (
+              <button
+                onClick={() => onDelete(client)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 6,
+                  border: `1px solid ${COLOR_DANGER}40`,
+                  background: `${COLOR_DANGER}12`,
+                  color: COLOR_DANGER,
+                  fontSize: 11,
+                  fontFamily: FONT_BODY,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Delete Client
+              </button>
+            )}
           </div>
         </div>
       )}
     </div>
   );
-}
+});
 
 // ---- Main Settings Page ----
 
@@ -892,9 +896,11 @@ export function ClientsPage({
               {clients.length} client{clients.length !== 1 ? 's' : ''} configured
             </p>
           </div>
-          <button onClick={handleAddClient} style={buttonStyle(PRIMARY_COLOR)}>
-            + Add Client
-          </button>
+          {permissions.canCreate && (
+            <button onClick={handleAddClient} style={buttonStyle(PRIMARY_COLOR)}>
+              + Add Client
+            </button>
+          )}
         </div>
 
         {/* Empty state */}
@@ -912,9 +918,11 @@ export function ClientsPage({
             <p style={{ fontSize: 13, margin: 0, fontFamily: FONT_BODY }}>
               No clients configured. Add a client to manage database connections and channels.
             </p>
-            <button onClick={handleAddClient} style={{ ...buttonStyle(PRIMARY_COLOR), marginTop: 16 }}>
-              + Add Client
-            </button>
+            {permissions.canCreate && (
+              <button onClick={handleAddClient} style={{ ...buttonStyle(PRIMARY_COLOR), marginTop: 16 }}>
+                + Add Client
+              </button>
+            )}
           </div>
         )}
 
@@ -930,6 +938,7 @@ export function ClientsPage({
                 goalCount={goalCountFor(client.id)}
                 bridgeConnected={bridgeConnected}
                 canCheckIn={permissions.canCheckIn}
+                canDelete={permissions.canDelete}
                 setMonitor={setMonitor}
                 testConnection={testConnection}
                 getChannels={getChannels}

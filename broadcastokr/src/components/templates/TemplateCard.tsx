@@ -1,11 +1,13 @@
+import { memo } from 'react';
 import { PillBadge } from '../ui/PillBadge';
 import { PRIMARY_COLOR, COLOR_DANGER, COLOR_SUCCESS, COLOR_INFO, FONT_HEADING, FONT_BODY } from '../../constants/config';
-import type { GoalTemplate, Theme } from '../../types';
+import type { GoalTemplate, RolePermissions, Theme } from '../../types';
 
 interface TemplateCardProps {
   template: GoalTemplate;
   theme: Theme;
   clientCount: number;
+  permissions: RolePermissions;
   onEdit: () => void;
   onMaterialize: () => void;
   onDelete: () => void;
@@ -17,7 +19,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Custom': PRIMARY_COLOR,
 };
 
-export function TemplateCard({ template, theme, clientCount, onEdit, onMaterialize, onDelete }: TemplateCardProps) {
+export const TemplateCard = memo(function TemplateCard({ template, theme, clientCount, permissions, onEdit, onMaterialize, onDelete }: TemplateCardProps) {
   const categoryColor = CATEGORY_COLORS[template.category] ?? PRIMARY_COLOR;
 
   return (
@@ -74,55 +76,61 @@ export function TemplateCard({ template, theme, clientCount, onEdit, onMateriali
 
         {/* Action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <button
-            onClick={onEdit}
-            style={{
-              padding: '4px 10px',
-              borderRadius: 6,
-              border: `1px solid ${theme.border}`,
-              background: 'transparent',
-              color: theme.textSecondary,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: FONT_BODY,
-            }}
-          >
-            \u270E Edit
-          </button>
-          <button
-            onClick={onMaterialize}
-            style={{
-              padding: '4px 10px',
-              borderRadius: 6,
-              border: 'none',
-              background: PRIMARY_COLOR,
-              color: '#fff',
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: FONT_BODY,
-            }}
-          >
-            {'\u{1F4CB}'} Materialize
-          </button>
-          <button
-            onClick={onDelete}
-            aria-label="Delete template"
-            style={{
-              padding: '4px 10px',
-              borderRadius: 6,
-              border: `1px solid ${COLOR_DANGER}4D`,
-              background: `${COLOR_DANGER}18`,
-              color: COLOR_DANGER,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: FONT_BODY,
-            }}
-          >
-            {'\u{1F5D1}'}
-          </button>
+          {permissions.canEdit && (
+            <button
+              onClick={onEdit}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: `1px solid ${theme.border}`,
+                background: 'transparent',
+                color: theme.textSecondary,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: FONT_BODY,
+              }}
+            >
+              \u270E Edit
+            </button>
+          )}
+          {permissions.canCreate && (
+            <button
+              onClick={onMaterialize}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: 'none',
+                background: PRIMARY_COLOR,
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: FONT_BODY,
+              }}
+            >
+              {'\u{1F4CB}'} Materialize
+            </button>
+          )}
+          {permissions.canDelete && (
+            <button
+              onClick={onDelete}
+              aria-label="Delete template"
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: `1px solid ${COLOR_DANGER}4D`,
+                background: `${COLOR_DANGER}18`,
+                color: COLOR_DANGER,
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: FONT_BODY,
+              }}
+            >
+              {'\u{1F5D1}'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -158,4 +166,4 @@ export function TemplateCard({ template, theme, clientCount, onEdit, onMateriali
       )}
     </div>
   );
-}
+});
