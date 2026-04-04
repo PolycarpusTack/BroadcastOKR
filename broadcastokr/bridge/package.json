@@ -1,0 +1,23 @@
+{
+  "name": "broadcastokr-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BroadcastOKR Bridge Service — SQLite + Oracle/PostgreSQL proxy",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test __tests__/*.test.cjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.0",
+    "express": "^5.2.1",
+    "morgan": "^1.10.1",
+    "rotating-file-stream": "^3.2.9"
+  },
+  "optionalDependencies": {
+    "oracledb": "^6.10.0",
+    "pg": "^8.20.0"
+  }
+}
