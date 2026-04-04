@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  bridge:
+    build: ./broadcastokr/bridge
+    ports:
+      - "3001:3001"
+    volumes:
+      - bridge-data:/app/data
+      - bridge-logs:/app/logs
+      - bridge-backups:/app/backups
+    env_file:
+      - ./broadcastokr/bridge/.env
+    restart: unless-stopped
+
+volumes:
+  bridge-data:
+  bridge-logs:
+  bridge-backups:
