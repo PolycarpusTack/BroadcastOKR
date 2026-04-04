@@ -128,7 +128,9 @@ export function useBridge() {
     try {
       const data = await apiFetch<LiveKPI[]>('/api/kpi/poll');
       setLiveKPIs(prev => {
-        if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+        if (prev.length === data.length && prev.every((p, i) => p.current === data[i]?.current && p.name === data[i]?.name)) {
+          return prev;
+        }
         return data;
       });
     } catch {
