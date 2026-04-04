@@ -5,7 +5,7 @@ export function ToastContainer() {
   const { toasts } = useToast();
 
   return (
-    <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
+    <div aria-live="polite" role="status" style={{ position: 'fixed', top: 16, right: 16, zIndex: 2000, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
       {toasts.map((t) => (
         <div
           key={t.id}
