@@ -14,7 +14,7 @@ const DARK: Theme = {
   text: '#F0F4FF',
   textSecondary: '#9BAAC4',
   textMuted: '#5E6F8A',
-  textFaint: '#3D4F68',
+  textFaint: '#6A7B95',
   sidebarText: '#5E6F8A',
   sidebarTextActive: '#5B33F0',
   overlay: 'rgba(0,0,0,.7)',
