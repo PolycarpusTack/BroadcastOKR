@@ -260,13 +260,27 @@ function getTestQuery(connConfig) {
 
 // Health check
 app.get('/api/health', (req, res) => {
+  let dbStats = null;
+  try {
+    const tableCount = db.prepare("SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'").get().c;
+    const pageCount = db.pragma('page_count', { simple: true });
+    const pageSize = db.pragma('page_size', { simple: true });
+    const dbSizeBytes = pageCount * pageSize;
+    const dbSizeMB = (dbSizeBytes / 1024 / 1024).toFixed(2);
+    dbStats = { size: `${dbSizeMB} MB`, tables: tableCount };
+  } catch { /* db might not be initialized */ }
+
+  const uptime = Math.floor(process.uptime());
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
+    uptime,
     drivers: {
       oracle: !!oracledb,
       postgres: !!pg,
     },
+    database: dbStats,
   });
 });
 
