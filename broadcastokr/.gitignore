@@ -35,3 +35,7 @@ bridge/backups/
 bridge/broadcastokr.db
 bridge/broadcastokr.db-wal
 bridge/broadcastokr.db-shm
+
+# Playwright
+test-results/
+playwright-report/
