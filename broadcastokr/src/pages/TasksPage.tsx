@@ -13,7 +13,7 @@ import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { PillBadge } from '../components/ui/PillBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
-import { TaskCard } from '../components/tasks/TaskCard';
+import { KanbanColumn } from '../components/tasks/KanbanColumn';
 import { TaskDetailModal } from '../components/tasks/TaskDetailModal';
 import { CreateTaskModal } from '../components/tasks/CreateTaskModal';
 import type { Task, TaskStatus } from '../types';
@@ -138,22 +138,16 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
           {STATUS_FLOW.map((status) => {
             const colTasks = filtered.filter((t) => t.status === status);
             return (
-              <div key={status} style={{ minHeight: 200 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[status] }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: theme.text }}>{STATUS_LABELS[status]}</span>
-                  <span style={{ fontSize: 11, color: theme.textFaint, marginLeft: 'auto' }}>{colTasks.length}</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {colTasks.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '24px 12px', color: theme.textFaint, fontSize: 12 }}>No tasks</div>
-                  ) : (
-                    colTasks.map((task) => (
-                      <TaskCard key={task.id} task={task} theme={theme} dark={dark} onClick={() => setSelectedTaskId(task.id)} />
-                    ))
-                  )}
-                </div>
-              </div>
+              <KanbanColumn
+                key={status}
+                status={status}
+                label={STATUS_LABELS[status]}
+                color={STATUS_COLORS[status]}
+                tasks={colTasks}
+                theme={theme}
+                dark={dark}
+                onTaskClick={setSelectedTaskId}
+              />
             );
           })}
         </div>
