@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { CHANNELS } from '../constants';
 import { useStore } from '../store/store';
 import { nextGoalId, nextTaskId } from './ids';
@@ -49,6 +49,46 @@ function str(val: unknown): string {
   return val == null ? '' : String(val).trim();
 }
 
+/* ─── Download trigger ─── */
+
+function triggerDownload(data: BlobPart, filename: string, mimeType: string): void {
+  const blob = new Blob([data], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ─── Sheet → row objects helper ─── */
+
+function sheetToRowObjects(worksheet: ExcelJS.Worksheet): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = [];
+  const headers: string[] = [];
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      // Header row
+      row.eachCell((cell, colNumber) => {
+        headers[colNumber] = str(cell.value);
+      });
+    } else {
+      const obj: Record<string, unknown> = {};
+      for (let i = 1; i <= headers.length; i++) {
+        if (headers[i]) {
+          const cell = row.getCell(i);
+          obj[headers[i]] = cell.value != null ? cell.value : '';
+        }
+      }
+      // Only add if at least one header was found
+      if (headers.some(Boolean)) {
+        rows.push(obj);
+      }
+    }
+  });
+  return rows;
+}
+
 /* ─── File Reading ─── */
 
 export interface ParsedData {
@@ -90,15 +130,16 @@ async function readText(file: File): Promise<string> {
 
 async function parseExcel(file: File): Promise<ParsedData> {
   const buf = await readArrayBuffer(file);
-  const wb = XLSX.read(buf, { type: 'array' });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buf);
   const warnings: string[] = [];
   let goals: Goal[] = [];
   let tasks: Task[] = [];
   let kpis: KPI[] = [];
 
-  for (const name of wb.SheetNames) {
-    const sheet = wb.Sheets[name];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  for (const worksheet of workbook.worksheets) {
+    const name = worksheet.name;
+    const rows = sheetToRowObjects(worksheet);
     if (rows.length === 0) continue;
 
     const cols = Object.keys(rows[0]).map((k) => k.toLowerCase());
@@ -135,10 +176,23 @@ async function parseExcel(file: File): Promise<ParsedData> {
 
 async function parseCSV(file: File): Promise<ParsedData> {
   const text = await readText(file);
-  const wb = XLSX.read(text, { type: 'string' });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
   const warnings: string[] = [];
+
+  // Parse CSV manually: split lines, handle quoted fields
+  const lines = parseCSVLines(text);
+  if (lines.length < 2) {
+    return { goals: [], tasks: [], kpis: [], clients: [], goalTemplates: [], warnings: ['CSV file is empty'] };
+  }
+
+  const headers = lines[0];
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const obj: Record<string, unknown> = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j]] = lines[i][j] ?? '';
+    }
+    rows.push(obj);
+  }
 
   if (rows.length === 0) {
     return { goals: [], tasks: [], kpis: [], clients: [], goalTemplates: [], warnings: ['CSV file is empty'] };
@@ -156,6 +210,54 @@ async function parseCSV(file: File): Promise<ParsedData> {
   }
   // Default to tasks
   return { goals: [], tasks: parseTaskRows(rows, warnings), kpis: [], clients: [], goalTemplates: [], warnings };
+}
+
+/** Parse CSV text into array of string arrays, handling quoted fields */
+function parseCSVLines(text: string): string[][] {
+  const results: string[][] = [];
+  let current: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < text.length && text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        current.push(field.trim());
+        field = '';
+      } else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+        current.push(field.trim());
+        field = '';
+        if (current.some((f) => f !== '')) {
+          results.push(current);
+        }
+        current = [];
+        if (ch === '\r') i++;
+      } else {
+        field += ch;
+      }
+    }
+  }
+  // Last field
+  current.push(field.trim());
+  if (current.some((f) => f !== '')) {
+    results.push(current);
+  }
+
+  return results;
 }
 
 /* ─── JSON ─── */
@@ -386,9 +488,19 @@ function parseKPIRows(rows: Record<string, unknown>[], warnings: string[]): KPI[
 
 /* ─── Export ─── */
 
-export function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients: Client[] = [], goalTemplates: GoalTemplate[] = []): void {
+/** Helper to add rows from an array of objects to a worksheet */
+function addRowsToSheet(ws: ExcelJS.Worksheet, data: Record<string, unknown>[]): void {
+  if (data.length === 0) return;
+  const keys = Object.keys(data[0]);
+  ws.columns = keys.map((k) => ({ header: k, key: k }));
+  for (const row of data) {
+    ws.addRow(row);
+  }
+}
+
+export async function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients: Client[] = [], goalTemplates: GoalTemplate[] = []): Promise<void> {
   void clients; void goalTemplates; // Excel export omits these — JSON export is the canonical format
-  const wb = XLSX.utils.book_new();
+  const workbook = new ExcelJS.Workbook();
 
   // Goals sheet
   const goalRows = goals.map((g) => ({
@@ -404,7 +516,8 @@ export function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients
     }).join('; '),
   }));
   if (goalRows.length > 0) {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalRows), 'Goals');
+    const ws = workbook.addWorksheet('Goals');
+    addRowsToSheet(ws, goalRows);
   }
 
   // Tasks sheet
@@ -420,7 +533,8 @@ export function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients
     Subtasks: t.subtasks.map((s) => s.text).join('; '),
   }));
   if (taskRows.length > 0) {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskRows), 'Tasks');
+    const ws = workbook.addWorksheet('Tasks');
+    addRowsToSheet(ws, taskRows);
   }
 
   // KPIs sheet
@@ -433,15 +547,34 @@ export function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], clients
     Trend: k.trend.join('; '),
   }));
   if (kpiRows.length > 0) {
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiRows), 'KPIs');
+    const ws = workbook.addWorksheet('KPIs');
+    addRowsToSheet(ws, kpiRows);
   }
 
-  XLSX.writeFile(wb, `BroadcastOKR_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const buffer = await workbook.xlsx.writeBuffer();
+  triggerDownload(buffer, `BroadcastOKR_Export_${new Date().toISOString().slice(0, 10)}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
+
+/** Escape a CSV field, quoting if necessary */
+function csvEscape(val: unknown): string {
+  const s = val == null ? '' : String(val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+/** Build a CSV string from an array of row objects */
+function buildCSV(data: Record<string, unknown>[]): string {
+  if (data.length === 0) return '';
+  const keys = Object.keys(data[0]);
+  const header = keys.map(csvEscape).join(',');
+  const lines = data.map((row) => keys.map((k) => csvEscape(row[k])).join(','));
+  return [header, ...lines].join('\n');
 }
 
 export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'goals' | 'tasks' | 'kpis', clients: Client[] = [], goalTemplates: GoalTemplate[] = []): void {
   void clients; void goalTemplates; // CSV export omits these — JSON export is the canonical format
-  const wb = XLSX.utils.book_new();
 
   if (type === 'goals') {
     const rows = goals.map((g) => ({
@@ -456,8 +589,7 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
         return kr.liveConfig ? `${base} | LIVE:${kr.liveConfig.connectionId}` : base;
       }).join('; '),
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Goals');
-    XLSX.writeFile(wb, `BroadcastOKR_Goals_${new Date().toISOString().slice(0, 10)}.csv`, { bookType: 'csv' });
+    triggerDownload(buildCSV(rows), `BroadcastOKR_Goals_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
   } else if (type === 'tasks') {
     const rows = tasks.map((t) => ({
       Title: t.title,
@@ -470,8 +602,7 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
       Type: t.taskType,
       Subtasks: t.subtasks.map((s) => s.text).join('; '),
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Tasks');
-    XLSX.writeFile(wb, `BroadcastOKR_Tasks_${new Date().toISOString().slice(0, 10)}.csv`, { bookType: 'csv' });
+    triggerDownload(buildCSV(rows), `BroadcastOKR_Tasks_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
   } else {
     const rows = kpis.map((k) => ({
       Name: k.name,
@@ -481,45 +612,42 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
       Current: k.current,
       Trend: k.trend.join('; '),
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'KPIs');
-    XLSX.writeFile(wb, `BroadcastOKR_KPIs_${new Date().toISOString().slice(0, 10)}.csv`, { bookType: 'csv' });
+    triggerDownload(buildCSV(rows), `BroadcastOKR_KPIs_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
   }
 }
 
 export function exportToJSON(goals: Goal[], tasks: Task[], kpis: KPI[], clients: Client[] = [], goalTemplates: GoalTemplate[] = []): void {
   const { users, teams } = useStore.getState();
   const data = { goals, tasks, kpis, clients, goalTemplates, users, teams };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `BroadcastOKR_Export_${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(JSON.stringify(data, null, 2), `BroadcastOKR_Export_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
 }
 
 /* ─── Template Generator ─── */
 
-export function downloadTemplate(): void {
-  const wb = XLSX.utils.book_new();
+export async function downloadTemplate(): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
 
   const goalData = [
     { Title: 'Achieve 99.95% playout uptime', Channel: 'VRT 1', Owner: 'Yannick De Smet', Period: 'Q1 2026', 'Key Results': 'Reduce outage minutes to <5/month | 30 | 5 | 15; Automate failover for 3 feeds | 0 | 3 | 1' },
     { Title: 'Launch VRT MAX kids section', Channel: 'VRT MAX', Owner: 'Lien Verstraete', Period: 'Q2 2026', 'Key Results': 'Curate 200 titles | 0 | 200 | 0; Achieve 50k MAU in first month | 0 | 50000 | 0' },
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(goalData), 'Goals');
+  const goalWs = workbook.addWorksheet('Goals');
+  addRowsToSheet(goalWs, goalData);
 
   const taskData = [
     { Title: 'Clear rights for new drama series', Description: 'Contact distributor for broadcast window', Status: 'todo', Priority: 'high', Channel: 'VRT 1', Assignee: 'Niels Janssen', 'Due Date': '2026-04-15', Type: 'rights_clearance', Subtasks: 'Check contract terms; Contact distributor; Update rights DB' },
     { Title: 'Update EPG metadata for Q2', Description: '', Status: 'backlog', Priority: 'medium', Channel: 'VRT Canvas', Assignee: 'Ava Mertens', 'Due Date': '2026-03-31', Type: 'schedule_change', Subtasks: '' },
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), 'Tasks');
+  const taskWs = workbook.addWorksheet('Tasks');
+  addRowsToSheet(taskWs, taskData);
 
   const kpiData = [
     { Name: 'Playout Uptime', Unit: '%', Direction: 'hi', Target: 99.95, Current: 99.8, Trend: '99.5;99.6;99.7;99.75;99.8' },
     { Name: 'Ad Fill Rate', Unit: '%', Direction: 'hi', Target: 95, Current: 88, Trend: '80;82;85;86;88' },
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(kpiData), 'KPIs');
+  const kpiWs = workbook.addWorksheet('KPIs');
+  addRowsToSheet(kpiWs, kpiData);
 
-  XLSX.writeFile(wb, 'BroadcastOKR_Template.xlsx');
+  const buffer = await workbook.xlsx.writeBuffer();
+  triggerDownload(buffer, 'BroadcastOKR_Template.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }

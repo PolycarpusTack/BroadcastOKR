@@ -30,7 +30,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
 
   const { toast } = useToast();
   const { logAction } = useActivityLog();
-  const { currentUser } = useAuth();
+  const { currentUser, permissions } = useAuth();
 
   const goals = useStore((s) => s.goals);
   const tasks = useStore((s) => s.tasks);
@@ -63,6 +63,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
 
   const handleImport = () => {
     if (!preview) return;
+    if (!permissions.canCreate) return;
 
     let imported = 0;
 
@@ -119,9 +120,9 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
     onClose();
   };
 
-  const handleExport = (format: 'xlsx' | 'json') => {
+  const handleExport = async (format: 'xlsx' | 'json') => {
     if (format === 'xlsx') {
-      exportToExcel(goals, tasks, kpis, clients, goalTemplates);
+      await exportToExcel(goals, tasks, kpis, clients, goalTemplates);
     } else {
       exportToJSON(goals, tasks, kpis, clients, goalTemplates);
     }
@@ -302,7 +303,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
                 </div>
 
                 {/* Import Button */}
-                {(preview.goals.length > 0 || preview.tasks.length > 0 || preview.kpis.length > 0) && (
+                {(preview.goals.length > 0 || preview.tasks.length > 0 || preview.kpis.length > 0) && permissions.canCreate && (
                   <button
                     onClick={handleImport}
                     style={{ ...btnStyle, background: PRIMARY_COLOR, color: '#fff', marginTop: 4 }}
