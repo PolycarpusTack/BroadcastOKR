@@ -53,7 +53,7 @@ describe('checkInKR', () => {
   });
 
   it('writes history entry with correct fields', () => {
-    useStore.getState().checkInKR('g1', 0, {
+    useStore.getState().checkInKR('g1', 'kr1', {
       value: 42,
       confidence: 'on_track',
       note: 'Looking good',
@@ -72,7 +72,7 @@ describe('checkInKR', () => {
   });
 
   it('updates kr.current and recalculates progress for manual KR', () => {
-    useStore.getState().checkInKR('g1', 0, { value: 50, actor: 'alice' });
+    useStore.getState().checkInKR('g1', 'kr1', { value: 50, actor: 'alice' });
     const kr = useStore.getState().goals[0].keyResults[0];
     expect(kr.current).toBe(50);
     expect(kr.progress).toBeCloseTo(0.5);
@@ -100,7 +100,7 @@ describe('checkInKR', () => {
         ],
       }),
     ]);
-    useStore.getState().checkInKR('g1', 0, { value: 99, actor: 'bob' });
+    useStore.getState().checkInKR('g1', 'kr-live', { value: 99, actor: 'bob' });
     const kr = useStore.getState().goals[0].keyResults[0];
     // current should stay at 25 (unchanged)
     expect(kr.current).toBe(25);
@@ -119,7 +119,7 @@ describe('checkInKR', () => {
     }));
     resetStore([goal]);
 
-    useStore.getState().checkInKR('g1', 0, { value: 999, actor: 'alice' });
+    useStore.getState().checkInKR('g1', 'kr1', { value: 999, actor: 'alice' });
     const kr = useStore.getState().goals[0].keyResults[0];
     // 101 entries => pruned to 75
     expect(kr.history!.length).toBe(75);
@@ -191,7 +191,7 @@ describe('syncLiveKRBatch with monitoring', () => {
     resetStore([liveGoal(futureDate)]);
 
     useStore.getState().syncLiveKRBatch([
-      { goalId: 'g1', krIndex: 0, current: 42, status: 'ok' },
+      { goalId: 'g1', krId: 'kr-live', current: 42, status: 'ok' },
     ]);
 
     const kr = useStore.getState().goals[0].keyResults[0];
@@ -207,7 +207,7 @@ describe('syncLiveKRBatch with monitoring', () => {
     resetStore([liveGoal(pastDate)]);
 
     useStore.getState().syncLiveKRBatch([
-      { goalId: 'g1', krIndex: 0, current: 42, status: 'ok' },
+      { goalId: 'g1', krId: 'kr-live', current: 42, status: 'ok' },
     ]);
 
     const kr = useStore.getState().goals[0].keyResults[0];
@@ -222,7 +222,7 @@ describe('syncLiveKRBatch with monitoring', () => {
     );
 
     useStore.getState().syncLiveKRBatch([
-      { goalId: 'g1', krIndex: 0, current: 55, status: 'ok' },
+      { goalId: 'g1', krId: 'kr-live', current: 55, status: 'ok' },
     ]);
 
     const kr = useStore.getState().goals[0].keyResults[0];
@@ -259,7 +259,7 @@ describe('syncLiveKR with monitoring', () => {
     const futureDate = new Date(Date.now() + 86400000).toISOString();
     resetStore([liveGoal(futureDate)]);
 
-    useStore.getState().syncLiveKR('g1', 0, 60);
+    useStore.getState().syncLiveKR('g1', 'kr-live', 60);
 
     const kr = useStore.getState().goals[0].keyResults[0];
     expect(kr.history).toBeDefined();
@@ -271,7 +271,7 @@ describe('syncLiveKR with monitoring', () => {
   it('does NOT write history without active monitor', () => {
     resetStore([liveGoal()]);
 
-    useStore.getState().syncLiveKR('g1', 0, 60);
+    useStore.getState().syncLiveKR('g1', 'kr-live', 60);
 
     const kr = useStore.getState().goals[0].keyResults[0];
     expect(kr.history ?? []).toEqual([]);

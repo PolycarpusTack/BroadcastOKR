@@ -10,13 +10,13 @@ describe('safeUser', () => {
 
   it('returns fallback for unknown id', () => {
     const result = safeUser(USERS, 999);
-    expect(result.name).toBe('Unknown');
+    expect(result.name).toBe('Unassigned');
     expect(result.id).toBe(-1);
   });
 
   it('returns fallback for negative id', () => {
     const result = safeUser(USERS, -1);
-    expect(result.name).toBe('Unknown');
+    expect(result.name).toBe('Unassigned');
   });
 });
 
