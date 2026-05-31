@@ -107,9 +107,11 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  // Open external links in the default browser
+  // Open external links in the default browser (only http/https)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 
@@ -156,12 +158,14 @@ function createMenu() {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { role: 'resetZoom' },
-        { type: 'separator' },
-        {
-          label: 'Toggle DevTools',
-          accelerator: 'F12',
-          click: () => mainWindow?.webContents.toggleDevTools(),
-        },
+        ...(isDev ? [
+          { type: 'separator' },
+          {
+            label: 'Toggle DevTools',
+            accelerator: 'F12',
+            click: () => mainWindow?.webContents.toggleDevTools(),
+          },
+        ] : []),
       ],
     },
     {
