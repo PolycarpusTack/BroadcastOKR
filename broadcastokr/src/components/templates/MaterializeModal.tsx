@@ -71,6 +71,7 @@ export function MaterializeModal({
     setSelectedIds(new Set());
     setSearch('');
     setTagFilter(null);
+    onClose();
   };
 
   const inp = inputStyle(theme);

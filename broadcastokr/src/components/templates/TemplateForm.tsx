@@ -121,6 +121,7 @@ function TemplateFormContent({
       syncIntervalMs: template?.syncIntervalMs,
     };
     onSave(result);
+    onClose();
   };
 
   const inp = inputStyle(theme);
