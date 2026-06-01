@@ -99,26 +99,37 @@ export interface DriverStatus {
   postgres: boolean;
 }
 
+export interface BridgeHealth {
+  status: string;
+  timestamp: string;
+  uptime: number;
+  drivers: DriverStatus;
+  database: { size: string; tables: number } | null;
+}
+
 export function useBridge() {
   const [connected, setConnected] = useState(false);
   const [bridgeRunning, setBridgeRunning] = useState(false);
   const [liveKPIs, setLiveKPIs] = useState<LiveKPI[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [drivers, setDrivers] = useState<DriverStatus>({ oracle: false, postgres: false });
+  const [health, setHealth] = useState<BridgeHealth | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const krSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Check bridge health via HTTP
   const checkHealth = useCallback(async () => {
     try {
-      const health = await apiFetch<{ drivers: DriverStatus }>('/api/health');
+      const result = await apiFetch<BridgeHealth>('/api/health');
       setConnected(true);
       setBridgeRunning(true);
-      if (health.drivers) setDrivers(health.drivers);
+      if (result.drivers) setDrivers(result.drivers);
+      setHealth(result);
       return true;
     } catch {
       setConnected(false);
       if (!isElectron()) setBridgeRunning(false);
+      setHealth(null);
       return false;
     }
   }, []);
@@ -138,12 +149,15 @@ export function useBridge() {
     }
   }, []);
 
-  // Start polling interval
+  // Start polling interval — refresh KPIs and health stats together
   const startPolling = useCallback((intervalMs = BRIDGE_POLL_INTERVAL_MS) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     pollKPIs();
-    intervalRef.current = setInterval(pollKPIs, intervalMs);
-  }, [pollKPIs]);
+    intervalRef.current = setInterval(() => {
+      pollKPIs();
+      checkHealth();
+    }, intervalMs);
+  }, [pollKPIs, checkHealth]);
 
   const stopPolling = useCallback(() => {
     if (intervalRef.current) {
@@ -379,6 +393,7 @@ export function useBridge() {
     liveKPIs,
     syncing,
     drivers,
+    health,
     checkHealth,
     pollKPIs,
     startPolling,

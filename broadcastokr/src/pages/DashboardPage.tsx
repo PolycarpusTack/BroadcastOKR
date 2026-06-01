@@ -11,11 +11,12 @@ import { ChannelBadge } from '../components/ui/ChannelBadge';
 import { Avatar } from '../components/ui/Avatar';
 import { PillBadge } from '../components/ui/PillBadge';
 import { LiveKPIPanel } from '../components/kpi/LiveKPIPanel';
+import { SystemHealthPanel } from '../components/dashboard/SystemHealthPanel';
 import { progressColor, statusIcon, kpiStatus } from '../utils/colors';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
 import { cardStyle as makeCardStyle } from '../utils/styles';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_WARNING, FONT_HEADING } from '../constants/config';
-import type { LiveKPI, DriverStatus } from '../hooks/useBridge';
+import type { LiveKPI, DriverStatus, BridgeHealth } from '../hooks/useBridge';
 
 interface DashboardPageProps {
   onOpenKPIConfig?: () => void;
@@ -24,6 +25,7 @@ interface DashboardPageProps {
   bridgeSyncing?: boolean;
   liveKPIs?: LiveKPI[];
   drivers?: DriverStatus;
+  health?: BridgeHealth | null;
   onStartBridge?: () => Promise<{ ok: boolean; message: string }>;
   onStopBridge?: () => Promise<{ ok: boolean; message: string }>;
   onSyncNow?: () => Promise<void>;
@@ -34,7 +36,7 @@ const noopVoid = () => Promise.resolve();
 
 export function DashboardPage({
   onOpenKPIConfig, bridgeConnected = false, bridgeRunning = false,
-  bridgeSyncing = false, liveKPIs = [], drivers,
+  bridgeSyncing = false, liveKPIs = [], drivers, health = null,
   onStartBridge = noopAsync, onStopBridge = noopAsync, onSyncNow = noopVoid,
 }: DashboardPageProps) {
   const { theme, dark } = useTheme();
@@ -218,6 +220,9 @@ export function DashboardPage({
           </div>
         </div>
       </div>
+
+      {/* System Health */}
+      <SystemHealthPanel theme={theme} connected={bridgeConnected} health={health} />
     </div>
   );
 }

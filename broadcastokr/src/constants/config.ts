@@ -18,6 +18,7 @@ export const COLOR_COBALT_MID = '#5B33F0';
 
 /** Database type badge colors */
 export const COLOR_DB_POSTGRES = '#3B82F6';
+export const COLOR_DB_ORACLE = '#F80000';
 
 /** Sidebar border color */
 export const COLOR_SIDEBAR_BORDER = '#1F2D45';
