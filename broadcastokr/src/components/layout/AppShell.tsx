@@ -6,6 +6,8 @@ import { ActivityLog } from '../activity/ActivityLog';
 import { PersonaPanel } from '../dev/PersonaPanel';
 // Lazy — pulls in exceljs (~700 kB), only needed when the dialog is opened.
 const ImportExportModal = lazy(() => import('../data/ImportExportModal').then((m) => ({ default: m.ImportExportModal })));
+// Lazy — help content is large prose, only needed when opened.
+const HelpModal = lazy(() => import('../help/HelpModal').then((m) => ({ default: m.HelpModal })));
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -33,6 +35,7 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [importExportOpen, setImportExportOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const handleStress = () => {
     const st = generateStressTasks(60);
@@ -100,6 +103,7 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
           onCreateTask={onCreateTask || (() => {})}
           onMobileMenu={() => setMobileSidebarOpen(true)}
           onImportExport={() => setImportExportOpen(true)}
+          onHelp={() => setHelpOpen(true)}
           connected={connected}
           bridgeRunning={bridgeRunning}
         />
@@ -109,6 +113,11 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
       {importExportOpen && (
         <Suspense fallback={null}>
           <ImportExportModal open={importExportOpen} onClose={() => setImportExportOpen(false)} theme={theme} />
+        </Suspense>
+      )}
+      {helpOpen && (
+        <Suspense fallback={null}>
+          <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} theme={theme} />
         </Suspense>
       )}
       <ActivityLog log={log} open={logOpen} onClose={() => setLogOpen(false)} theme={theme} />

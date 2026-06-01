@@ -26,11 +26,12 @@ interface HeaderProps {
   onCreateTask: () => void;
   onMobileMenu?: () => void;
   onImportExport?: () => void;
+  onHelp?: () => void;
   connected?: boolean;
   bridgeRunning?: boolean;
 }
 
-export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu, onImportExport, connected, bridgeRunning }: HeaderProps) {
+export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu, onImportExport, onHelp, connected, bridgeRunning }: HeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const page = PAGE_INFO[location.pathname] || PAGE_INFO['/dashboard'];
@@ -84,6 +85,16 @@ export function Header({ theme, taskCount, perms, onCreateTask, onMobileMenu, on
             style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
           >
             {'\u{1F4C1}'} Import/Export
+          </button>
+        )}
+        {onHelp && (
+          <button
+            onClick={onHelp}
+            aria-label="Open help guide"
+            title="Help & Getting Started"
+            style={{ width: 30, height: 30, borderRadius: '50%', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textMuted, fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >
+            ?
           </button>
         )}
         {perms.canCreate && (
