@@ -24,8 +24,9 @@ const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,
 app.use(cors({ origin: CORS_ORIGINS }));
 app.use(express.json());
 
-// Auth + request logging must run BEFORE any routes so they actually guard
-// and capture every endpoint. (/api/health is exempted inside the auth middleware.)
+// Rate limiting, auth, and request logging must run BEFORE any routes so they
+// actually guard and capture every endpoint. (/api/health is exempt from each.)
+const { createRateLimitMiddleware } = require('./middleware/rateLimit.cjs');
 const { createAuthMiddleware } = require('./middleware/auth.cjs');
 const { createLoggingMiddleware } = require('./middleware/logging.cjs');
 
@@ -33,6 +34,7 @@ const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
 if (!BRIDGE_API_KEY) {
   console.warn('  WARNING: BRIDGE_API_KEY not set — auth disabled. Set it in .env for production.');
 }
+app.use(createRateLimitMiddleware());
 app.use(createAuthMiddleware(BRIDGE_API_KEY));
 app.use(createLoggingMiddleware());
 

@@ -12,6 +12,15 @@ Authorization: Bearer <BRIDGE_API_KEY>
 
 Set `BRIDGE_API_KEY` in your `.env` file. Auth is disabled when the key is not set (development mode).
 
+## Rate Limiting
+
+All endpoints except `GET /api/health` are rate limited per client IP as defense-in-depth. Requests over the limit receive `429 Too Many Requests`. Configure via `.env`:
+
+```
+BRIDGE_RATE_LIMIT=600        # max requests per window (default 600)
+BRIDGE_RATE_WINDOW_MS=60000  # window length in ms (default 60s)
+```
+
 ## Endpoints
 
 ### Health
