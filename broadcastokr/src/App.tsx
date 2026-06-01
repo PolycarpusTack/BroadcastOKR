@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import './styles/accessibility.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DashboardPage } from './pages/DashboardPage';
-import { GoalsPage } from './pages/GoalsPage';
-import { TasksPage } from './pages/TasksPage';
-import { TeamPage } from './pages/TeamPage';
-import { ReportsPage } from './pages/ReportsPage';
-import { ClientsPage } from './pages/ClientsPage';
-import { ComparePage } from './pages/ComparePage';
 import { KPIConfigModal } from './components/kpi/KPIConfigModal';
+
+// Route pages are code-split so each becomes its own chunk, keeping the
+// initial bundle small. Named exports are adapted to default for React.lazy.
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const GoalsPage = lazy(() => import('./pages/GoalsPage').then((m) => ({ default: m.GoalsPage })));
+const TasksPage = lazy(() => import('./pages/TasksPage').then((m) => ({ default: m.TasksPage })));
+const TeamPage = lazy(() => import('./pages/TeamPage').then((m) => ({ default: m.TeamPage })));
+const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const ClientsPage = lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage })));
+const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })));
 import { useBridge } from './hooks/useBridge';
 import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
@@ -120,6 +123,11 @@ export default function App() {
   return (
     <AppShell onCreateTask={() => setCreateTaskOpen(true)} connected={connected} bridgeRunning={bridgeRunning}>
       <ErrorBoundary>
+        <Suspense fallback={
+          <div role="status" aria-label="Loading" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 64, color: theme.textMuted, fontSize: 13 }}>
+            Loading…
+          </div>
+        }>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={
@@ -157,6 +165,7 @@ export default function App() {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </Suspense>
       </ErrorBoundary>
       <KPIConfigModal
         open={kpiConfigOpen}

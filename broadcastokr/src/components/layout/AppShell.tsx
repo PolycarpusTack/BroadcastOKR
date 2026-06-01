@@ -1,10 +1,11 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import { useState, useCallback, lazy, Suspense, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { ToastContainer } from '../toast/ToastContainer';
 import { ActivityLog } from '../activity/ActivityLog';
 import { PersonaPanel } from '../dev/PersonaPanel';
-import { ImportExportModal } from '../data/ImportExportModal';
+// Lazy — pulls in exceljs (~700 kB), only needed when the dialog is opened.
+const ImportExportModal = lazy(() => import('../data/ImportExportModal').then((m) => ({ default: m.ImportExportModal })));
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -105,7 +106,11 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
         <div className="main-content" style={{ padding: 28, flex: 1 }}>{children}</div>
       </main>
 
-      <ImportExportModal open={importExportOpen} onClose={() => setImportExportOpen(false)} theme={theme} />
+      {importExportOpen && (
+        <Suspense fallback={null}>
+          <ImportExportModal open={importExportOpen} onClose={() => setImportExportOpen(false)} theme={theme} />
+        </Suspense>
+      )}
       <ActivityLog log={log} open={logOpen} onClose={() => setLogOpen(false)} theme={theme} />
       <ToastContainer />
       {import.meta.env.DEV && (
