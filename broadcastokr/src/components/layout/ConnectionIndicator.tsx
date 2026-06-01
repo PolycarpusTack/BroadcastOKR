@@ -32,6 +32,7 @@ export function ConnectionIndicator({ connected, bridgeRunning }: ConnectionIndi
           borderRadius: '50%',
           background: color,
           boxShadow: status === 'connected' ? `0 0 6px ${color}` : 'none',
+          animation: status === 'reconnecting' ? 'pulseDot 1.5s infinite' : 'none',
         }}
       />
       <span style={{ fontSize: 10, fontFamily: FONT_MONO, color, fontWeight: 600 }}>

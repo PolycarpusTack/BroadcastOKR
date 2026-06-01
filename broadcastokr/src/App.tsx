@@ -17,6 +17,7 @@ import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
 import { fetchState, fetchChanges } from './store/bridgeSync';
+import { logger } from './utils/logger';
 
 export default function App() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -28,6 +29,7 @@ export default function App() {
     syncing,
     liveKPIs,
     drivers,
+    health,
     startBridge,
     stopBridge,
     syncNow,
@@ -70,7 +72,7 @@ export default function App() {
         useStore.getState()._initFromBridge(state);
         lastSync = state.timestamp || lastSync;
       })
-      .catch(console.error);
+      .catch((err) => logger.error('Failed to fetch initial bridge state', err));
 
     const pollInterval = setInterval(() => {
       fetchChanges(lastSync)
@@ -87,8 +89,8 @@ export default function App() {
   // Global error handlers
   useEffect(() => {
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason);
       const msg = event.reason?.message || String(event.reason);
+      logger.error('Unhandled promise rejection', event.reason);
       // Don't toast bridge fetch errors — they're expected when offline
       if (!msg.includes('Failed to fetch') && !msg.includes('AbortError')) {
         toast(`Error: ${msg}`, COLOR_DANGER, '⚠️');
@@ -96,7 +98,7 @@ export default function App() {
     };
 
     const handleError = (event: ErrorEvent) => {
-      console.error('Uncaught error:', event.error);
+      logger.error('Uncaught error', event.error);
       toast(`Error: ${event.message}`, COLOR_DANGER, '⚠️');
     };
 
@@ -128,6 +130,7 @@ export default function App() {
               bridgeSyncing={syncing}
               liveKPIs={liveKPIs}
               drivers={drivers}
+              health={health}
               onStartBridge={startBridge}
               onStopBridge={stopBridge}
               onSyncNow={syncNow}
