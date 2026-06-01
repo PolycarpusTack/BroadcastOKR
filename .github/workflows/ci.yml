@@ -40,3 +40,28 @@ jobs:
         # Use the real build script (tsc -b && vite build) so the project
         # references and noUnusedLocals checks run, matching local `npm run build`.
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: broadcastokr/package-lock.json
+
+      - name: Install dependencies
+        working-directory: broadcastokr
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: broadcastokr
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: broadcastokr
+        # playwright.config starts the bridge + vite dev server automatically.
+        run: npx playwright test
