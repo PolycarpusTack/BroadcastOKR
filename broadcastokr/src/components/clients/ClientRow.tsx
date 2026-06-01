@@ -6,7 +6,6 @@ import { HealthDot } from './HealthDot';
 import type { HealthStatus } from './HealthDot';
 import {
   PRIMARY_COLOR,
-  COLOR_SUCCESS,
   COLOR_DANGER,
   COLOR_WARNING,
   FONT_HEADING,

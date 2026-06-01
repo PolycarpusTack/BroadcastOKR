@@ -253,7 +253,7 @@ export function GoalsPage({
     const existingGoal = goals.find((g) => g.id === editGoalId);
     if (!existingGoal) return;
 
-    const updatedKRs: KeyResult[] = krs.map((kr, i) => {
+    const updatedKRs: KeyResult[] = krs.map((kr) => {
       const existing = kr.id ? existingGoal.keyResults.find((e) => e.id === kr.id) : undefined;
       // If nothing changed on this KR, preserve existing state
       if (existing && existing.title === kr.title && existing.start === kr.start && existing.target === kr.target

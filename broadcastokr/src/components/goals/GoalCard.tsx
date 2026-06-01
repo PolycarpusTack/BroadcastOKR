@@ -3,7 +3,7 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { ChannelBadge } from '../ui/ChannelBadge';
 import { Avatar } from '../ui/Avatar';
 import { PillBadge } from '../ui/PillBadge';
-import { progressColor, statusIcon, goalStatus } from '../../utils/colors';
+import { progressColor, statusIcon } from '../../utils/colors';
 import { safeUser, safeChannel } from '../../utils/safeGet';
 import { resolveScopedChannels } from '../../utils/channelScope';
 import { COLOR_INFO, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR } from '../../constants/config';

@@ -5,7 +5,6 @@ import {
   PRIMARY_COLOR,
   COLOR_DANGER,
   FONT_BODY,
-  FONT_HEADING,
 } from '../../constants/config';
 import type { User, Client, Theme } from '../../types';
 
@@ -161,8 +160,6 @@ export function UserModal({
     onDelete(user.id, reassignId);
     onClose();
   }
-
-  const sep = { borderTop: `1px solid ${theme.borderLight}`, margin: '16px 0' };
 
   const otherUsers = users.filter((u) => u.id !== user?.id);
 

@@ -37,4 +37,6 @@ jobs:
 
       - name: Build
         working-directory: broadcastokr
-        run: npx vite build
+        # Use the real build script (tsc -b && vite build) so the project
+        # references and noUnusedLocals checks run, matching local `npm run build`.
+        run: npm run build

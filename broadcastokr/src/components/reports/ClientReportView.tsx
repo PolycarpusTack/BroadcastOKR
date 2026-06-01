@@ -6,7 +6,6 @@ import { HistoryDetail } from './HistoryDetail';
 import { ProgressBar } from '../ui/ProgressBar';
 import { progressColor, statusIcon } from '../../utils/colors';
 import {
-  PRIMARY_COLOR,
   FONT_HEADING,
   FONT_BODY,
   FONT_MONO,

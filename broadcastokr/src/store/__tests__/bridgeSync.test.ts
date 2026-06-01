@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '../store';
-import type { Goal, Task, Client, User } from '../../types';
+import type { Goal, Task } from '../../types';
 
 function resetStore() {
   useStore.setState({
