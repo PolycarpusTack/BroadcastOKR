@@ -1,10 +1,46 @@
 import { describe, it, expect } from 'vitest';
-import { computeTrend, computePeriodDelta, computeGoalProgressTimeline } from '../reportHelpers';
-import type { KRHistoryEntry, KeyResult } from '../../types';
+import { computeTrend, computePeriodDelta, computeGoalProgressTimeline, filterGoalHistoryByDays } from '../reportHelpers';
+import type { Goal, KRHistoryEntry, KeyResult } from '../../types';
 
 function entry(value: number, timestamp = '2026-03-10T12:00:00Z', extra?: Partial<KRHistoryEntry>): KRHistoryEntry {
   return { timestamp, value, actor: 'test', source: 'check-in', ...extra };
 }
+
+function goalWith(history: KRHistoryEntry[] | undefined): Goal {
+  return {
+    id: 'g1', title: 'Goal', status: 'on_track', progress: 0.5, owner: 0, channel: 0, period: 'Q2 2026',
+    keyResults: [{ id: 'kr1', title: 'KR', start: 0, target: 100, current: 50, progress: 0.5, status: 'on_track', history }],
+  } as Goal;
+}
+
+describe('filterGoalHistoryByDays', () => {
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+
+  it('returns goals unchanged for null (all time)', () => {
+    const goals = [goalWith([entry(10, daysAgo(100))])];
+    expect(filterGoalHistoryByDays(goals, null)).toBe(goals);
+  });
+
+  it('keeps only entries within the window', () => {
+    const goals = [goalWith([entry(10, daysAgo(40)), entry(20, daysAgo(20)), entry(30, daysAgo(5))])];
+    const [g] = filterGoalHistoryByDays(goals, 30);
+    expect(g.keyResults[0].history!.map((e) => e.value)).toEqual([20, 30]);
+  });
+
+  it('yields empty history when nothing is in range', () => {
+    const goals = [goalWith([entry(10, daysAgo(90))])];
+    const [g] = filterGoalHistoryByDays(goals, 7);
+    expect(g.keyResults[0].history).toEqual([]);
+  });
+
+  it('leaves KRs without history untouched and does not mutate input', () => {
+    const goals = [goalWith(undefined), goalWith([entry(10, daysAgo(50)), entry(20, daysAgo(1))])];
+    const result = filterGoalHistoryByDays(goals, 7);
+    expect(result[0].keyResults[0].history).toBeUndefined();
+    expect(result[1].keyResults[0].history!.length).toBe(1);
+    expect(goals[1].keyResults[0].history!.length).toBe(2); // original intact
+  });
+});
 
 describe('computeTrend', () => {
   it('returns null for 0 entries', () => {
