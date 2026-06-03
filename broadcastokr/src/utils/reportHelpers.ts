@@ -1,4 +1,5 @@
 import type { KRHistoryEntry, KeyResult } from '../types';
+import { krProgress } from './progress';
 
 /** Compute trend direction from history entries */
 export function computeTrend(
@@ -67,9 +68,7 @@ export function computeGoalProgressTimeline(
       // Find last known value at or before this timestamp
       const entries = (kr.history ?? []).filter(e => e.timestamp <= ts);
       const value = entries.length > 0 ? entries[entries.length - 1].value : kr.start;
-      const range = Math.abs(kr.target - kr.start);
-      const progress = range === 0 ? (value === kr.target ? 1 : 0) : Math.min(Math.abs(value - kr.start) / range, 1);
-      totalProgress += progress;
+      totalProgress += krProgress(kr.start, kr.target, value);
     }
     timeline.push({
       timestamp: ts,

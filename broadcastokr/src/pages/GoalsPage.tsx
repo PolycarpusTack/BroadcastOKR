@@ -16,8 +16,10 @@ import { TemplateCard } from '../components/templates/TemplateCard';
 import { TemplateForm } from '../components/templates/TemplateForm';
 import { MaterializeModal } from '../components/templates/MaterializeModal';
 import { goalStatus } from '../utils/colors';
+import { krProgress } from '../utils/progress';
 import { nextGoalId } from '../utils/ids';
-import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO } from '../constants/config';
+import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO, COLOR_WARNING, STALE_SYNC_THRESHOLD_MS } from '../constants/config';
+import { formatTimeAgo } from '../utils/dates';
 import type { Goal, KeyResult, SyncStatus, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
 
@@ -260,9 +262,8 @@ export function GoalsPage({
         && JSON.stringify(existing.liveConfig) === JSON.stringify(kr.liveConfig)) {
         return existing;
       }
-      const range = Math.abs(kr.target - kr.start);
       const current = existing?.current ?? kr.start;
-      const progress = range === 0 ? 0 : Math.min(Math.abs(current - kr.start) / range, 1);
+      const progress = krProgress(kr.start, kr.target, current);
       return {
         id: existing?.id ?? crypto.randomUUID(),
         title: kr.title.trim(),
@@ -458,6 +459,18 @@ export function GoalsPage({
     setDeleteTemplateId(null);
   };
 
+  // Oldest live-KR sync timestamp, only when past the staleness threshold
+  const stalestSyncAt = useMemo(() => {
+    let oldest: string | null = null;
+    for (const g of goals) {
+      for (const kr of g.keyResults) {
+        if (kr.liveConfig && kr.lastSyncAt && (!oldest || kr.lastSyncAt < oldest)) oldest = kr.lastSyncAt;
+      }
+    }
+    if (!oldest) return null;
+    return Date.now() - new Date(oldest).getTime() > STALE_SYNC_THRESHOLD_MS ? oldest : null;
+  }, [goals]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* View toggle */}
@@ -493,6 +506,17 @@ export function GoalsPage({
           Templates ({goalTemplates.length})
         </button>
       </div>
+
+      {/* Staleness banner — live KR data older than threshold */}
+      {view === 'goals' && stalestSyncAt && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px',
+          borderRadius: 10, background: `${COLOR_WARNING}18`, border: `1px solid ${COLOR_WARNING}55`,
+          color: COLOR_WARNING, fontSize: 12, fontWeight: 600,
+        }}>
+          {'⚠️'} Live KR data last synced {formatTimeAgo(stalestSyncAt)} — check the bridge connection if this persists.
+        </div>
+      )}
 
       {/* ──────────── TEMPLATES VIEW ──────────── */}
       {view === 'templates' && (
