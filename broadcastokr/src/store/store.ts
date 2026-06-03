@@ -5,6 +5,7 @@ import { createInitialGoals, createInitialTasks, createInitialKPIs } from '../co
 import { createInitialUsers } from '../constants/users';
 import { createInitialTeams } from '../constants/teams';
 import { goalStatus } from '../utils/colors';
+import { krProgress } from '../utils/progress';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
 import { bridgePost, bridgePut, bridgeDelete } from './bridgeSync';
@@ -115,10 +116,7 @@ export const useStore = create<AppStore>()(
 
           if (!kr.liveConfig) {
             kr.current = entry.value;
-            const range = Math.abs(kr.target - kr.start);
-            kr.progress = range === 0
-              ? (kr.current === kr.target ? 1 : 0)
-              : Math.min(Math.abs(kr.current - kr.start) / range, 1);
+            kr.progress = krProgress(kr.start, kr.target, kr.current);
             kr.status = goalStatus(kr.progress);
           }
 
@@ -160,8 +158,7 @@ export const useStore = create<AppStore>()(
           if (!kr) return {};
 
           kr.current = current;
-          const range = Math.abs(kr.target - kr.start);
-          kr.progress = range === 0 ? (current === kr.target ? 1 : 0) : Math.min(Math.abs(current - kr.start) / range, 1);
+          kr.progress = krProgress(kr.start, kr.target, current);
           kr.status = goalStatus(kr.progress);
           kr.syncStatus = 'ok';
           kr.syncError = undefined;
@@ -212,8 +209,7 @@ export const useStore = create<AppStore>()(
 
             if (r.status === 'ok' && r.current !== undefined) {
               kr.current = r.current;
-              const range = Math.abs(kr.target - kr.start);
-              kr.progress = range === 0 ? (r.current === kr.target ? 1 : 0) : Math.min(Math.abs(r.current - kr.start) / range, 1);
+              kr.progress = krProgress(kr.start, kr.target, r.current);
               kr.status = goalStatus(kr.progress);
               kr.syncError = undefined;
               kr.lastSyncAt = new Date().toISOString();
@@ -553,10 +549,7 @@ export const useStore = create<AppStore>()(
                   }
                 }
                 // Recalc progress with potentially new start/target
-                const range = Math.abs(existing.target - existing.start);
-                existing.progress = range === 0
-                  ? (existing.current === existing.target ? 1 : 0)
-                  : Math.min(Math.abs(existing.current - existing.start) / range, 1);
+                existing.progress = krProgress(existing.start, existing.target, existing.current);
                 existing.status = goalStatus(existing.progress);
               } else {
                 goal.keyResults.push({

@@ -21,6 +21,19 @@ export function formatTime(): string {
   return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+/** Human-readable elapsed time from an ISO timestamp, e.g. "12m ago", "3h ago". */
+export function formatTimeAgo(iso: string): string {
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) return '--';
+  const elapsed = Date.now() - time;
+  if (elapsed < 60_000) return 'just now';
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 /** Human-readable uptime from a seconds count, e.g. 3725 -> "1h 2m". */
 export function formatUptime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '--';

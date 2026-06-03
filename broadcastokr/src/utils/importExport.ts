@@ -4,6 +4,7 @@ import { useStore } from '../store/store';
 import { nextGoalId, nextTaskId } from './ids';
 import type { Goal, Task, KPI, KeyResult, TaskStatus, Priority, Client, GoalTemplate } from '../types';
 import { goalStatus } from './colors';
+import { krProgress } from './progress';
 import { migrateKRIds } from '../store/migration';
 
 /* ─── Helpers ─── */
@@ -348,16 +349,15 @@ function parseGoalRows(rows: Record<string, unknown>[], warnings: string[]): Goa
         const start = parseNumber(segments[1], 0);
         const target = parseNumber(segments[2], 100);
         const current = parseNumber(segments[3], start);
-        const range = Math.abs(target - start);
-        const krProgress = range === 0 ? 0 : Math.min(Math.abs(current - start) / range, 1);
+        const progress = krProgress(start, target, current);
         keyResults.push({
           id: crypto.randomUUID(),
           title: krTitle,
           start,
           target,
           current,
-          progress: krProgress,
-          status: goalStatus(krProgress),
+          progress,
+          status: goalStatus(progress),
         });
       }
     }
@@ -370,16 +370,15 @@ function parseGoalRows(rows: Record<string, unknown>[], warnings: string[]): Goa
         const start = parseNumber(col(row, `kr${k}_start`, `kr${k}start`), 0);
         const target = parseNumber(col(row, `kr${k}_target`, `kr${k}target`), 100);
         const current = parseNumber(col(row, `kr${k}_current`, `kr${k}current`), start);
-        const range = Math.abs(target - start);
-        const krProgress = range === 0 ? 0 : Math.min(Math.abs(current - start) / range, 1);
+        const progress = krProgress(start, target, current);
         keyResults.push({
           id: crypto.randomUUID(),
           title: krTitle,
           start,
           target,
           current,
-          progress: krProgress,
-          status: goalStatus(krProgress),
+          progress,
+          status: goalStatus(progress),
         });
       }
     }

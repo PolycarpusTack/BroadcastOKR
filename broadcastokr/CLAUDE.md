@@ -53,6 +53,7 @@ KPI { name, unit, direction, target, current, trend[] }
 ## Key Patterns
 - `structuredClone` for immutable state updates in all store actions
 - `goalStatus()` is the single source of truth in `src/utils/colors.ts` (thresholds: >=70% on_track, >=40% at_risk, <40% behind)
+- `krProgress()` in `src/utils/progress.ts` is the single source of truth for KR progress — direction-aware (wrong-direction movement clamps to 0, works for lower-is-better KRs) and supports hold-the-line KRs (start === target → 1 only while current holds target)
 - `recalcGoal()` helper for DRY progress recalculation from KRs
 - Live KR toggle: presence/absence of `liveConfig` on a KeyResult (no separate boolean)
 - KR history capped at 100 entries per KR, pruned to 75 via `pruneHistory()` in `src/utils/history.ts`
@@ -85,9 +86,10 @@ components/
 
 ## Utilities (src/utils/)
 - `colors.ts` — goalStatus, progressColor, statusIcon, kpiStatus, roleColor
+- `progress.ts` — krProgress (direction-aware KR progress, single source of truth)
 - `history.ts` — pruneHistory (100 cap, prune to 75)
 - `reportHelpers.ts` — computeTrend, computePeriodDelta, computeGoalProgressTimeline
-- `dates.ts` — daysUntil, getUrgencyBadge, formatTime
+- `dates.ts` — daysUntil, getUrgencyBadge, formatTime, formatTimeAgo
 - `ids.ts` — nextGoalId, nextTaskId
 - `safeGet.ts` — safeUser, safeChannel (null-safe lookups)
 - `styles.ts` — cardStyle, selectStyle (theme-aware)
@@ -159,3 +161,4 @@ Frontend-only persona switching (no backend auth). Three roles:
 3. Code review pass (remaining hardcoded colors/fonts)
 4. Date range filtering on report views
 5. Export history to file (if localStorage gets tight)
+6. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype

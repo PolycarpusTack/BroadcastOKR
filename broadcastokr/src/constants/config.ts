@@ -8,6 +8,8 @@ export const PRIMARY_GRADIENT = 'linear-gradient(135deg, #3805E3 0%, #5B33F0 100
 export const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://localhost:3001';
 export const BRIDGE_API_KEY = import.meta.env.VITE_BRIDGE_API_KEY || '';
 export const BRIDGE_POLL_INTERVAL_MS = 900_000; // 15 minutes
+/** Live KR data older than this is flagged stale in the UI (4 missed polls) */
+export const STALE_SYNC_THRESHOLD_MS = 3_600_000; // 60 minutes
 
 /** Status colors */
 export const COLOR_SUCCESS = '#2DD4BF';

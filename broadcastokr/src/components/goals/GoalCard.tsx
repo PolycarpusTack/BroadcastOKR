@@ -6,7 +6,8 @@ import { PillBadge } from '../ui/PillBadge';
 import { progressColor, statusIcon } from '../../utils/colors';
 import { safeUser, safeChannel } from '../../utils/safeGet';
 import { resolveScopedChannels } from '../../utils/channelScope';
-import { COLOR_INFO, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR } from '../../constants/config';
+import { COLOR_INFO, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR, STALE_SYNC_THRESHOLD_MS } from '../../constants/config';
+import { formatTimeAgo } from '../../utils/dates';
 import type { Goal, KeyResult, Theme, User, Client, Channel, RolePermissions } from '../../types';
 
 export interface GoalCardProps {
@@ -254,9 +255,15 @@ export const GoalCard = React.memo(function GoalCard({
                 <div style={{ fontSize: 11, color: theme.textFaint, marginTop: 2 }}>
                   {kr.current} / {kr.target} (from {kr.start})
                   {kr.liveConfig && kr.lastSyncAt && (
-                    <span style={{ marginLeft: 8, fontSize: 10, color: theme.textFaint }}>
-                      synced {new Date(kr.lastSyncAt).toLocaleTimeString()}
-                    </span>
+                    Date.now() - new Date(kr.lastSyncAt).getTime() > STALE_SYNC_THRESHOLD_MS ? (
+                      <span style={{ marginLeft: 8, fontSize: 10, color: COLOR_WARNING, fontWeight: 600 }}>
+                        ⚠ stale — synced {formatTimeAgo(kr.lastSyncAt)}
+                      </span>
+                    ) : (
+                      <span style={{ marginLeft: 8, fontSize: 10, color: theme.textFaint }}>
+                        synced {new Date(kr.lastSyncAt).toLocaleTimeString()}
+                      </span>
+                    )
                   )}
                 </div>
                 {kr.syncError && (
