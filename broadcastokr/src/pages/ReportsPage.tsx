@@ -11,9 +11,17 @@ import { kpiStatus } from '../utils/colors';
 import { cardStyle as makeCardStyle } from '../utils/styles';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_COBALT_MID, FONT_HEADING } from '../constants/config';
 import type { Priority } from '../types';
+import { filterGoalHistoryByDays } from '../utils/reportHelpers';
 import { ClientReportView } from '../components/reports/ClientReportView';
 import { GoalReportView } from '../components/reports/GoalReportView';
 import { KRTemplateReportView } from '../components/reports/KRTemplateReportView';
+
+const DATE_RANGES: { label: string; days: number | null }[] = [
+  { label: '7d', days: 7 },
+  { label: '30d', days: 30 },
+  { label: '90d', days: 90 },
+  { label: 'All time', days: null },
+];
 
 export function ReportsPage() {
   const { theme } = useTheme();
@@ -26,6 +34,10 @@ export function ReportsPage() {
 
   const [reportView, setReportView] = useState<'tasks' | 'client-goals'>('tasks');
   const [subView, setSubView] = useState<'client' | 'goal' | 'template'>('client');
+  const [rangeDays, setRangeDays] = useState<number | null>(null);
+
+  // Goals with KR history trimmed to the selected window — feeds all three report views
+  const rangedGoals = useMemo(() => filterGoalHistoryByDays(goals, rangeDays), [goals, rangeDays]);
 
   const taskStats = useMemo(() => {
     const now = new Date();
@@ -212,8 +224,8 @@ export function ReportsPage() {
 
       {reportView === 'client-goals' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Sub-navigation */}
-          <div style={{ display: 'flex', gap: 6 }}>
+          {/* Sub-navigation + date range */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {([
               { key: 'client' as const, label: 'By Client' },
               { key: 'goal' as const, label: 'By Goal' },
@@ -233,11 +245,31 @@ export function ReportsPage() {
                 {label}
               </button>
             ))}
+
+            {/* Date range — trims KR history feeding sparklines/trends/drill-down */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 11, color: theme.textMuted, fontWeight: 600, marginRight: 4 }}>History</span>
+              {DATE_RANGES.map(({ label, days }) => (
+                <button
+                  key={label}
+                  onClick={() => setRangeDays(days)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6,
+                    border: `1px solid ${rangeDays === days ? PRIMARY_COLOR : theme.border}`,
+                    background: rangeDays === days ? `${PRIMARY_COLOR}18` : 'transparent',
+                    color: rangeDays === days ? PRIMARY_COLOR : theme.textSecondary,
+                    fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {subView === 'client' && <ClientReportView goals={goals} clients={clients} theme={theme} />}
-          {subView === 'goal' && <GoalReportView goals={goals} clients={clients} theme={theme} />}
-          {subView === 'template' && <KRTemplateReportView goals={goals} clients={clients} goalTemplates={goalTemplates} theme={theme} />}
+          {subView === 'client' && <ClientReportView goals={rangedGoals} clients={clients} theme={theme} />}
+          {subView === 'goal' && <GoalReportView goals={rangedGoals} clients={clients} theme={theme} />}
+          {subView === 'template' && <KRTemplateReportView goals={rangedGoals} clients={clients} goalTemplates={goalTemplates} theme={theme} />}
         </div>
       )}
     </div>

@@ -1,5 +1,23 @@
-import type { KRHistoryEntry, KeyResult } from '../types';
+import type { Goal, KRHistoryEntry, KeyResult } from '../types';
 import { krProgress } from './progress';
+
+/**
+ * Return goals with each KR's history trimmed to the last `days` days.
+ * `days === null` means no filtering (all time) — goals are returned as-is.
+ * Only history is filtered; current/progress/status stay live values.
+ */
+export function filterGoalHistoryByDays(goals: Goal[], days: number | null): Goal[] {
+  if (days === null) return goals;
+  const cutoff = Date.now() - days * 86400000;
+  return goals.map((g) => ({
+    ...g,
+    keyResults: g.keyResults.map((kr) =>
+      kr.history
+        ? { ...kr, history: kr.history.filter((e) => new Date(e.timestamp).getTime() >= cutoff) }
+        : kr,
+    ),
+  }));
+}
 
 /** Compute trend direction from history entries */
 export function computeTrend(

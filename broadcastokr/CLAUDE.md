@@ -130,35 +130,33 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npx vitest run` — 105 tests across 15 test files
-- `npx tsc --noEmit` — must compile clean before committing
-- WSL2 worker timeouts affect some test files (safeGet, ids) — environment issue, not code bugs
-- Key test files: `store.test.ts` (core actions), `history.test.ts` (checkInKR, setMonitor, monitoring sync), `clients.test.ts` (client CRUD, templates, materialization)
+- `npm test` — 169 tests across 30 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 48 bridge tests (node --test)
+- `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
+- Key test files: `store.test.ts` (core actions), `history.test.ts` (checkInKR, setMonitor, monitoring sync), `clients.test.ts` (client CRUD, templates, materialization), `progress.test.ts` (krProgress direction/hold-the-line)
 
 ## Build
 - `npx vite build` — production web build to `dist/`
 - `npm run electron:build` — Electron packaged app
 - `npm run bridge` — Start Express bridge on localhost:3001
 
-## Current State (2026-03-18)
+## Current State (2026-06-04)
 
 ### What's done
 - Full React app with Dashboard, Goals, Tasks, Team, Reports, Clients, Compare pages
-- Bridge service with Oracle/PostgreSQL, connection CRUD, schema browser
-- Live Key Results: manual/live toggle per KR, SQL editor, batch sync, auto-sync on create/edit
+- Bridge service with Oracle/PostgreSQL, connection CRUD, schema browser, auth/logging/rate-limit middleware, SQLite-backed CRUD routes + frontend bridgeSync
+- Live Key Results: manual/live toggle per KR, SQL editor, batch sync, auto-sync on create/edit, periodic auto-sync timer (15 min via startKRAutoSync in App.tsx), staleness banner + per-KR stale labels (60 min threshold)
 - Multi-client architecture: clients with connections, channels, SQL overrides
 - Goal templates: materialization per client, full sync propagation
 - KR history tracking: check-in with confidence + notes, monitoring mode per goal/client
 - Three-view reporting: By Client, By Goal, By KR Template with sparklines, trends, drill-down
-- Connection rebinding on client connection change
-- MaterializeModal blocks clients without connections
-- Health checks recompute on client list changes
+- Direction-aware KR progress (`krProgress()`) incl. lower-is-better and hold-the-line KRs
+- Production readiness phases 1–7 complete (see docs/PRODUCTION-READINESS.md) — verdict: production-ready for internal/trusted-network use
+- Code-split bundle (1.21MB → 67KB main), 0 npm vulns, Playwright E2E in CI
 - localStorage quota-exceeded handler
 
 ### Next steps
-1. Extract SchemaExplorer component from KPIConfigModal (609 lines)
-2. Add periodic auto-sync timer for live KRs
-3. Code review pass (remaining hardcoded colors/fonts)
-4. Date range filtering on report views
-5. Export history to file (if localStorage gets tight)
-6. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype
+1. Date range filtering on report views
+2. Export history to file (if localStorage gets tight)
+3. Phase 3 offline mutation queue (deferred — server convergence, not data loss)
+4. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype
