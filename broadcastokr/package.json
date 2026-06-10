@@ -82,7 +82,7 @@
     "oracledb": "^6.10.0",
     "pg": "^8.20.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react-dom": "^19.2.7",
     "react-router-dom": "^7.13.1",
     "rotating-file-stream": "^3.2.9",
     "zustand": "^5.0.11"
