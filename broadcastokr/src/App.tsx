@@ -16,6 +16,8 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ defa
 // (FLEET_IN_BUILD folds to false), and gated at runtime everywhere else.
 const ClientsPage = FLEET_IN_BUILD ? lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage }))) : null;
 const ComparePage = FLEET_IN_BUILD ? lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage }))) : null;
+// The client edition gets a slim single-tenant settings surface instead
+const ClientSettingsPage = !FLEET_IN_BUILD ? lazy(() => import('./pages/ClientSettingsPage').then((m) => ({ default: m.ClientSettingsPage }))) : null;
 import { useBridge } from './hooks/useBridge';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
@@ -223,6 +225,11 @@ export default function App() {
               fleet
                 ? <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
                 : <Navigate to="/dashboard" replace />
+            } />
+          )}
+          {!FLEET_IN_BUILD && ClientSettingsPage && (
+            <Route path="/clients" element={
+              <ClientSettingsPage bridgeConnected={connected} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} />
             } />
           )}
           {FLEET_IN_BUILD && ComparePage && (
