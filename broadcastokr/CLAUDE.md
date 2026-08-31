@@ -134,8 +134,8 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 195 tests across 33 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 52 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
+- `npm test` — 206 tests across 36 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 72 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
 - `npm run lint` — 0 errors, gated in CI
 - After `npm run electron:build*`, run `npm rebuild better-sqlite3` — electron-builder rebuilds it for Electron's ABI, which breaks the dev bridge under system Node
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
@@ -151,7 +151,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 ### What's done
 - Full React app with Dashboard, Goals, Tasks, Team, Reports, Clients, Compare pages
 - Bridge service with Oracle/PostgreSQL, connection CRUD, schema browser, auth/logging/rate-limit middleware, SQLite-backed CRUD routes + frontend bridgeSync
-- Live Key Results: manual/live toggle per KR, SQL editor, batch sync, auto-sync on create/edit, periodic auto-sync timer (15 min via startKRAutoSync in App.tsx), staleness banner + per-KR stale labels (60 min threshold)
+- Live Key Results: manual/live toggle per KR, SQL editor, batch sync, auto-sync on create/edit, bridge-side sync loop (15 min default, `bridge/liveSync.cjs`; `POST /api/kpi/sync-now` to trigger; progress recomputed client-side in `_mergeChanges`), staleness banner + per-KR stale labels (60 min threshold)
 - Multi-client architecture: clients with connections, channels, SQL overrides
 - Goal templates: materialization per client, full sync propagation
 - KR history tracking: check-in with confidence + notes, monitoring mode per goal/client

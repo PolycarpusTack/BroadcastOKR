@@ -81,6 +81,20 @@ describe('_mergeChanges', () => {
     useStore.getState()._mergeChanges({});
     expect(useStore.getState().goals).toEqual(before);
   });
+
+  it('recomputes KR and goal progress on merged goals (bridge writes raw facts only)', () => {
+    useStore.getState()._mergeChanges({
+      goals: [{
+        id: 'g1', title: 'Synced', status: 'behind', progress: 0, owner: 1, channel: 0, period: 'Q1',
+        keyResults: [{ id: 'kr1', title: 'Live', start: 0, target: 100, current: 80, progress: 0, status: 'behind' }],
+      }],
+    });
+
+    const goal = useStore.getState().goals.find((g) => g.id === 'g1');
+    expect(goal?.keyResults[0].progress).toBe(0.8);
+    expect(goal?.keyResults[0].status).toBe('on_track');
+    expect(goal?.progress).toBe(0.8);
+  });
 });
 
 const emptyBridge: BridgeState = {

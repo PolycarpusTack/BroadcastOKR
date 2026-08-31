@@ -51,6 +51,14 @@ describe('activity log API', () => {
     assert.ok(list[0].timestamp);
   });
 
+  it('POST /api/kpi/sync-now triggers a sync pass', async () => {
+    const res = await fetch(`${BASE}/api/kpi/sync-now`, { method: 'POST' });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.total, 0);
+  });
+
   it('rejects entries without actor or text', async () => {
     const res = await fetch(`${BASE}/api/activity`, {
       method: 'POST',

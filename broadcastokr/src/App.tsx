@@ -41,7 +41,6 @@ export default function App() {
     startBridge,
     stopBridge,
     syncNow,
-    startKRAutoSync,
     testConnection,
     getConnections,
     getChannels,
@@ -59,7 +58,6 @@ export default function App() {
   const { theme } = useTheme();
   const { toast } = useToast();
   const { hydrateLog } = useActivityLog();
-  const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
 
   // Tenancy: the bridge's health.mode wins over the build-time edition
   const mode: TenancyMode = useMemo(() => {
@@ -68,16 +66,6 @@ export default function App() {
   }, [health?.mode]);
   useEffect(() => { setRuntimeMode(mode); }, [mode]);
   const fleet = hasFeature('fleet', mode);
-
-  // Start periodic auto-sync for live KRs when bridge is connected
-  useEffect(() => {
-    if (connected) {
-      startKRAutoSync(
-        () => useStore.getState().goals,
-        syncLiveKRBatch,
-      );
-    }
-  }, [connected, startKRAutoSync, syncLiveKRBatch]);
 
   // Fetch full state from bridge on connect, then poll for changes
   useEffect(() => {

@@ -22,6 +22,19 @@ function isMonitorActive(until?: string): boolean {
   return !!until && new Date(until) > new Date();
 }
 
+/**
+ * Goals arriving from the bridge carry raw facts; progress semantics are
+ * client-owned (krProgress is the single source of truth), so recompute every
+ * KR and the goal rollup on the way in.
+ */
+function withRecomputedProgress(goal: Goal): Goal {
+  const keyResults = goal.keyResults.map((kr) => {
+    const progress = krProgress(kr.start, kr.target, kr.current);
+    return { ...kr, progress, status: goalStatus(progress) };
+  });
+  return recalcGoal({ ...goal, keyResults });
+}
+
 interface AppStore {
   goals: Goal[];
   tasks: Task[];
@@ -638,7 +651,7 @@ export const useStore = create<AppStore>()(
 
       // Bridge sync actions
       _initFromBridge: (state) => set(() => ({
-        goals: state.goals ?? [],
+        goals: (state.goals ?? []).map(withRecomputedProgress),
         tasks: state.tasks ?? [],
         kpis: state.kpis ?? [],
         clients: state.clients ?? [],
@@ -651,11 +664,11 @@ export const useStore = create<AppStore>()(
         const result: Partial<Pick<AppStore, 'goals' | 'tasks' | 'kpis' | 'clients' | 'users' | 'teams' | 'goalTemplates'>> = {};
 
         if (changes.goals) {
-          const changedMap = new Map(changes.goals.map((g) => [g.id, g]));
+          const changedMap = new Map(changes.goals.map((g) => [g.id, withRecomputedProgress(g)]));
           const merged = s.goals.map((g) => changedMap.get(g.id) ?? g);
           const existingIds = new Set(s.goals.map((g) => g.id));
           for (const g of changes.goals) {
-            if (!existingIds.has(g.id)) merged.push(g);
+            if (!existingIds.has(g.id)) merged.push(changedMap.get(g.id) ?? g);
           }
           result.goals = merged;
         }

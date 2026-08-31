@@ -89,6 +89,42 @@ app.use('/api', createWhatsonRouter({
   decrypt: (password) => (BRIDGE_API_KEY ? decrypt(password, BRIDGE_API_KEY) : password),
 }));
 
+// ── Bridge-side live-KR sync loop ──
+
+const { buildBinds } = require('./whatson/core.cjs');
+const { runKRSyncOnce, startKRSyncLoop } = require('./liveSync.cjs');
+
+/** Same value-extraction contract as /api/kpi/execute-batch. */
+async function executeKrQuery(q) {
+  const config = store.loadConfig();
+  const connConfig = config.connections.find(c => c.id === q.connectionId);
+  if (!connConfig) return { status: 'error', error: 'Connection not found' };
+  try {
+    const rows = await core.runQueryWithTimeout(connConfig, q.sql, buildBinds(q));
+    if (!rows || rows.length === 0) return { status: 'no_data', error: 'Query returned no rows' };
+    const value = Number(Object.values(rows[0])[0]);
+    if (isNaN(value)) return { status: 'error', error: 'Query did not return a numeric value' };
+    return { status: 'ok', current: value };
+  } catch (err) {
+    const status = err.message === 'Query timed out' ? 'timeout' : 'error';
+    return { status, error: status === 'timeout' ? 'Query timed out' : 'Query execution failed' };
+  }
+}
+
+const KR_SYNC_INTERVAL_MS = Number(process.env.BRIDGE_KR_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
+startKRSyncLoop(db, { executeQuery: executeKrQuery, intervalMs: KR_SYNC_INTERVAL_MS });
+
+// Manual trigger for the loop (the app's "Sync now" affordances)
+app.post('/api/kpi/sync-now', async (req, res) => {
+  try {
+    const result = await runKRSyncOnce(db, { executeQuery: executeKrQuery });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error('Manual KR sync failed:', err);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
 // ── Health ──
 
 app.get('/api/health', (req, res) => {
