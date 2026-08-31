@@ -1,4 +1,4 @@
-import { BRIDGE_URL, BRIDGE_API_KEY } from '../constants/config';
+import { BRIDGE_URL, BRIDGE_API_KEY, PROTOCOL_VERSION } from '../constants/config';
 import { logger } from '../utils/logger';
 import type { Goal, Task, Client, GoalTemplate, User, Team, KPI } from '../types';
 
@@ -81,7 +81,7 @@ export async function bridgeFetch<T>(
       const res = await fetch(`${BRIDGE_URL}${path}`, {
         ...options,
         signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
+        headers: { 'Content-Type': 'application/json', 'X-BrOKR-Protocol': String(PROTOCOL_VERSION), ...authHeaders, ...options?.headers },
       });
       clearTimeout(timeout);
 

@@ -26,11 +26,14 @@ const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
 if (!BRIDGE_API_KEY) {
   console.warn('  WARNING: BRIDGE_API_KEY not set — auth disabled. Set it in .env for production.');
 }
+const { createProtocolMiddleware } = require('./middleware/protocol.cjs');
 app.use(createRateLimitMiddleware());
+app.use(createProtocolMiddleware());
 app.use(createAuthMiddleware(BRIDGE_API_KEY));
 app.use(createLoggingMiddleware());
 
 const { MODE } = require('./editions.cjs');
+const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
 const { encrypt, decrypt } = require('./utils/crypto.cjs');
 
 // ── Tenant data plane (SQLite) ──
@@ -141,6 +144,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     mode: MODE,
+    protocolVersion: PROTOCOL_VERSION,
+    minSupported: MIN_SUPPORTED,
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
     drivers: {

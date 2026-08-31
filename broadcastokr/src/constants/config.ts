@@ -29,3 +29,10 @@ export const COLOR_SIDEBAR_BORDER = '#1F2D45';
 export const FONT_BODY = "'IBM Plex Sans', sans-serif";
 export const FONT_HEADING = "'Space Grotesk', sans-serif";
 export const FONT_MONO = "'JetBrains Mono', monospace";
+
+/**
+ * Mirror of bridge/protocol.cjs PROTOCOL_VERSION (CJS/ESM split forces the
+ * mirror); a vitest equality test pins the two. Sent as X-BrOKR-Protocol on
+ * every bridge call.
+ */
+export const PROTOCOL_VERSION = 1;
