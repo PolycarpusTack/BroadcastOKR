@@ -3,6 +3,7 @@ const { parseCookies, serializeCookie, clearCookie } = require('../utils/cookies
 const { createSession, getSession, deleteSession, upsertSsoUser } = require('../sessions.cjs');
 const { ROLE_PERMS } = require('../permissions.cjs');
 const { MODE } = require('../editions.cjs');
+const { audit } = require('../audit.cjs');
 
 const SESSION_COOKIE = 'brokr_session';
 const FLOW_COOKIE = 'brokr_auth_flow';
@@ -84,6 +85,7 @@ function createAuthRouter(db, oidcEnv) {
       });
 
       const sessionId = createSession(db, user.id);
+      audit(db, { user: { id: user.id } }, 'Signed in via SSO');
       res.setHeader('Set-Cookie', [
         serializeCookie(SESSION_COOKIE, sessionId, { secure: secureCookies() }),
         clearCookie(FLOW_COOKIE),
@@ -97,7 +99,11 @@ function createAuthRouter(db, oidcEnv) {
 
   router.post('/logout', (req, res) => {
     const sessionId = parseCookies(req)[SESSION_COOKIE];
-    if (sessionId) deleteSession(db, sessionId);
+    if (sessionId) {
+      const session = getSession(db, sessionId);
+      if (session) audit(db, { user: { id: session.userId } }, 'Signed out');
+      deleteSession(db, sessionId);
+    }
     res.setHeader('Set-Cookie', clearCookie(SESSION_COOKIE));
     res.json({ ok: true });
   });

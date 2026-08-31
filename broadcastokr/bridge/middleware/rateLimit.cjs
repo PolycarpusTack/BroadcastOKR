@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
  * Defaults: 600 requests / 60s (generous for an internal tool that polls
  * KPIs and syncs state, but enough to blunt runaway loops or abuse).
  */
-function createRateLimitMiddleware() {
+function createRateLimitMiddleware({ sessionKeyed = false } = {}) {
   const windowMs = Number(process.env.BRIDGE_RATE_WINDOW_MS) || 60_000;
   const max = Number(process.env.BRIDGE_RATE_LIMIT) || 600;
 
@@ -18,6 +18,14 @@ function createRateLimitMiddleware() {
     standardHeaders: true,
     legacyHeaders: false,
     skip: (req) => req.path === '/api/health',
+    // Behind the cloud load balancer all traffic shares an IP — key on the
+    // session cookie when present so one user can't throttle the tenant.
+    ...(sessionKeyed ? {
+      keyGenerator: (req) => {
+        const m = /(?:^|;\s*)brokr_session=([^;]+)/.exec(req.headers.cookie || '');
+        return m ? m[1] : (req.ip || 'unknown');
+      },
+    } : {}),
     message: { error: 'Too many requests — slow down and retry shortly.' },
   });
 }

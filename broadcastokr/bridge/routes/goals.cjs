@@ -1,4 +1,5 @@
 const express = require('express');
+const { audit } = require('../audit.cjs');
 
 /**
  * Convert a goal DB row + its key_results rows into the frontend Goal shape.
@@ -172,7 +173,15 @@ function createGoalsRouter(db) {
     }
 
     if (g.keyResults) {
+      const beforeShared = new Map(db.prepare('SELECT id, shared_with_mediagenix AS s FROM key_results WHERE goal_id = ?')
+        .all(req.params.id).map(r => [r.id, !!r.s]));
       upsertKeyResults(db, req.params.id, g.keyResults);
+      for (const kr of g.keyResults) {
+        const was = beforeShared.get(kr.id);
+        if (was !== undefined && was !== !!kr.sharedWithMediagenix) {
+          audit(db, req, `${kr.sharedWithMediagenix ? 'Enabled' : 'Disabled'} Mediagenix sharing for KR '${kr.title}'`);
+        }
+      }
     }
 
     const row = db.prepare('SELECT version FROM goals WHERE id = ?').get(req.params.id);

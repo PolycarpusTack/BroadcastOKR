@@ -1,4 +1,5 @@
 const express = require('express');
+const { audit } = require('../audit.cjs');
 
 function toUserDTO(row) {
   return {
@@ -28,6 +29,10 @@ function createUsersRouter(db) {
 
   router.put('/:id', (req, res) => {
     const u = req.body;
+    const before = db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.params.id);
+    if (before && u.role && before.role !== u.role) {
+      audit(db, req, `Changed role of ${before.name}: ${before.role} → ${u.role}`);
+    }
     db.prepare(`UPDATE users SET name=?, role=?, av=?, color=?, dept=?, title=?, email=?, phone=?,
       avatar_url=?, client_ids=?, skills=?, updated_at=datetime('now') WHERE id=?`)
       .run(u.name, u.role, u.av, u.color, u.dept, u.title, u.email || null, u.phone || null,

@@ -69,9 +69,12 @@ describe('OIDC sign-in (client mode)', () => {
     return session;
   }
 
-  it('unauthenticated API calls are refused; the shellless health stays open', async () => {
+  it('unauthenticated API calls are refused; health stays open but trimmed', async () => {
     assert.equal((await fetch(`${BASE}/api/tasks`)).status, 401);
-    assert.equal((await fetch(`${BASE}/api/health`)).status, 200);
+    const health = await (await fetch(`${BASE}/api/health`)).json();
+    assert.equal(health.status, 'ok');
+    assert.equal(health.database, undefined, 'operational stats must be hidden from anonymous callers');
+    assert.equal(health.uptime, undefined);
   });
 
   it('completes the code+PKCE flow; the first user becomes owner', async () => {

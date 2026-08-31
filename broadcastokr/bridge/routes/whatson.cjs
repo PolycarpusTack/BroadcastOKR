@@ -11,7 +11,10 @@ const { getKpiTemplates } = require('../whatson/templates.cjs');
  * from createWhatsonCore, `store` from createConfigStore; `encrypt`/`decrypt`
  * handle credential storage (no-ops when no key is configured).
  */
-function createWhatsonRouter({ core, store, encrypt, decrypt }) {
+function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decrypt }) {
+  const { audit } = require('../audit.cjs');
+  const cloud = mode !== 'desktop';
+  const auditSql = (req, what) => { if (cloud && db) audit(db, req, what); };
   const router = express.Router();
   const { loadConfig, saveConfig, loadHistory, saveHistory } = store;
 
@@ -44,6 +47,7 @@ function createWhatsonRouter({ core, store, encrypt, decrypt }) {
       if (key in incoming) filtered[key] = incoming[key];
     }
     saveConfig({ ...config, ...filtered });
+    auditSql(req, 'Updated bridge configuration');
     res.json({ ok: true });
   });
 
@@ -98,6 +102,7 @@ function createWhatsonRouter({ core, store, encrypt, decrypt }) {
       config.connections = [...(config.connections || []), conn];
     }
     saveConfig(config);
+    auditSql(req, `Saved database connection '${conn.name || conn.id}'`);
     res.json({ ok: true, connection: { ...conn, password: '***' } });
   });
 
@@ -106,6 +111,7 @@ function createWhatsonRouter({ core, store, encrypt, decrypt }) {
     const config = loadConfig();
     config.connections = (config.connections || []).filter(c => c.id !== req.params.id);
     saveConfig(config);
+    auditSql(req, `Deleted database connection '${req.params.id}'`);
     res.json({ ok: true });
   });
 
@@ -208,6 +214,7 @@ function createWhatsonRouter({ core, store, encrypt, decrypt }) {
     const connConfig = config.connections.find(c => c.id === connectionId);
     if (!connConfig) return res.status(400).json({ error: 'Connection not found' });
 
+    auditSql(req, `Previewed SQL on '${connConfig.name || connectionId}'`);
     try {
       assertSelectOnly(sql);
       const safeSql = wrapPreviewQuery(connConfig, sql);

@@ -141,6 +141,15 @@ describe('server-enforced RBAC (client mode)', () => {
     assert.equal((await fetch(`${BASE}/api/clients`, json('POST', { id: 'c9', name: 'X', connectionId: '', color: '#000', channels: [] }, member))).status, 403);
   });
 
+  it('server-side audit recorded the sensitive actions with session actors', async () => {
+    const log = await (await fetch(`${BASE}/api/activity?limit=100`, { headers: { Cookie: owner } })).json();
+    const texts = log.map((e) => `${e.actor}: ${e.text}`);
+    assert.ok(texts.some((t) => t.includes('Signed in via SSO')), 'sign-ins must be audited');
+    assert.ok(texts.some((t) => t.includes('Changed role of Member One: member → manager')), 'role changes must be audited');
+    const roleEntry = log.find((e) => e.text.includes('Changed role'));
+    assert.equal(roleEntry.actor, 'Owner One', 'actor must come from the session, not a body claim');
+  });
+
   it('owners can do all of it', async () => {
     assert.equal((await fetch(`${BASE}/api/goals/g1`, json('DELETE', undefined, owner))).status, 200);
     const client = await fetch(`${BASE}/api/clients`, json('POST', { id: 'c1', name: 'Pinned', connectionId: '', color: '#000', channels: [] }, owner));

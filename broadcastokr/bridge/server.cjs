@@ -68,7 +68,8 @@ const { createLoggingMiddleware } = require('./middleware/logging.cjs');
 const { createProtocolMiddleware } = require('./middleware/protocol.cjs');
 
 const { createRbacMiddleware } = require('./middleware/rbac.cjs');
-app.use(createRateLimitMiddleware());
+if (MODE !== 'desktop') app.set('trust proxy', 1);
+app.use(createRateLimitMiddleware({ sessionKeyed: MODE !== 'desktop' }));
 app.use(createProtocolMiddleware());
 app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureNoAuth: INSECURE_NO_AUTH }));
 app.use(createRbacMiddleware({ mode: MODE, insecureNoAuth: INSECURE_NO_AUTH, db }));
@@ -76,7 +77,7 @@ app.use(createLoggingMiddleware());
 
 // Mounted in every mode: /me and /logout are OIDC-independent, and a desktop
 // /login correctly reports the identity provider as unavailable.
-const { createAuthRouter } = require('./routes/auth.cjs');
+const { createAuthRouter, SESSION_COOKIE: SESSION_COOKIE_NAME } = require('./routes/auth.cjs');
 app.use('/api/auth', createAuthRouter(db, OIDC_ENV));
 
 const { startBackupScheduler } = require('./utils/backup.cjs');
@@ -119,6 +120,8 @@ const core = createWhatsonCore({
 });
 
 app.use('/api', createWhatsonRouter({
+  db,
+  mode: MODE,
   core,
   store,
   encrypt: (password) => (BRIDGE_API_KEY ? encrypt(password, BRIDGE_API_KEY) : password),
@@ -163,7 +166,14 @@ app.post('/api/kpi/sync-now', async (req, res) => {
 
 // ── Health ──
 
+const { parseCookies } = require('./utils/cookies.cjs');
+const { getSession } = require('./sessions.cjs');
+
 app.get('/api/health', (req, res) => {
+  // Cloud instances reveal operational stats only to signed-in callers
+  if (MODE !== 'desktop' && !INSECURE_NO_AUTH && !getSession(db, parseCookies(req)[SESSION_COOKIE_NAME])) {
+    return res.json({ status: 'ok', mode: MODE, protocolVersion: PROTOCOL_VERSION, minSupported: MIN_SUPPORTED });
+  }
   let dbStats = null;
   try {
     const tableCount = db.prepare("SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'").get().c;
