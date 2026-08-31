@@ -2,6 +2,7 @@
 
 **Status:** PLAN OF RECORD — successor to the tiered development plan (all three
 deployment forms complete, `794da36`).
+**Execution instructions:** `readiness-instructions.md` — per-EPIC prerequisites, steps, and done-when.
 **Goal:** reach **95%**: everything Mediagenix-side is validated, operable, billable,
 hardened, and documented, such that onboarding the first client is a purely commercial
 act — contract, their IdP config, an agent install — with no engineering in the path.
