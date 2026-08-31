@@ -75,6 +75,8 @@ export function UserModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reassignTo, setReassignTo] = useState<string>('');
 
+  /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
+     modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
   useEffect(() => {
     if (!open) return;
     setShowDeleteConfirm(false);
@@ -107,6 +109,7 @@ export function UserModal({
       setSkillsRaw('');
     }
   }, [open, user]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleNameChange(value: string) {
     setName(value);

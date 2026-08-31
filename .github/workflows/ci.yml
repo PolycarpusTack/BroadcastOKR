@@ -27,6 +27,10 @@ jobs:
         working-directory: broadcastokr
         run: npx tsc --noEmit
 
+      - name: Lint
+        working-directory: broadcastokr
+        run: npm run lint
+
       - name: Run unit tests
         working-directory: broadcastokr
         run: npx vitest run

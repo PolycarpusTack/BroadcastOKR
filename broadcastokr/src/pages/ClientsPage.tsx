@@ -7,7 +7,7 @@ import { useStore } from '../store/store';
 import { useShallow } from 'zustand/react/shallow';
 import { ClientModal } from '../components/clients/ClientModal';
 import { ClientRow } from '../components/clients/ClientRow';
-import { toConnectionInput } from '../components/clients/ClientRow';
+import { toConnectionInput } from '../utils/connections';
 import { DeleteConfirmModal } from '../components/clients/DeleteConfirmModal';
 import type { HealthStatus } from '../components/clients/HealthDot';
 import {

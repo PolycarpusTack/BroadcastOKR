@@ -65,7 +65,12 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
   const [tagsRaw, setTagsRaw] = useState('');
   const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>({});
   const [overrideEnabled, setOverrideEnabled] = useState<Record<string, Record<string, boolean>>>({});
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [connTestResult, setConnTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
+     modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
   useEffect(() => {
     setConnTestResult(null);
     if (!open) return;
@@ -129,6 +134,7 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
       setOverrideEnabled(initialEnabled);
     }
   }, [open, client, connections, templates]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleToggleOverride(templateId: string, krTemplateId: string, enabled: boolean) {
     setOverrideEnabled((prev) => ({
@@ -143,10 +149,6 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
       [templateId]: { ...prev[templateId], [krTemplateId]: sql },
     }));
   }
-
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [connTestResult, setConnTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   async function handleSave() {
     const trimmed = name.trim();

@@ -97,6 +97,8 @@ export function GoalsPage({
     }
   }, [bridgeConnected, getConnections]);
 
+  // Syncs from the bridge (async fetch); the disconnected branch clears state synchronously
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(refreshConnections, [refreshConnections]);
 
   // View toggle: goals vs templates
@@ -143,6 +145,8 @@ export function GoalsPage({
 
   // Re-fetch connections when create/edit modal opens (picks up new connections from KPIConfigModal)
   useEffect(() => {
+    // Same sync-from-bridge callback as above
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (createOpen || editGoalId) refreshConnections();
   }, [createOpen, editGoalId, refreshConnections]);
 
@@ -459,7 +463,7 @@ export function GoalsPage({
     setDeleteTemplateId(null);
   };
 
-  // Oldest live-KR sync timestamp, only when past the staleness threshold
+  // Oldest live-KR sync timestamp, only when past the staleness threshold.
   const stalestSyncAt = useMemo(() => {
     let oldest: string | null = null;
     for (const g of goals) {
@@ -468,6 +472,8 @@ export function GoalsPage({
       }
     }
     if (!oldest) return null;
+    // Date.now() is deliberate: staleness re-evaluates when goals change; no live clock needed.
+    // eslint-disable-next-line react-hooks/purity
     return Date.now() - new Date(oldest).getTime() > STALE_SYNC_THRESHOLD_MS ? oldest : null;
   }, [goals]);
 

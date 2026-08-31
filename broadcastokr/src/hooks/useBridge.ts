@@ -285,6 +285,8 @@ export function useBridge() {
 
   // On mount, check health and start polling if bridge is reachable
   useEffect(() => {
+    // Health check syncs from the bridge; state updates land in the async continuation
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkHealth().then((ok) => {
       if (ok) startPolling();
     });

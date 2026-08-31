@@ -53,6 +53,8 @@ export function TeamModal({
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
+     modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
   useEffect(() => {
     if (!open) return;
     setShowDeleteConfirm(false);
@@ -72,6 +74,7 @@ export function TeamModal({
       setSelectedClientIds([]);
     }
   }, [open, team]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleMember(userId: number) {
     setMemberIds((prev) => {

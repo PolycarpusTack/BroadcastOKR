@@ -3,6 +3,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
 import { PillBadge } from '../ui/PillBadge';
 import { HealthDot } from './HealthDot';
+import { toConnectionInput } from '../../utils/connections';
 import type { HealthStatus } from './HealthDot';
 import {
   PRIMARY_COLOR,
@@ -29,10 +30,6 @@ const CHANNEL_PALETTE = [
   '#818CF8',
 ];
 
-export function toConnectionInput({ id, ...connection }: DBConnection): Omit<DBConnection, 'id'> {
-  void id;
-  return connection;
-}
 
 export interface ClientRowProps {
   client: Client;
