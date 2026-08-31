@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BRIDGE_URL, BRIDGE_POLL_INTERVAL_MS, BRIDGE_API_KEY } from '../constants/config';
+import { BRIDGE_POLL_INTERVAL_MS } from '../constants/config';
 import type { Goal, SyncStatus } from '../types';
 import { buildLiveKRQueries, mapResultsToKrIds, type LiveKRBatchResult } from '../utils/liveSync';
+import { bridgeFetch } from '../store/bridgeSync';
 
 // Electron API type (available when running in Electron)
 interface ElectronAPI {
@@ -78,19 +79,9 @@ export interface ColumnInfo {
   DATA_LENGTH: number;
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const authHeaders: Record<string, string> = BRIDGE_API_KEY
-    ? { Authorization: `Bearer ${BRIDGE_API_KEY}` }
-    : {};
-  const res = await fetch(`${BRIDGE_URL}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
-  }
-  return res.json();
+/** Interactive calls fail fast — no retry; the unified client adds auth + timeout. */
+function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  return bridgeFetch<T>(path, options, { retries: 0 });
 }
 
 const isElectron = () => !!window.electronAPI?.isElectron;

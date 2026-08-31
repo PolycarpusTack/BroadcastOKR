@@ -44,15 +44,23 @@ async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Fetch wrapper with auth header, retry with exponential backoff */
-export async function bridgeFetch<T>(path: string, options?: RequestInit): Promise<T> {
+/**
+ * The single HTTP client for all bridge calls (auth header, 15s timeout,
+ * retry with exponential backoff). Interactive callers that need fast
+ * failure (health checks, UI-triggered fetches) pass `retries: 0`.
+ */
+export async function bridgeFetch<T>(
+  path: string,
+  options?: RequestInit,
+  { retries = MAX_RETRIES }: { retries?: number } = {},
+): Promise<T> {
   const authHeaders: Record<string, string> = BRIDGE_API_KEY
     ? { Authorization: `Bearer ${BRIDGE_API_KEY}` }
     : {};
 
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -71,7 +79,7 @@ export async function bridgeFetch<T>(path: string, options?: RequestInit): Promi
       return res.json();
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < MAX_RETRIES) {
+      if (attempt < retries) {
         await delay(RETRY_DELAYS[attempt]);
       }
     }
