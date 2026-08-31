@@ -1,3 +1,5 @@
 # Execution Mode
 
-**HARDENING** — set 2026-08-31, per current-state evaluation of same date (see `docs/gpm/state/hardening-backlog-2026-08-31.md`, Readiness Decision). Rationale: the multi-user sync layer (1.0 headline feature) has silent-failure defects; no new features on the sync path until the contract is fixed and guarded by tests. Re-evaluate mode after EPIC B completes.
+**DELIVERY** — set 2026-08-31 after completing hardening EPICs A+B (see `phase-summaries/2026-08-31-hardening-epics-a-b.md`). The sync-path defects that forced HARDENING are fixed and contract-guarded in CI; open debt is TD-1/TD-2 in the backlog file. Feature work may resume; the sync-path contract test gates regressions.
+
+History: HARDENING 2026-08-31 (current-state evaluation → hardening backlog, same date).
