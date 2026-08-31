@@ -8,54 +8,70 @@ merge `--no-ff`, suites green before every commit).
 
 ---
 
-## R1 — Real-system validation rig
+## R1 — Real-system validation rig (LOCAL variant — Windows PC)
 
-**You must provide (nothing starts without these):**
-- An app registration in Mediagenix's Entra tenant: redirect URI
-  `https://<staging-host>/api/auth/callback`, scopes `openid profile email`,
-  a client secret. Note the issuer URL (`https://login.microsoftonline.com/<tenant>/v2.0`).
-- A host (VM or k8s namespace) with a DNS name and the ability to terminate TLS.
-- Access to an internal WHATS'ON test database (Oracle or Postgres) with a
-  read-only account granted SELECT on the PSI tables you'll query.
+Runs entirely on your machine: local Oracle + Postgres are the real-driver test,
+Keycloak (Docker) is the real-OIDC test. The corporate Entra tenant is only a short
+spot-check at the end (R1b) — testing stays local.
+
+**You must provide:** Docker Desktop running; your local Oracle and Postgres
+credentials; Node 22. Nothing corporate.
 
 **Steps:**
-1. Provision the two instances on the host:
-   `node scripts/provision-instance.mjs --dir /srv/brokr-cockpit --name "Mediagenix" --mode cockpit --base-url https://cockpit.<host>`
-   and the same with `--mode client --name "Tenant Zero" --base-url https://t0.<host>`.
-   Fill the OIDC values in each generated `.env` (both instances refuse to start until you do — that's correct).
-2. Build the edition bundles: `VITE_EDITION=internal npx vite build` → serve from the
-   cockpit instance (`BRIDGE_APP_DIR`), `VITE_EDITION=client npx vite build` → the
-   client instance. Put both behind the TLS proxy (Caddy/Traefik/nginx), routing each
-   hostname to its instance's port 3001.
-3. Sign in to each with your Entra account. **Expect real-IdP friction here** — claim
-   names, `email` vs `preferred_username`, tenant-restricted consent. Fix what breaks
-   in `bridge/routes/auth.cjs` (`upsertSsoUser` claims mapping) and record each fix.
-4. On the cockpit: create the Tenant Zero client row, mint a share token
-   (`POST /api/cockpit/tenants` via the UI once R6-1 lands, curl until then), set
-   `BRIDGE_COCKPIT_URL` + `BRIDGE_SHARE_TOKEN` in the client instance's `.env`, restart.
-5. Enroll an agent against the client instance on a machine that can reach the test DB:
-   mint (`POST /api/agents/enrol-token`), then
-   `node bridge/agent.cjs enroll --instance https://t0.<host> --token <T> --name "staging-agent" --dir /etc/brokr-agent`.
-   Edit `/etc/brokr-agent/agent-config.json`: add the test-DB connection and 2–3
-   `bindings` with real PSI queries (start from the presets in
-   `bridge/whatson/templates.cjs`). Run `node bridge/agent.cjs run --dir /etc/brokr-agent`
-   under systemd.
-6. Seed real content: put Mediagenix's actual quarterly OKRs on the cockpit; on Tenant
-   Zero create goals whose KR ids match the agent bindings; flip 1–2 KRs to
-   "Shared with Mediagenix".
-7. **Dogfood for 14 days.** Keep a `docs/saas/readiness/r1-findings.md` log: every
-   mock-vs-real discrepancy, UX papercut, and silent failure, each triaged to
-   fix-now / backlog / accepted.
+1. **IdP:** `docker compose -f scripts/local-rig/keycloak-compose.yml up -d` — a
+   Keycloak with realm `brokr` pre-imported: client `brokr-local` (secret
+   `brokr-local-dev-secret`, redirect URIs for ports 3100/3101) and users
+   `owner`/`owner`, `member`/`member`. Issuer: `http://localhost:8080/realms/brokr`
+   (the bridge's `allowInsecure` path accepts http:// issuers for exactly this).
+2. **Test schemas:** load `scripts/local-rig/psi-test-schema.postgres.sql` into your
+   Postgres and `psi-test-schema.oracle.sql` into your Oracle (header comments carry
+   the exact commands, including creating a **read-only** `brokr_reader` account for
+   the agent — use it, that's part of what R1 validates).
+3. **Instances:** provision two —
+   `node scripts/provision-instance.mjs --dir ./local-rig/cockpit --name "Mediagenix" --mode cockpit --base-url http://localhost:3100 --oidc-issuer http://localhost:8080/realms/brokr --oidc-client-id brokr-local --oidc-client-secret brokr-local-dev-secret`
+   and the same with `--dir ./local-rig/tenant0 --name "Tenant Zero" --mode client --base-url http://localhost:3101`.
+   Build the app bundles (`VITE_EDITION=internal npx vite build --outDir local-rig/cockpit/app`,
+   `VITE_EDITION=client npx vite build --outDir local-rig/tenant0/app`), set
+   `BRIDGE_APP_DIR` to each in the generated `.env`s plus `BRIDGE_PORT=3100`/`3101`,
+   `BRIDGE_HOST=127.0.0.1`, and start both bridges with their env files.
+4. **Sign in** at http://localhost:3100 and :3101 with `owner` — first sign-in
+   becomes instance owner (verify), then `member` (verify member role). Any claim
+   mapping fixes go in `upsertSsoUser` (bridge/routes/auth.cjs).
+5. **Channel:** on the cockpit create the Tenant Zero client row and mint a share
+   token (`POST /api/cockpit/tenants` — curl until R6-1's UI lands); put
+   `BRIDGE_COCKPIT_URL=http://localhost:3100` + `BRIDGE_SHARE_TOKEN=<token>` in
+   tenant0's `.env`, restart it.
+6. **Agent:** mint an enrol token on tenant0, then
+   `node bridge/agent.cjs enroll --instance http://localhost:3101 --token <T> --name "local-agent" --dir ./local-rig/agent`.
+   Edit `local-rig/agent/agent-config.json`: add BOTH local connections (Oracle via
+   `brokr_reader`, Postgres) and bindings using the preset queries from
+   `bridge/whatson/templates.cjs` (e.g. Transmissions This Month against each DB).
+   `node bridge/agent.cjs run --dir ./local-rig/agent`. (Windows note: file-mode
+   0600 is a no-op on NTFS — acceptable locally, noted as a rig limitation.)
+7. **Content:** cockpit gets Mediagenix's real OKRs; tenant0 gets goals whose KR ids
+   match the agent bindings; flip one KR to Shared. Verify: agent values land on
+   tenant0, the shared value appears on the cockpit fleet panel, direction/staleness
+   render sanely.
+8. **Dogfood 7–14 days** on your PC (bridges + Keycloak as startup tasks). Log every
+   mock-vs-real discrepancy in `docs/saas/readiness/r1-findings.md`, triaged
+   fix-now / backlog / accepted. Expect the interesting findings in Oracle driver
+   behavior and Keycloak claim names.
 
-**Done when:** 14 unattended days; agent values visible on Tenant Zero and its shared
-metrics on the cockpit fleet panel; findings log fully triaged; the OIDC and agent
-sections of `docs/operations.md` corrected from what staging taught.
+**R1b — corporate Entra spot-check (half a day, later, before any client demo):**
+register one app in Mediagenix's Entra tenant (redirect
+`http://localhost:3101/api/auth/callback` works for a spot-check), point tenant0's
+OIDC env at it, and verify sign-in, claims (`name`/`email` vs `preferred_username`),
+logout, and an MFA-policy login end-to-end. Fixes discovered here are almost always
+claim-mapping lines in `upsertSsoUser`.
 
----
+**Done when:** the 7–14-day local run completes with findings triaged; both DB
+dialects exercised through the agent via a read-only account; R1b passes against the
+real Entra tenant; the OIDC and agent sections of `docs/operations.md` corrected from
+what the rig taught.
 
 ## R2 — Fleet operations machinery
 
-**Needs:** the R1 rig (drills run against it), a container registry.
+**Needs:** the R1 local rig (drills run against it), a container registry. Cloud/VM hosting can come later — the drill mechanics validate locally first.
 
 **Steps:**
 1. Make the instance a first-class image: extend `bridge/Dockerfile` (or a new

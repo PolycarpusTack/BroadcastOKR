@@ -20,11 +20,14 @@ functions FF-1..FF-7 in CI plus golden protocol-v1 fixtures (FF-5). Suites at cl
 ~212 vitest + ~108 bridge + 3 Playwright, lint 0, audit 0. Phase summaries and
 backlogs for everything are in `docs/gpm/state/`.
 
-**The active plan is the readiness plan (R1–R7).** R1 (real-system validation rig)
-is first and blocks on things only Yannick can provide: an Entra app registration,
-a TLS-capable staging host, and read-only access to an internal WHATS'ON test
-database. If those exist, decompose R1 per the instructions and execute. If not,
-the code-heavy EPICs can start without staging: R3 (entitlements + usage metering,
+**The active plan is the readiness plan (R1–R7).** R1 is now the LOCAL variant
+(rewritten in readiness-instructions.md): everything runs on Yannick's Windows PC —
+Keycloak in Docker as the IdP (`scripts/local-rig/keycloak-compose.yml`, realm
+pre-imported), his local Oracle + Postgres with the PSI test schemas in
+`scripts/local-rig/`, two provisioned instances on ports 3100/3101, and the agent
+against a read-only DB account. Only prerequisites: Docker Desktop + local DB
+credentials. The corporate Entra tenant is a half-day spot-check (R1b) later, not a
+blocker. The code-heavy EPICs can also run in parallel: R3 (entitlements + usage metering,
 incl. the FF-8 fitness function), R6 (closed 5-item product list: admin UIs for
 tokens/agents, fleet board in the Compare grid, TD-2 modal refactor, KPI-vs-LiveKR
 ADR, period archival), and R7 (one-tag release engineering). Ask which to start,
