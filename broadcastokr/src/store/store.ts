@@ -133,7 +133,7 @@ export const useStore = create<AppStore>()(
         bridgePut(`/api/goals/${goalId}`, updated).catch(bridgeWriteFailed);
       },
 
-      setMonitor: (type, id, days) =>
+      setMonitor: (type, id, days) => {
         set((s) => {
           const monitorUntil = days === null
             ? undefined
@@ -151,7 +151,14 @@ export const useStore = create<AppStore>()(
               c.id === id ? { ...c, monitorUntil } : c,
             ),
           };
-        }),
+        });
+        const full = type === 'goal'
+          ? get().goals.find((g) => g.id === id)
+          : get().clients.find((c) => c.id === id);
+        if (full) {
+          bridgePut(`/api/${type === 'goal' ? 'goals' : 'clients'}/${id}`, full).catch(bridgeWriteFailed);
+        }
+      },
 
       syncLiveKR: (goalId, krId, current) =>
         set((s) => {
@@ -260,7 +267,7 @@ export const useStore = create<AppStore>()(
         if (full) bridgePut(`/api/tasks/${id}`, full).catch(bridgeWriteFailed);
       },
 
-      toggleSubtask: (taskId, subtaskIndex) =>
+      toggleSubtask: (taskId, subtaskIndex) => {
         set((s) => ({
           tasks: s.tasks.map((t) => {
             if (t.id !== taskId) return t;
@@ -268,9 +275,17 @@ export const useStore = create<AppStore>()(
             subtasks[subtaskIndex] = { ...subtasks[subtaskIndex], done: !subtasks[subtaskIndex].done };
             return { ...t, subtasks };
           }),
-        })),
+        }));
+        const full = get().tasks.find((t) => t.id === taskId);
+        if (full) bridgePut(`/api/tasks/${taskId}`, full).catch(bridgeWriteFailed);
+      },
 
-      addBulkTasks: (newTasks) => set((s) => ({ tasks: [...newTasks, ...s.tasks] })),
+      addBulkTasks: (newTasks) => {
+        set((s) => ({ tasks: [...newTasks, ...s.tasks] }));
+        for (const t of newTasks) {
+          bridgePost('/api/tasks', t).catch(bridgeWriteFailed);
+        }
+      },
 
       updateTask: (id, updates) => {
         set((s) => ({
