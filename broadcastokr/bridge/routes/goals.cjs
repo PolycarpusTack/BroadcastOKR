@@ -175,19 +175,15 @@ function createGoalsRouter(db) {
     const kr = db.prepare('SELECT * FROM key_results WHERE id = ? AND goal_id = ?').get(krId, req.params.id);
     if (!kr) return res.status(404).json({ error: 'Key result not found' });
 
-    // Insert history entry
+    // Insert history entry. Values and progress are NOT computed here: the
+    // client owns progress semantics (direction-aware krProgress) and PUTs the
+    // recalculated goal alongside this call.
     db.prepare('INSERT INTO kr_history (kr_id, timestamp, value, confidence, note, actor, source) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(krId, new Date().toISOString(), value, confidence || null, note || null, actor, 'check-in');
 
-    // Update KR current value (only for non-live KRs)
-    if (!kr.live_config) {
-      const range = Math.abs(kr.target_val - kr.start_val);
-      const progress = range === 0
-        ? (value === kr.target_val ? 1 : 0)
-        : Math.min(Math.abs(value - kr.start_val) / range, 1);
-      db.prepare('UPDATE key_results SET current_val=?, progress=?, status=? WHERE id=?')
-        .run(value, progress, progress >= 0.7 ? 'on_track' : progress >= 0.4 ? 'at_risk' : 'behind', krId);
-    }
+    // Bump the goal so /api/sync/changes propagates this check-in even if the
+    // client's follow-up PUT is lost.
+    db.prepare("UPDATE goals SET updated_at=datetime('now') WHERE id=?").run(req.params.id);
 
     // Prune history to 100 entries
     const count = db.prepare('SELECT COUNT(*) as c FROM kr_history WHERE kr_id = ?').get(krId).c;

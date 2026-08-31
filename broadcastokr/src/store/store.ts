@@ -125,7 +125,12 @@ export const useStore = create<AppStore>()(
 
           return { goals };
         });
+        const updated = get().goals.find((g) => g.id === goalId);
+        if (!updated?.keyResults.some((k) => k.id === krId)) return;
         bridgePost(`/api/goals/${goalId}/check-in`, { krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor }).catch(console.error);
+        // The client owns progress semantics (krProgress); the PUT persists the
+        // recalculated goal and bumps updated_at so other clients' polls see it.
+        bridgePut(`/api/goals/${goalId}`, updated).catch(console.error);
       },
 
       setMonitor: (type, id, days) =>

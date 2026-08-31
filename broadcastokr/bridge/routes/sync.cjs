@@ -1,6 +1,21 @@
 const express = require('express');
 const fs = require('fs');
 
+/**
+ * Rows store updated_at as sqlite "YYYY-MM-DD HH:MM:SS" (UTC) while the
+ * frontend sends an ISO `since`. Byte-wise TEXT comparison would rank every
+ * same-day sqlite timestamp below the ISO string (' ' < 'T'), silently
+ * excluding all same-day changes. Normalize ISO to the stored format, minus
+ * one second for the second-granularity edge (at-least-once delivery — the
+ * client merge is idempotent by id).
+ */
+function normalizeSince(since) {
+  if (!since.includes('T')) return since;
+  const t = Date.parse(since);
+  if (Number.isNaN(t)) return since;
+  return new Date(t - 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function createSyncRouter(db, dbPath) {
   const router = express.Router();
 
@@ -25,8 +40,9 @@ function createSyncRouter(db, dbPath) {
 
   // GET /api/sync/changes?since=<ISO timestamp>
   router.get('/changes', (req, res) => {
-    const since = req.query.since;
-    if (!since) return res.status(400).json({ error: 'since parameter required' });
+    const rawSince = req.query.since;
+    if (!rawSince) return res.status(400).json({ error: 'since parameter required' });
+    const since = normalizeSince(rawSince);
 
     const goals = db.prepare('SELECT * FROM goals WHERE updated_at > ?').all(since);
     const tasks = db.prepare('SELECT * FROM tasks WHERE updated_at > ?').all(since);
