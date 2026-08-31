@@ -24,6 +24,7 @@ describe('static app serving (client mode)', () => {
       env: {
         ...process.env,
         BRIDGE_MODE: 'client',
+        BRIDGE_INSECURE_NO_AUTH: '1',
         BRIDGE_APP_DIR: appDir,
         BRIDGE_DB_PATH: ':memory:', BRIDGE_PORT: String(PORT),
         BRIDGE_HOST: '127.0.0.1', BRIDGE_API_KEY: '',

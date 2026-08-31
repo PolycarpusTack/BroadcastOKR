@@ -10,31 +10,45 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
-  .split(',')
-  .map(s => s.trim());
-app.use(cors({ origin: CORS_ORIGINS }));
-app.use(express.json());
-
-// Rate limiting, auth, and request logging must run BEFORE any routes so they
-// actually guard and capture every endpoint. (/api/health is exempt from each.)
-const { createRateLimitMiddleware } = require('./middleware/rateLimit.cjs');
-const { createAuthMiddleware } = require('./middleware/auth.cjs');
-const { createLoggingMiddleware } = require('./middleware/logging.cjs');
-
-const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
-if (!BRIDGE_API_KEY) {
-  console.warn('  WARNING: BRIDGE_API_KEY not set — auth disabled. Set it in .env for production.');
-}
-const { createProtocolMiddleware } = require('./middleware/protocol.cjs');
-app.use(createRateLimitMiddleware());
-app.use(createProtocolMiddleware());
-app.use(createAuthMiddleware(BRIDGE_API_KEY));
-app.use(createLoggingMiddleware());
-
 const { MODE } = require('./editions.cjs');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
 const { encrypt, decrypt } = require('./utils/crypto.cjs');
+
+const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+  .split(',')
+  .map(s => s.trim());
+// Cloud modes use cookie sessions — CORS must allow credentials
+app.use(cors({ origin: CORS_ORIGINS, credentials: MODE !== 'desktop' }));
+app.use(express.json());
+
+// ── Identity configuration (validated before anything mounts) ──
+
+const BRIDGE_API_KEY = process.env.BRIDGE_API_KEY;
+const OIDC_ENV = {
+  issuer: process.env.BRIDGE_OIDC_ISSUER,
+  clientId: process.env.BRIDGE_OIDC_CLIENT_ID,
+  clientSecret: process.env.BRIDGE_OIDC_CLIENT_SECRET,
+  baseUrl: process.env.BRIDGE_BASE_URL,
+  // http:// issuers are only for tests/local mocks
+  allowInsecure: (process.env.BRIDGE_OIDC_ISSUER || '').startsWith('http://'),
+};
+const OIDC_CONFIGURED = !!(OIDC_ENV.issuer && OIDC_ENV.clientId && OIDC_ENV.clientSecret && OIDC_ENV.baseUrl);
+const INSECURE_NO_AUTH = process.env.BRIDGE_INSECURE_NO_AUTH === '1';
+
+if (MODE === 'desktop') {
+  if (!BRIDGE_API_KEY) {
+    console.warn('  WARNING: BRIDGE_API_KEY not set — auth disabled. Set it in .env for production.');
+  }
+} else if (!OIDC_CONFIGURED) {
+  // Cloud modes fail closed: no identity, no server. The explicit escape is
+  // for tests and local development only, and it screams.
+  if (!INSECURE_NO_AUTH) {
+    console.error(`  FATAL: cloud mode '${MODE}' requires OIDC configuration `
+      + '(BRIDGE_OIDC_ISSUER, BRIDGE_OIDC_CLIENT_ID, BRIDGE_OIDC_CLIENT_SECRET, BRIDGE_BASE_URL).');
+    process.exit(1);
+  }
+  console.warn('  WARNING: BRIDGE_INSECURE_NO_AUTH=1 — cloud mode WITHOUT authentication. Tests/dev only.');
+}
 
 // ── Tenant data plane (SQLite) ──
 
@@ -45,6 +59,23 @@ const DB_PATH = process.env.BRIDGE_DB_PATH || path.join(__dirname, 'broadcastokr
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 const db = createDB(DB_PATH);
 runMigrations(db, MIGRATIONS_DIR);
+
+// Rate limiting, protocol floor, auth, and request logging must run BEFORE any
+// routes so they actually guard and capture every endpoint.
+const { createRateLimitMiddleware } = require('./middleware/rateLimit.cjs');
+const { createAuthMiddleware } = require('./middleware/auth.cjs');
+const { createLoggingMiddleware } = require('./middleware/logging.cjs');
+const { createProtocolMiddleware } = require('./middleware/protocol.cjs');
+
+app.use(createRateLimitMiddleware());
+app.use(createProtocolMiddleware());
+app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureNoAuth: INSECURE_NO_AUTH }));
+app.use(createLoggingMiddleware());
+
+if (OIDC_CONFIGURED) {
+  const { createAuthRouter } = require('./routes/auth.cjs');
+  app.use('/api/auth', createAuthRouter(db, OIDC_ENV));
+}
 
 const { startBackupScheduler } = require('./utils/backup.cjs');
 const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR
