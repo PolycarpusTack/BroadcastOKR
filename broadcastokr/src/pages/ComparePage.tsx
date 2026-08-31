@@ -5,6 +5,7 @@ import { useStore } from '../store/store';
 import { useShallow } from 'zustand/react/shallow';
 import { PillBadge } from '../components/ui/PillBadge';
 import { goalStatus, progressColor } from '../utils/colors';
+import { krProgress } from '../utils/progress';
 import {
   PRIMARY_COLOR,
   COLOR_WARNING,
@@ -536,7 +537,7 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
                   return (
                     <td key={krt.id} style={summaryTdStyle}>
                       {avg !== undefined ? (
-                        <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: progressColor(avg / (krt.target || 1)) }}>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: progressColor(krProgress(krt.start, krt.target, avg)) }}>
                           {formatValue(avg, krt.unit)}
                         </span>
                       ) : (
