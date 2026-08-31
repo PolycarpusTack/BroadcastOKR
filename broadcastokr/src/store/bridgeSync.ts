@@ -40,19 +40,40 @@ export interface BridgeChanges {
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000];
 
+/** A version-checked write lost the race; `current` is the server's row. */
+export class ConflictError extends Error {
+  current: unknown;
+  constructor(current: unknown) {
+    super('version_conflict');
+    this.name = 'ConflictError';
+    this.current = current;
+  }
+}
+
+/** 4xx responses are deterministic — retrying them only repeats the answer. */
+class NoRetryError extends Error {}
+
 async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Fetch wrapper with auth header, retry with exponential backoff */
-export async function bridgeFetch<T>(path: string, options?: RequestInit): Promise<T> {
+/**
+ * The single HTTP client for all bridge calls (auth header, 15s timeout,
+ * retry with exponential backoff). Interactive callers that need fast
+ * failure (health checks, UI-triggered fetches) pass `retries: 0`.
+ */
+export async function bridgeFetch<T>(
+  path: string,
+  options?: RequestInit,
+  { retries = MAX_RETRIES }: { retries?: number } = {},
+): Promise<T> {
   const authHeaders: Record<string, string> = BRIDGE_API_KEY
     ? { Authorization: `Bearer ${BRIDGE_API_KEY}` }
     : {};
 
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -66,12 +87,17 @@ export async function bridgeFetch<T>(path: string, options?: RequestInit): Promi
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+        if (res.status === 409) {
+          throw new ConflictError((body as { current?: unknown }).current);
+        }
+        const message = (body as { error?: string }).error || `HTTP ${res.status}`;
+        throw res.status < 500 ? new NoRetryError(message) : new Error(message);
       }
       return res.json();
     } catch (err) {
+      if (err instanceof ConflictError || err instanceof NoRetryError) throw err;
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < MAX_RETRIES) {
+      if (attempt < retries) {
         await delay(RETRY_DELAYS[attempt]);
       }
     }
@@ -109,6 +135,46 @@ export function bridgePut(path: string, body: unknown): Promise<unknown> {
 /** DELETE to bridge */
 export function bridgeDelete(path: string): Promise<unknown> {
   return bridgeFetch(path, { method: 'DELETE' });
+}
+
+const entityWriteQueues = new Map<string, Promise<void>>();
+
+/**
+ * Version-checked PUT for goals/tasks. Writes to the same entity are
+ * serialized client-side so a second rapid edit can't race the first PUT's
+ * version echo (which would 409 against ourselves). The version is read via
+ * `getVersion` at send time — after the previous write applied its echo.
+ * A real conflict (someone else won) lands in `onConflict` with the server row.
+ */
+export function bridgePutEntity(
+  kind: 'goals' | 'tasks',
+  body: Record<string, unknown> & { id: string },
+  hooks: {
+    getVersion: () => number | undefined;
+    onVersion: (version: number) => void;
+    onConflict: (current: unknown) => void;
+  },
+): Promise<void> {
+  const key = `${kind}:${body.id}`;
+  const base = kind === 'goals' ? '/api/goals' : '/api/tasks';
+  const task = async () => {
+    try {
+      const res = await bridgeFetch<{ ok: boolean; version?: number }>(`${base}/${body.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...body, version: hooks.getVersion() }),
+      });
+      if (typeof res.version === 'number') hooks.onVersion(res.version);
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        hooks.onConflict(err.current);
+        return;
+      }
+      bridgeWriteFailed(err);
+    }
+  };
+  const next = (entityWriteQueues.get(key) ?? Promise.resolve()).then(task);
+  entityWriteQueues.set(key, next);
+  return next;
 }
 
 /** POST /api/sync/migrate-from-local — migrate localStorage data to bridge */

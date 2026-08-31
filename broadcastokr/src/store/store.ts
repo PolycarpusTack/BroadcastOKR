@@ -8,7 +8,8 @@ import { goalStatus } from '../utils/colors';
 import { krProgress } from '../utils/progress';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
-import { bridgePost, bridgePut, bridgeDelete, bridgeWriteFailed } from './bridgeSync';
+import { bridgePost, bridgePut, bridgePutEntity, bridgeDelete, bridgeWriteFailed } from './bridgeSync';
+import { hasFeature, getRuntimeMode } from '../editions/entitlements';
 
 /** Recalculate goal progress and status from its KRs */
 function recalcGoal(goal: Goal): Goal {
@@ -19,6 +20,19 @@ function recalcGoal(goal: Goal): Goal {
 
 function isMonitorActive(until?: string): boolean {
   return !!until && new Date(until) > new Date();
+}
+
+/**
+ * Goals arriving from the bridge carry raw facts; progress semantics are
+ * client-owned (krProgress is the single source of truth), so recompute every
+ * KR and the goal rollup on the way in.
+ */
+function withRecomputedProgress(goal: Goal): Goal {
+  const keyResults = goal.keyResults.map((kr) => {
+    const progress = krProgress(kr.start, kr.target, kr.current);
+    return { ...kr, progress, status: goalStatus(progress) };
+  });
+  return recalcGoal({ ...goal, keyResults });
 }
 
 interface AppStore {
@@ -81,7 +95,32 @@ interface AppStore {
 
 export const useStore = create<AppStore>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      /** Version-checked, per-entity-serialized PUT; conflicts refresh from the
+       *  server row and notify App (bridge-write-conflict → toast). */
+      const putVersioned = (kind: 'goals' | 'tasks', id: string) => {
+        const find = () => (kind === 'goals'
+          ? get().goals.find((g) => g.id === id)
+          : get().tasks.find((t) => t.id === id));
+        const full = find();
+        if (!full) return;
+        bridgePutEntity(kind, full as unknown as Record<string, unknown> & { id: string }, {
+          getVersion: () => find()?.version,
+          onVersion: (version) => set((s) => (kind === 'goals'
+            ? { goals: s.goals.map((g) => (g.id === id ? { ...g, version } : g)) }
+            : { tasks: s.tasks.map((t) => (t.id === id ? { ...t, version } : t)) })),
+          onConflict: (current) => {
+            get()._mergeChanges(kind === 'goals'
+              ? { goals: [current as Goal] }
+              : { tasks: [current as Task] });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('bridge-write-conflict'));
+            }
+          },
+        });
+      };
+
+      return {
       goals: createInitialGoals(),
       tasks: createInitialTasks(),
       kpis: createInitialKPIs(),
@@ -130,10 +169,10 @@ export const useStore = create<AppStore>()(
         bridgePost(`/api/goals/${goalId}/check-in`, { krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor }).catch(bridgeWriteFailed);
         // The client owns progress semantics (krProgress); the PUT persists the
         // recalculated goal and bumps updated_at so other clients' polls see it.
-        bridgePut(`/api/goals/${goalId}`, updated).catch(bridgeWriteFailed);
+        putVersioned('goals', goalId);
       },
 
-      setMonitor: (type, id, days) =>
+      setMonitor: (type, id, days) => {
         set((s) => {
           const monitorUntil = days === null
             ? undefined
@@ -151,7 +190,14 @@ export const useStore = create<AppStore>()(
               c.id === id ? { ...c, monitorUntil } : c,
             ),
           };
-        }),
+        });
+        if (type === 'goal') {
+          putVersioned('goals', id);
+        } else {
+          const full = get().clients.find((c) => c.id === id);
+          if (full) bridgePut(`/api/clients/${id}`, full).catch(bridgeWriteFailed);
+        }
+      },
 
       syncLiveKR: (goalId, krId, current) =>
         set((s) => {
@@ -256,11 +302,10 @@ export const useStore = create<AppStore>()(
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)),
         }));
-        const full = get().tasks.find((t) => t.id === id);
-        if (full) bridgePut(`/api/tasks/${id}`, full).catch(bridgeWriteFailed);
+        putVersioned('tasks', id);
       },
 
-      toggleSubtask: (taskId, subtaskIndex) =>
+      toggleSubtask: (taskId, subtaskIndex) => {
         set((s) => ({
           tasks: s.tasks.map((t) => {
             if (t.id !== taskId) return t;
@@ -268,16 +313,22 @@ export const useStore = create<AppStore>()(
             subtasks[subtaskIndex] = { ...subtasks[subtaskIndex], done: !subtasks[subtaskIndex].done };
             return { ...t, subtasks };
           }),
-        })),
+        }));
+        putVersioned('tasks', taskId);
+      },
 
-      addBulkTasks: (newTasks) => set((s) => ({ tasks: [...newTasks, ...s.tasks] })),
+      addBulkTasks: (newTasks) => {
+        set((s) => ({ tasks: [...newTasks, ...s.tasks] }));
+        for (const t of newTasks) {
+          bridgePost('/api/tasks', t).catch(bridgeWriteFailed);
+        }
+      },
 
       updateTask: (id, updates) => {
         set((s) => ({
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         }));
-        const full = get().tasks.find((t) => t.id === id);
-        if (full) bridgePut(`/api/tasks/${id}`, full).catch(bridgeWriteFailed);
+        putVersioned('tasks', id);
       },
 
       deleteTask: (id) => {
@@ -295,8 +346,7 @@ export const useStore = create<AppStore>()(
           goals[idx] = recalcGoal({ ...goals[idx], ...updates });
           return { goals };
         });
-        const full = get().goals.find((g) => g.id === id);
-        if (full) bridgePut(`/api/goals/${id}`, full).catch(bridgeWriteFailed);
+        putVersioned('goals', id);
       },
 
       deleteGoal: (id) => {
@@ -473,6 +523,7 @@ export const useStore = create<AppStore>()(
       },
 
       materializeTemplate: (templateId, clientIds, ownerIndex = 0) => {
+        if (!hasFeature('fleet', getRuntimeMode())) return;
         const s = get();
         const template = s.goalTemplates.find((t) => t.id === templateId);
         if (!template) return;
@@ -526,6 +577,7 @@ export const useStore = create<AppStore>()(
       },
 
       syncTemplateToGoals: (templateId) => {
+        if (!hasFeature('fleet', getRuntimeMode())) return;
         set((s) => {
           const template = s.goalTemplates.find((t) => t.id === templateId);
           if (!template) return {};
@@ -593,13 +645,13 @@ export const useStore = create<AppStore>()(
           return { goals };
         });
         for (const goal of get().goals.filter((g) => g.templateId === templateId)) {
-          bridgePut(`/api/goals/${goal.id}`, goal).catch(bridgeWriteFailed);
+          putVersioned('goals', goal.id);
         }
       },
 
       // Bridge sync actions
       _initFromBridge: (state) => set(() => ({
-        goals: state.goals ?? [],
+        goals: (state.goals ?? []).map(withRecomputedProgress),
         tasks: state.tasks ?? [],
         kpis: state.kpis ?? [],
         clients: state.clients ?? [],
@@ -612,11 +664,11 @@ export const useStore = create<AppStore>()(
         const result: Partial<Pick<AppStore, 'goals' | 'tasks' | 'kpis' | 'clients' | 'users' | 'teams' | 'goalTemplates'>> = {};
 
         if (changes.goals) {
-          const changedMap = new Map(changes.goals.map((g) => [g.id, g]));
+          const changedMap = new Map(changes.goals.map((g) => [g.id, withRecomputedProgress(g)]));
           const merged = s.goals.map((g) => changedMap.get(g.id) ?? g);
           const existingIds = new Set(s.goals.map((g) => g.id));
           for (const g of changes.goals) {
-            if (!existingIds.has(g.id)) merged.push(g);
+            if (!existingIds.has(g.id)) merged.push(changedMap.get(g.id) ?? g);
           }
           result.goals = merged;
         }
@@ -683,7 +735,8 @@ export const useStore = create<AppStore>()(
 
         return result;
       }),
-    }),
+      };
+    },
     {
       name: 'broadcastokr-data',
       version: 1,

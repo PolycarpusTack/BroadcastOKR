@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BRIDGE_URL, BRIDGE_POLL_INTERVAL_MS, BRIDGE_API_KEY } from '../constants/config';
-import type { Goal, SyncStatus } from '../types';
-import { buildLiveKRQueries, mapResultsToKrIds, type LiveKRBatchResult } from '../utils/liveSync';
+import { BRIDGE_POLL_INTERVAL_MS } from '../constants/config';
+import type { DBConnection } from '../types';
+import { bridgeFetch } from '../store/bridgeSync';
 
 // Electron API type (available when running in Electron)
 interface ElectronAPI {
@@ -54,18 +54,7 @@ export interface KPIDefinition {
   binds?: Record<string, unknown>;
 }
 
-export interface DBConnection {
-  id: string;
-  name: string;
-  type: 'oracle' | 'postgres';
-  host: string;
-  port: number;
-  service: string;
-  schema: string;
-  user: string;
-  password: string;
-  clientDir?: string;
-}
+export type { DBConnection } from '../types';
 
 export interface TableInfo {
   TABLE_NAME: string;
@@ -78,19 +67,9 @@ export interface ColumnInfo {
   DATA_LENGTH: number;
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const authHeaders: Record<string, string> = BRIDGE_API_KEY
-    ? { Authorization: `Bearer ${BRIDGE_API_KEY}` }
-    : {};
-  const res = await fetch(`${BRIDGE_URL}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...authHeaders, ...options?.headers },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
-  }
-  return res.json();
+/** Interactive calls fail fast — no retry; the unified client adds auth + timeout. */
+function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  return bridgeFetch<T>(path, options, { retries: 0 });
 }
 
 const isElectron = () => !!window.electronAPI?.isElectron;
@@ -102,6 +81,7 @@ export interface DriverStatus {
 
 export interface BridgeHealth {
   status: string;
+  mode?: string;
   timestamp: string;
   uptime: number;
   drivers: DriverStatus;
@@ -116,7 +96,6 @@ export function useBridge() {
   const [drivers, setDrivers] = useState<DriverStatus>({ oracle: false, postgres: false });
   const [health, setHealth] = useState<BridgeHealth | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const krSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Check bridge health via HTTP
   const checkHealth = useCallback(async () => {
@@ -165,42 +144,12 @@ export function useBridge() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (krSyncRef.current) {
-      clearInterval(krSyncRef.current);
-      krSyncRef.current = null;
-    }
   }, []);
 
-  /** Auto-sync all live KRs by reading goals from the store and calling execute-batch */
-  const autoSyncLiveKRs = useCallback(async (
-    getGoals: () => Goal[],
-    onResults: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void,
-  ) => {
-    const queries = buildLiveKRQueries(getGoals());
-    if (queries.length === 0) return;
-    try {
-      const { results } = await apiFetch<{ results: LiveKRBatchResult[] }>('/api/kpi/execute-batch', {
-        method: 'POST',
-        body: JSON.stringify({ queries }),
-      });
-      onResults(mapResultsToKrIds(results, queries));
-    } catch {
-      // Bridge might be down — skip this cycle
-    }
+  /** Trigger one bridge-side live-KR sync pass (the loop itself runs on the bridge). */
+  const syncLiveKRsNow = useCallback(async () => {
+    return apiFetch<{ ok: boolean; synced: number; total: number }>('/api/kpi/sync-now', { method: 'POST' });
   }, []);
-
-  /** Start periodic auto-sync for live KRs */
-  const startKRAutoSync = useCallback((
-    getGoals: () => Goal[],
-    onResults: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void,
-    intervalMs = BRIDGE_POLL_INTERVAL_MS,
-  ) => {
-    if (krSyncRef.current) clearInterval(krSyncRef.current);
-    // Initial sync
-    autoSyncLiveKRs(getGoals, onResults);
-    // Periodic sync
-    krSyncRef.current = setInterval(() => autoSyncLiveKRs(getGoals, onResults), intervalMs);
-  }, [autoSyncLiveKRs]);
 
   // Start bridge service (Electron: via IPC, Web: just check health)
   const startBridge = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
@@ -387,7 +336,7 @@ export function useBridge() {
     startBridge,
     stopBridge,
     syncNow,
-    startKRAutoSync,
+    syncLiveKRsNow,
     testConnection,
     getTables,
     getColumns,

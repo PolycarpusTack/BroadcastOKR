@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { FLEET_IN_BUILD } from '../../editions/entitlements';
 import type { Theme, RolePermissions } from '../../types';
 import { PRIMARY_COLOR, FONT_HEADING, FONT_MONO } from '../../constants/config';
 import { ConnectionIndicator } from './ConnectionIndicator';
@@ -15,7 +16,7 @@ const PAGE_INFO: Record<string, { icon: string; label: string; desc: string }> =
   '/tasks': { icon: '\u2705', label: 'Tasks', desc: 'Broadcast operations workflow and task management' },
   '/team': { icon: '\u{1F465}', label: 'Team', desc: 'Operations crew and team workload' },
   '/reports': { icon: '\u{1F4C8}', label: 'Reports', desc: 'Analytics, compliance, and operational reporting' },
-  '/compare': { icon: '\u{1F9EE}', label: 'Compare', desc: 'Cross-client health check comparison' },
+  ...(FLEET_IN_BUILD ? { '/compare': { icon: '\u{1F9EE}', label: 'Compare', desc: 'Cross-client health check comparison' } } : {}),
   '/clients': { icon: '\u2699\uFE0F', label: 'Settings', desc: 'Manage clients, database connections, and channels' },
 };
 

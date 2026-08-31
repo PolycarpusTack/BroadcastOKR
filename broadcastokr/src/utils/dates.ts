@@ -17,8 +17,8 @@ export function getUrgencyBadge(days: number, _dark: boolean): UrgencyBadge {
   return { text: `${days}d`, bg: '#1C2333', fg: '#5E6F8A', pulse: false };
 }
 
-export function formatTime(): string {
-  return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+export function formatTime(date: Date = new Date()): string {
+  return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 /** Human-readable elapsed time from an ISO timestamp, e.g. "12m ago", "3h ago". */

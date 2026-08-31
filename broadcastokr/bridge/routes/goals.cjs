@@ -16,6 +16,7 @@ function toGoalDTO(goalRow, krs, historyMap) {
     channelScope: goalRow.channel_scope ? JSON.parse(goalRow.channel_scope) : undefined,
     templateId: goalRow.template_id || undefined,
     monitorUntil: goalRow.monitor_until || undefined,
+    version: goalRow.version ?? 0,
     keyResults: krs.map(kr => ({
       id: kr.id,
       title: kr.title,
@@ -72,6 +73,24 @@ function upsertKeyResults(db, goalId, keyResults) {
   }
 }
 
+/** Full DTO for one goal (KRs + history), or null when it doesn't exist. */
+function getGoalDTO(db, id) {
+  const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(id);
+  if (!goal) return null;
+  const krs = db.prepare('SELECT * FROM key_results WHERE goal_id = ? ORDER BY sort_order').all(id);
+  const historyByKR = new Map();
+  for (const kr of krs) {
+    const history = db.prepare('SELECT * FROM kr_history WHERE kr_id = ? ORDER BY timestamp DESC').all(kr.id);
+    if (history.length > 0) {
+      historyByKR.set(kr.id, history.map(h => ({
+        timestamp: h.timestamp, value: h.value, confidence: h.confidence || undefined,
+        note: h.note || undefined, actor: h.actor, source: h.source,
+      })));
+    }
+  }
+  return toGoalDTO(goal, krs, historyByKR);
+}
+
 function createGoalsRouter(db) {
   const router = express.Router();
 
@@ -106,22 +125,9 @@ function createGoalsRouter(db) {
 
   // GET /api/goals/:id
   router.get('/:id', (req, res) => {
-    const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(req.params.id);
-    if (!goal) return res.status(404).json({ error: 'Goal not found' });
-
-    const krs = db.prepare('SELECT * FROM key_results WHERE goal_id = ? ORDER BY sort_order').all(req.params.id);
-    const historyByKR = new Map();
-    for (const kr of krs) {
-      const history = db.prepare('SELECT * FROM kr_history WHERE kr_id = ? ORDER BY timestamp DESC').all(kr.id);
-      if (history.length > 0) {
-        historyByKR.set(kr.id, history.map(h => ({
-          timestamp: h.timestamp, value: h.value, confidence: h.confidence || undefined,
-          note: h.note || undefined, actor: h.actor, source: h.source,
-        })));
-      }
-    }
-
-    res.json(toGoalDTO(goal, krs, historyByKR));
+    const dto = getGoalDTO(db, req.params.id);
+    if (!dto) return res.status(404).json({ error: 'Goal not found' });
+    res.json(dto);
   });
 
   // POST /api/goals — create
@@ -141,25 +147,34 @@ function createGoalsRouter(db) {
     res.status(201).json({ ok: true, id: g.id });
   });
 
-  // PUT /api/goals/:id — update
+  // PUT /api/goals/:id — update. When the body carries `version`, the write is
+  // compare-and-swap: stale versions 409 with the current row. Bodies without
+  // a version keep last-write-wins (older clients).
   router.put('/:id', (req, res) => {
     const g = req.body;
     const existing = db.prepare('SELECT id FROM goals WHERE id = ?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Goal not found' });
 
-    db.prepare(`UPDATE goals SET title=?, status=?, progress=?, owner=?, channel=?, period=?,
-      client_ids=?, channel_scope=?, template_id=?, monitor_until=?, updated_at=datetime('now')
-      WHERE id=?`)
+    const checked = typeof g.version === 'number';
+    const result = db.prepare(`UPDATE goals SET title=?, status=?, progress=?, owner=?, channel=?, period=?,
+      client_ids=?, channel_scope=?, template_id=?, monitor_until=?, version=version+1, updated_at=datetime('now')
+      WHERE id=?${checked ? ' AND version=?' : ''}`)
       .run(g.title, g.status, g.progress, g.owner, g.channel, g.period,
         g.clientIds ? JSON.stringify(g.clientIds) : null,
         g.channelScope ? JSON.stringify(g.channelScope) : null,
-        g.templateId || null, g.monitorUntil || null, req.params.id);
+        g.templateId || null, g.monitorUntil || null,
+        ...(checked ? [req.params.id, g.version] : [req.params.id]));
+
+    if (result.changes === 0) {
+      return res.status(409).json({ error: 'version_conflict', current: getGoalDTO(db, req.params.id) });
+    }
 
     if (g.keyResults) {
       upsertKeyResults(db, req.params.id, g.keyResults);
     }
 
-    res.json({ ok: true });
+    const row = db.prepare('SELECT version FROM goals WHERE id = ?').get(req.params.id);
+    res.json({ ok: true, version: row.version });
   });
 
   // DELETE /api/goals/:id

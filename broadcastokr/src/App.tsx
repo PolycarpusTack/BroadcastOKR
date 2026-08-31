@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import './styles/accessibility.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
@@ -12,14 +12,19 @@ const GoalsPage = lazy(() => import('./pages/GoalsPage').then((m) => ({ default:
 const TasksPage = lazy(() => import('./pages/TasksPage').then((m) => ({ default: m.TasksPage })));
 const TeamPage = lazy(() => import('./pages/TeamPage').then((m) => ({ default: m.TeamPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const ClientsPage = lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage })));
-const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })));
+// Fleet pages are excluded from client-edition bundles at build time
+// (FLEET_IN_BUILD folds to false), and gated at runtime everywhere else.
+const ClientsPage = FLEET_IN_BUILD ? lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage }))) : null;
+const ComparePage = FLEET_IN_BUILD ? lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage }))) : null;
 import { useBridge } from './hooks/useBridge';
 import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
-import { performInitialSync, fetchChanges } from './store/bridgeSync';
+import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
+import { useActivityLog } from './context/ActivityLogContext';
+import { DeploymentProvider } from './context/DeploymentContext';
+import { BUILD_EDITION, FLEET_IN_BUILD, setRuntimeMode, hasFeature, type TenancyMode } from './editions/entitlements';
 import { logger } from './utils/logger';
 
 export default function App() {
@@ -36,7 +41,6 @@ export default function App() {
     startBridge,
     stopBridge,
     syncNow,
-    startKRAutoSync,
     testConnection,
     getConnections,
     getChannels,
@@ -53,17 +57,15 @@ export default function App() {
   } = bridge;
   const { theme } = useTheme();
   const { toast } = useToast();
-  const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
+  const { hydrateLog } = useActivityLog();
 
-  // Start periodic auto-sync for live KRs when bridge is connected
-  useEffect(() => {
-    if (connected) {
-      startKRAutoSync(
-        () => useStore.getState().goals,
-        syncLiveKRBatch,
-      );
-    }
-  }, [connected, startKRAutoSync, syncLiveKRBatch]);
+  // Tenancy: the bridge's health.mode wins over the build-time edition
+  const mode: TenancyMode = useMemo(() => {
+    const m = health?.mode;
+    return m === 'desktop' || m === 'client' || m === 'cockpit' ? m : BUILD_EDITION;
+  }, [health?.mode]);
+  useEffect(() => { setRuntimeMode(mode); }, [mode]);
+  const fleet = hasFeature('fleet', mode);
 
   // Fetch full state from bridge on connect, then poll for changes
   useEffect(() => {
@@ -82,6 +84,10 @@ export default function App() {
       .then((state) => {
         useStore.getState()._initFromBridge(state);
         lastSync = state.timestamp || lastSync;
+        // Hydrate the activity log from its persisted history
+        return bridgeFetch<Array<{ id: number; timestamp: string; actor: string; text: string; color: string | null }>>(
+          '/api/activity', undefined, { retries: 0 },
+        ).then(hydrateLog).catch(() => {});
       })
       .catch((err) => {
         // Local state is deliberately left untouched on failure.
@@ -99,7 +105,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [connected, toast]);
+  }, [connected, toast, hydrateLog]);
 
   // Global error handlers
   useEffect(() => {
@@ -130,20 +136,27 @@ export default function App() {
       toast('Change not saved to server — kept locally', COLOR_WARNING, '⚠️');
     };
 
+    const handleWriteConflict = () => {
+      toast('Updated elsewhere — refreshed with the latest version', COLOR_WARNING, '🔄');
+    };
+
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     window.addEventListener('error', handleError);
     window.addEventListener('storage-quota-exceeded', handleStorageQuota);
     window.addEventListener('bridge-write-failed', handleBridgeWriteFailed);
+    window.addEventListener('bridge-write-conflict', handleWriteConflict);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleError);
       window.removeEventListener('storage-quota-exceeded', handleStorageQuota);
       window.removeEventListener('bridge-write-failed', handleBridgeWriteFailed);
+      window.removeEventListener('bridge-write-conflict', handleWriteConflict);
     };
   }, [toast]);
 
   return (
+    <DeploymentProvider mode={mode}>
     <AppShell onCreateTask={() => setCreateTaskOpen(true)} connected={connected} bridgeRunning={bridgeRunning}>
       <ErrorBoundary>
         <Suspense fallback={
@@ -177,12 +190,20 @@ export default function App() {
               executeBatch={executeBatch}
             />
           } />
-          <Route path="/clients" element={
-            <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
-          } />
-          <Route path="/compare" element={
-            <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
-          } />
+          {FLEET_IN_BUILD && ClientsPage && (
+            <Route path="/clients" element={
+              fleet
+                ? <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
+                : <Navigate to="/dashboard" replace />
+            } />
+          )}
+          {FLEET_IN_BUILD && ComparePage && (
+            <Route path="/compare" element={
+              fleet
+                ? <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
+                : <Navigate to="/dashboard" replace />
+            } />
+          )}
           <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
           <Route path="/team" element={<TeamPage />} />
           <Route path="/reports" element={<ReportsPage />} />
@@ -208,5 +229,6 @@ export default function App() {
         deleteConnection={deleteConnection}
       />
     </AppShell>
+    </DeploymentProvider>
   );
 }

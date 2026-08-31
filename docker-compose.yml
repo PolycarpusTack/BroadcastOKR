@@ -11,6 +11,9 @@ services:
       - bridge-backups:/app/backups
     env_file:
       - ./broadcastokr/bridge/.env
+    environment:
+      # The bridge binds 127.0.0.1 by default; containers must listen on all interfaces.
+      BRIDGE_HOST: 0.0.0.0
     restart: unless-stopped
 
 volumes:

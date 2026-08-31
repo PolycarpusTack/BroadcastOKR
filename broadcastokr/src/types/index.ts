@@ -110,6 +110,8 @@ export interface Goal {
   channelScope?: ChannelScope;
   templateId?: string;
   monitorUntil?: string;
+  /** Optimistic-concurrency counter, maintained by the bridge */
+  version?: number;
 }
 
 export interface Subtask {
@@ -131,6 +133,8 @@ export interface Task {
   clientIds?: string[];
   channelScope?: ChannelScope;
   goalId?: string;
+  /** Optimistic-concurrency counter, maintained by the bridge */
+  version?: number;
 }
 
 export interface KPI {
@@ -173,6 +177,20 @@ export interface Toast {
   bg: string;
   icon: string;
   exiting: boolean;
+}
+
+/** A WHATS'ON database connection as stored on the bridge */
+export interface DBConnection {
+  id: string;
+  name: string;
+  type: 'oracle' | 'postgres';
+  host: string;
+  port: number;
+  service: string;
+  schema: string;
+  user: string;
+  password: string;
+  clientDir?: string;
 }
 
 export interface ActivityEntry {

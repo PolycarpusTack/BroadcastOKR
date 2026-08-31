@@ -1,15 +1,20 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useDeployment } from '../../context/DeploymentContext';
+import { FLEET_IN_BUILD } from '../../editions/entitlements';
 import type { Theme, User } from '../../types';
 import { Avatar } from '../ui/Avatar';
 import { PRIMARY_COLOR, PRIMARY_GRADIENT, COLOR_COBALT_MID, FONT_HEADING, FONT_BODY, FONT_MONO } from '../../constants/config';
 
+// Fleet entries fold out of client-edition bundles (FLEET_IN_BUILD is a
+// build-time constant); the runtime `can('fleet')` filter below handles a
+// full build served in client mode.
 const NAV = [
   { path: '/dashboard', label: 'Dashboard', icon: '\u{1F4CA}' },
   { path: '/goals', label: 'Goals', icon: '\u{1F3AF}' },
-  { path: '/compare', label: 'Compare', icon: '\u{1F50D}' },
+  ...(FLEET_IN_BUILD ? [{ path: '/compare', label: 'Compare', icon: '\u{1F50D}', fleet: true }] : []),
   { path: '/tasks', label: 'Tasks', icon: '\u2705' },
   { path: '/team', label: 'Team', icon: '\u{1F465}' },
-  { path: '/clients', label: 'Settings', icon: '\u2699\uFE0F' },
+  ...(FLEET_IN_BUILD ? [{ path: '/clients', label: 'Settings', icon: '\u2699\uFE0F', fleet: true }] : []),
   { path: '/reports', label: 'Reports', icon: '\u{1F4C8}' },
 ];
 
@@ -25,6 +30,8 @@ interface SidebarProps {
 export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { can } = useDeployment();
+  const nav = NAV.filter((item) => !item.fleet || can('fleet'));
 
   return (
     <aside
@@ -85,7 +92,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
         <div style={{ padding: '6px 20px 4px', fontSize: '9.5px', textTransform: 'uppercase' as const, letterSpacing: '1.2px', color: '#3D4F68', fontWeight: 600 }}>
           {open ? 'Navigation' : ''}
         </div>
-        {NAV.map((n) => {
+        {nav.map((n) => {
           const active = location.pathname === n.path;
           return (
             <button

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { PillBadge } from '../ui/PillBadge';
+import { useDeployment } from '../../context/DeploymentContext';
 import { PRIMARY_COLOR, COLOR_DANGER, COLOR_SUCCESS, COLOR_INFO, FONT_HEADING, FONT_BODY } from '../../constants/config';
 import type { GoalTemplate, RolePermissions, Theme } from '../../types';
 
@@ -20,6 +21,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export const TemplateCard = memo(function TemplateCard({ template, theme, clientCount, permissions, onEdit, onMaterialize, onDelete }: TemplateCardProps) {
+  const { can } = useDeployment();
   const categoryColor = CATEGORY_COLORS[template.category] ?? PRIMARY_COLOR;
 
   return (
@@ -94,7 +96,7 @@ export const TemplateCard = memo(function TemplateCard({ template, theme, client
               \u270E Edit
             </button>
           )}
-          {permissions.canCreate && (
+          {permissions.canCreate && can('fleet') && (
             <button
               onClick={onMaterialize}
               style={{
