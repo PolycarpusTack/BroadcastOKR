@@ -330,8 +330,11 @@ app.post('/api/test-connection', async (req, res) => {
       if (!pg) return res.json({ ok: false, message: 'pg driver not installed. Run: npm install pg' });
       const client = new pg.Client({ host, port, database: service, user, password: decryptedPassword });
       await client.connect();
-      await client.query('SELECT 1 AS test');
-      await client.end();
+      try {
+        await client.query('SELECT 1 AS test');
+      } finally {
+        await client.end().catch(() => {});
+      }
     } else {
       if (!oracledb) return res.json({ ok: false, message: 'oracledb driver not installed. Run: npm install oracledb' });
       try { oracledb.initOracleClient({ libDir: clientDir || undefined }); } catch {}
@@ -339,8 +342,11 @@ app.post('/api/test-connection', async (req, res) => {
         user, password: decryptedPassword,
         connectString: `${host}:${port}/${service}`,
       });
-      await conn.execute(getTestQuery({ type: 'oracle' }));
-      await conn.close();
+      try {
+        await conn.execute(getTestQuery({ type: 'oracle' }));
+      } finally {
+        await conn.close().catch(() => {});
+      }
     }
     res.json({ ok: true, message: `${dbType === 'postgres' ? 'PostgreSQL' : 'Oracle'} connection successful` });
   } catch (err) {
