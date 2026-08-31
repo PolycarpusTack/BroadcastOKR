@@ -10,6 +10,8 @@ interface HelpModalProps {
   open: boolean;
   onClose: () => void;
   theme: Theme;
+  /** Opens the O'Reilly-style developer guide (rendered by AppShell) */
+  onOpenDevGuide?: () => void;
 }
 
 interface Section {
@@ -19,7 +21,7 @@ interface Section {
   body: () => React.ReactNode;
 }
 
-export function HelpModal({ open, onClose, theme }: HelpModalProps) {
+export function HelpModal({ open, onClose, theme, onOpenDevGuide }: HelpModalProps) {
   const [active, setActive] = useState('start');
 
   // ---- small inline helpers (theme-aware, For-Dummies styling) ----
@@ -90,6 +92,39 @@ export function HelpModal({ open, onClose, theme }: HelpModalProps) {
             <span style={{ color: COLOR_SUCCESS, fontWeight: 700 }}> green = on track</span>,
             <span style={{ color: COLOR_WARNING, fontWeight: 700 }}> amber = at risk</span>,
             <span style={{ color: COLOR_DANGER, fontWeight: 700 }}> red = behind</span>. Once you learn it here, you know it everywhere.
+          </Callout>
+        </>
+      ),
+    },
+    {
+      id: 'setup', icon: '\u{1F50C}', title: 'Set It Up',
+      body: () => (
+        <>
+          <H>Getting BrOKR running — two flavours.</H>
+          <P>
+            You only do this once, and there's a good chance someone already did it for you. If the app is
+            open right now, congratulations, setup is done — skip to the next chapter.
+          </P>
+          <Sub>Flavour 1: The desktop app (most people)</Sub>
+          <Steps items={[
+            <>Run the installer for your platform (Windows installer, Linux AppImage/deb, or macOS dmg) and open <b>BroadcastOKR</b>.</>,
+            <>Click <b>Start Bridge Service</b> when prompted — the app starts its own live-data helper. Watch the header dot turn green.</>,
+            <>That's it. Your work saves locally and automatically from the first click.</>,
+          ]} />
+          <Sub>Flavour 2: In the browser (shared team setup)</Sub>
+          <Steps items={[
+            <>Someone on your team runs the <b>bridge</b> on a shared machine (IT has a runbook for this).</>,
+            <>Open the app URL they give you — the header dot goes green when the bridge is reachable.</>,
+            <>Everyone connected to the same bridge sees the same goals, tasks, and check-ins.</>,
+          ]} />
+          <Jargon term="First connect">Already been working solo? The moment you connect to a fresh shared bridge, the app uploads your existing local data to it. Nothing is lost — your goals simply become the team's goals.</Jargon>
+          <Callout kind="tip">
+            To pull <b>live numbers</b> from WHATS'ON you'll also add a database connection — that's covered
+            in the "Live Data &amp; the Bridge" chapter. You can use everything else without it.
+          </Callout>
+          <Callout kind="watch">
+            Green dot but no live numbers? A bridge connection and a <i>database</i> connection are two
+            different things. The dot only tells you about the first one.
           </Callout>
         </>
       ),
@@ -299,6 +334,18 @@ export function HelpModal({ open, onClose, theme }: HelpModalProps) {
               </button>
             );
           })}
+          {onOpenDevGuide && (
+            <button
+              onClick={onOpenDevGuide}
+              style={{
+                marginTop: 'auto', textAlign: 'left', padding: '9px 11px', borderRadius: 8,
+                cursor: 'pointer', border: `1px dashed ${theme.borderLight}`, background: 'transparent',
+                color: theme.textMuted, fontSize: 12, fontWeight: 600,
+              }}
+            >
+              {'\u{1F4D6}'} Building or deploying BrOKR? Developer Guide {'→'}
+            </button>
+          )}
         </nav>
 
         {/* Right: chapter content */}
