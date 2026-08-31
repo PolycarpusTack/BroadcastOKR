@@ -156,6 +156,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ── Static app serving (cloud modes: one container = bridge + app) ──
+
+if (MODE !== 'desktop') {
+  const APP_DIR = process.env.BRIDGE_APP_DIR || path.join(__dirname, '..', 'dist');
+  app.use(express.static(APP_DIR));
+  // SPA fallback for everything that isn't the API
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.sendFile(path.join(APP_DIR, 'index.html'));
+  });
+}
+
 const { globalErrorHandler } = require('./middleware/errorHandler.cjs');
 app.use(globalErrorHandler);
 

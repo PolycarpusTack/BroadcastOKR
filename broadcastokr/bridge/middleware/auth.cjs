@@ -15,7 +15,9 @@ function safeEqual(a, b) {
  */
 function createAuthMiddleware(apiKey) {
   return function authMiddleware(req, res, next) {
-    // Skip auth for health endpoint
+    // Only API routes are guarded — static app assets (cloud modes) are
+    // public; the data behind them is not. Health stays open for probes.
+    if (!req.path.startsWith('/api/')) return next();
     if (req.path === '/api/health') return next();
 
     // If no API key configured, skip auth (development mode)
