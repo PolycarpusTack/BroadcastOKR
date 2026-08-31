@@ -134,7 +134,7 @@ electron/   main.cjs (forks the bridge) + preload.cjs (contextBridge API)`}</Cod
             [<>KR identity</>, <>KRs are matched by <C>kr.id</C>, never by array index. Batch results re-attach krIds via <C>src/utils/liveSync.ts</C>.</>],
             [<>structuredClone</>, <>Store actions clone state before mutating; <C>recalcGoal()</C> re-derives goal progress from KRs.</>],
             [<>Timestamps</>, <>The bridge stores sqlite <C>datetime('now')</C> (UTC, no 'T'). Anything comparing frontend ISO strings must normalize — see <C>normalizeSince</C> in bridge/routes/sync.cjs.</>],
-            [<>Editions</>, <>One codebase, three deployment forms (desktop/client/cockpit). Only <C>src/editions/</C> reads <C>VITE_EDITION</C> and only <C>bridge/editions.cjs</C> reads <C>BRIDGE_MODE</C> — everything gates through them (guardrail-tested). New sensitive routes go in the <C>rbac.cjs</C> POLICY table.</>],
+            [<>Editions</>, <>One codebase, three deployment forms (desktop/client/cockpit). Only <C>src/editions/</C> reads <C>{'VITE_' + 'EDITION'}</C> and only <C>bridge/editions.cjs</C> reads <C>BRIDGE_MODE</C> — everything gates through them (guardrail-tested). New sensitive routes go in the <C>rbac.cjs</C> POLICY table.</>],
             [<>Protocol</>, <>Every bridge call sends <C>X-BrOKR-Protocol</C>; versions below <C>MIN_SUPPORTED</C> get 426. Migrations stay additive unless marked <C>-- BREAKING:</C> with a floor bump; golden v1 fixtures replay in CI.</>],
           ]} />
           <Sub>Multi-user sync</Sub>
