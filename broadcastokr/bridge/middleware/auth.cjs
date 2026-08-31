@@ -27,6 +27,8 @@ function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = f
     if (!req.path.startsWith('/api/')) return next();
     if (req.path === '/api/health') return next();
     if (req.path.startsWith('/api/auth/')) return next();
+    // Machine endpoints carry their own credentials (share/agent tokens)
+    if (req.path === '/api/cockpit/ingest' || req.path.startsWith('/api/agent/')) return next();
 
     if (mode === 'desktop') {
       // If no API key configured, skip auth (development mode)
