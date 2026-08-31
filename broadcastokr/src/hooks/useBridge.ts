@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BRIDGE_URL, BRIDGE_POLL_INTERVAL_MS, BRIDGE_API_KEY } from '../constants/config';
 import type { Goal, SyncStatus } from '../types';
+import { buildLiveKRQueries, mapResultsToKrIds, type LiveKRBatchResult } from '../utils/liveSync';
 
 // Electron API type (available when running in Electron)
 interface ElectronAPI {
@@ -175,31 +176,14 @@ export function useBridge() {
     getGoals: () => Goal[],
     onResults: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void,
   ) => {
-    const goals = getGoals();
-    const queries: Array<{ goalId: string; krIndex: number; krId: string; connectionId: string; sql: string; timeframeDays?: number }> = [];
-    for (const goal of goals) {
-      goal.keyResults.forEach((kr, krIndex) => {
-        if (kr.liveConfig) {
-          queries.push({
-            goalId: goal.id,
-            krIndex,
-            krId: kr.id,
-            connectionId: kr.liveConfig.connectionId,
-            sql: kr.liveConfig.sql,
-            timeframeDays: kr.liveConfig.timeframeDays,
-          });
-        }
-      });
-    }
+    const queries = buildLiveKRQueries(getGoals());
     if (queries.length === 0) return;
     try {
-      const { results } = await apiFetch<{
-        results: Array<{ goalId: string; krIndex: number; status: 'ok' | 'error' | 'timeout' | 'no_data'; current?: number; error?: string }>;
-      }>('/api/kpi/execute-batch', {
+      const { results } = await apiFetch<{ results: LiveKRBatchResult[] }>('/api/kpi/execute-batch', {
         method: 'POST',
         body: JSON.stringify({ queries }),
       });
-      onResults(results.map((r, i) => ({ ...r, krId: queries[i]?.krId ?? '', status: r.status as SyncStatus })));
+      onResults(mapResultsToKrIds(results, queries));
     } catch {
       // Bridge might be down — skip this cycle
     }
