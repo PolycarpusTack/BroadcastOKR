@@ -1,4 +1,4 @@
-# Generated 2026-08-31T18:12:19Z — provisioning transcript (bridge/__tests__/provision.test.cjs)
+# Generated 2026-08-31T19:04:17Z — provisioning transcript (bridge/__tests__/provision.test.cjs)
   # Subtest: instance provisioning
       ok 1 - creates env + migrated db + pinned client, and refuses to overwrite
       ok 2 - the provisioned instance boots and serves the seeded client

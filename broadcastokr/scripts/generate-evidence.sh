@@ -36,4 +36,14 @@ stamp() { echo "# Generated $(date -u +%FT%TZ) — $1"; }
   node --test bridge/__tests__/provision.test.cjs 2>&1 | grep -E "^# Subtest|^# (tests|pass|fail)|ok [0-9]" | sed 's/^/  /'
 } > "$OUT/provisioning.txt"
 
+{
+  stamp "connector agent: enrolment, scalar-only ingest, revocation (bridge/__tests__/agent.test.cjs)"
+  node --test bridge/__tests__/agent.test.cjs 2>&1 | grep -E "^# Subtest|^# (tests|pass|fail)|ok [0-9]" | sed 's/^/  /'
+} > "$OUT/agent-lifecycle.txt"
+
+{
+  stamp "shared-metrics channel end-to-end + FF-4 projector (sharePayload + cockpit-channel tests)"
+  node --test bridge/__tests__/sharePayload.test.cjs bridge/__tests__/cockpit-channel.test.cjs 2>&1 | grep -E "^# Subtest|^# (tests|pass|fail)|ok [0-9]" | sed 's/^/  /'
+} > "$OUT/sharing-channel.txt"
+
 echo "evidence written to $OUT"

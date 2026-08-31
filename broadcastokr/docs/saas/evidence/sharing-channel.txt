@@ -1,0 +1,13 @@
+# Generated 2026-08-31T19:04:19Z — shared-metrics channel end-to-end + FF-4 projector (sharePayload + cockpit-channel tests)
+  # Subtest: shared-metrics channel end-to-end
+      ok 1 - only opted-in values arrive at the cockpit, under the tenant row
+      ok 2 - rejects wrong tokens and out-of-contract payloads
+  ok 1 - shared-metrics channel end-to-end
+  # Subtest: FF-4: share payload allowlist
+      ok 1 - serializes zero private sentinels and only allowlisted fields
+      ok 2 - carries the numeric facts and direction for the shared KR
+      ok 3 - unsharing removes the KR from the next payload
+  ok 2 - FF-4: share payload allowlist
+  # tests 5
+  # pass 5
+  # fail 0

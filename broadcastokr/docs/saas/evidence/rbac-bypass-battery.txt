@@ -1,4 +1,4 @@
-# Generated 2026-08-31T18:12:03Z — server-enforced RBAC UI-bypass battery (bridge/__tests__/rbac.test.cjs)
+# Generated 2026-08-31T19:04:01Z — server-enforced RBAC UI-bypass battery (bridge/__tests__/rbac.test.cjs)
   # Subtest: server-enforced RBAC (client mode)
       ok 1 - members can read, check in, and move tasks — but not create or delete
       ok 2 - members cannot touch credentials, config, raw SQL, or people
