@@ -74,6 +74,9 @@ app.use('/api/teams', createTeamsRouter(db));
 const { createSyncRouter } = require('./routes/sync.cjs');
 app.use('/api/sync', createSyncRouter(db, DB_PATH));
 
+const { createActivityRouter } = require('./routes/activity.cjs');
+app.use('/api/activity', createActivityRouter(db));
+
 // ── Config ──
 
 const CONFIG_PATH = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'config.json');

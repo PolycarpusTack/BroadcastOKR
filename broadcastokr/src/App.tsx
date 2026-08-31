@@ -19,7 +19,8 @@ import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
-import { performInitialSync, fetchChanges } from './store/bridgeSync';
+import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
+import { useActivityLog } from './context/ActivityLogContext';
 import { logger } from './utils/logger';
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
   } = bridge;
   const { theme } = useTheme();
   const { toast } = useToast();
+  const { hydrateLog } = useActivityLog();
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
 
   // Start periodic auto-sync for live KRs when bridge is connected
@@ -82,6 +84,10 @@ export default function App() {
       .then((state) => {
         useStore.getState()._initFromBridge(state);
         lastSync = state.timestamp || lastSync;
+        // Hydrate the activity log from its persisted history
+        return bridgeFetch<Array<{ id: number; timestamp: string; actor: string; text: string; color: string | null }>>(
+          '/api/activity', undefined, { retries: 0 },
+        ).then(hydrateLog).catch(() => {});
       })
       .catch((err) => {
         // Local state is deliberately left untouched on failure.
@@ -99,7 +105,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [connected, toast]);
+  }, [connected, toast, hydrateLog]);
 
   // Global error handlers
   useEffect(() => {
