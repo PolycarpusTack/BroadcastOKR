@@ -11,6 +11,8 @@ export interface GoalFormKR {
   target: number;
   /** If present, this KR is live — synced from a database */
   liveConfig?: LiveKRConfig;
+  /** Client-Edition opt-in: value may be shared with Mediagenix */
+  sharedWithMediagenix?: boolean;
 }
 
 export interface GoalFormKRListProps {
@@ -18,6 +20,8 @@ export interface GoalFormKRListProps {
   krs: GoalFormKR[];
   setKRs: (krs: GoalFormKR[]) => void;
   selectStyle: CSSProperties;
+  /** Owner-only, cloud editions: show the "shared with Mediagenix" toggle */
+  showSharing?: boolean;
   connections?: DBConnection[];
   getTables?: (connectionId: string) => Promise<TableInfo[]>;
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
@@ -25,7 +29,7 @@ export interface GoalFormKRListProps {
 }
 
 export function GoalFormKRList({
-  theme, krs, setKRs, selectStyle,
+  theme, krs, setKRs, selectStyle, showSharing,
   connections = [], getTables, getColumns, previewQuery,
 }: GoalFormKRListProps) {
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
@@ -121,6 +125,26 @@ export function GoalFormKRList({
                 }}
               >
                 {kr.liveConfig ? '\u{1F4E1} Live' : '\u270B Manual'}
+              </button>
+            )}
+            {showSharing && (
+              <button
+                onClick={() => updateKR(i, { sharedWithMediagenix: !kr.sharedWithMediagenix })}
+                title={kr.sharedWithMediagenix ? 'Shared with Mediagenix — click to stop sharing' : 'Not shared — click to share this value with Mediagenix'}
+                aria-pressed={kr.sharedWithMediagenix ? 'true' : 'false'}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  border: `1px solid ${kr.sharedWithMediagenix ? COLOR_INFO : theme.border}`,
+                  background: kr.sharedWithMediagenix ? `${COLOR_INFO}18` : 'transparent',
+                  color: kr.sharedWithMediagenix ? COLOR_INFO : theme.textMuted,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {kr.sharedWithMediagenix ? '\u{1F517} Shared' : '\u{1F512} Private'}
               </button>
             )}
             {krs.length > 1 && (

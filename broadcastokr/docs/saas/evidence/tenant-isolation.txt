@@ -1,0 +1,12 @@
+# Generated 2026-08-31T18:12:07Z — single-tenant isolation enforcement (bridge/__tests__/tenancy-mode.test.cjs)
+  # Subtest: tenancy mode: client
+      ok 1 - reports its mode on /api/health
+      ok 2 - allows exactly one client row and refuses a second
+      ok 3 - refuses deleting the last client
+  ok 1 - tenancy mode: client
+  # Subtest: tenancy mode: default (desktop)
+      ok 1 - reports desktop mode and allows multiple clients
+  ok 2 - tenancy mode: default (desktop)
+  # tests 4
+  # pass 4
+  # fail 0

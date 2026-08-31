@@ -14,7 +14,9 @@ const NAV = [
   ...(FLEET_IN_BUILD ? [{ path: '/compare', label: 'Compare', icon: '\u{1F50D}', fleet: true }] : []),
   { path: '/tasks', label: 'Tasks', icon: '\u2705' },
   { path: '/team', label: 'Team', icon: '\u{1F465}' },
-  ...(FLEET_IN_BUILD ? [{ path: '/clients', label: 'Settings', icon: '\u2699\uFE0F', fleet: true }] : []),
+  ...(FLEET_IN_BUILD
+    ? [{ path: '/clients', label: 'Settings', icon: '\u2699\uFE0F', fleet: true }]
+    : [{ path: '/clients', label: 'Settings', icon: '\u2699\uFE0F' }]),
   { path: '/reports', label: 'Reports', icon: '\u{1F4C8}' },
 ];
 

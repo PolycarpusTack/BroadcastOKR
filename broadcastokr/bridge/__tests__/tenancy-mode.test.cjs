@@ -24,6 +24,7 @@ describe('tenancy mode: client', () => {
       env: {
         ...process.env,
         BRIDGE_MODE: 'client',
+        BRIDGE_INSECURE_NO_AUTH: '1',
         BRIDGE_DB_PATH: ':memory:', BRIDGE_PORT: String(PORT),
         BRIDGE_HOST: '127.0.0.1', BRIDGE_API_KEY: '',
       },

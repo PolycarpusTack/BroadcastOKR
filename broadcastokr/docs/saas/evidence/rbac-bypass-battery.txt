@@ -1,0 +1,12 @@
+# Generated 2026-08-31T18:12:03Z — server-enforced RBAC UI-bypass battery (bridge/__tests__/rbac.test.cjs)
+  # Subtest: server-enforced RBAC (client mode)
+      ok 1 - members can read, check in, and move tasks — but not create or delete
+      ok 2 - members cannot touch credentials, config, raw SQL, or people
+      ok 3 - role escalation is owner-only, even for self
+      ok 4 - managers create and edit but cannot delete or manage clients
+      ok 5 - server-side audit recorded the sensitive actions with session actors
+      ok 6 - owners can do all of it
+  ok 1 - server-enforced RBAC (client mode)
+  # tests 6
+  # pass 6
+  # fail 0

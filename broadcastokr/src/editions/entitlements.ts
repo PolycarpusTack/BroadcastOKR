@@ -17,6 +17,8 @@ const FEATURES: Record<TenancyMode, Record<Feature, boolean>> = {
 };
 
 function normalize(value: unknown): TenancyMode | null {
+  // The build matrix calls the full cloud build "internal"; its runtime mode is cockpit.
+  if (value === 'internal') return 'cockpit';
   return value === 'desktop' || value === 'client' || value === 'cockpit' ? value : null;
 }
 

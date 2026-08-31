@@ -18,7 +18,7 @@ function mockRes() {
 }
 
 describe('auth middleware', () => {
-  const middleware = createAuthMiddleware('test-secret-key');
+  const middleware = createAuthMiddleware({ mode: 'desktop', apiKey: 'test-secret-key' });
 
   it('allows requests with valid bearer token', () => {
     const req = mockReq({ authorization: 'Bearer test-secret-key' });
