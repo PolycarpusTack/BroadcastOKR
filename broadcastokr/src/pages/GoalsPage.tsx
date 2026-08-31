@@ -3,6 +3,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useActivityLog } from '../context/ActivityLogContext';
+import { useDeployment } from '../context/DeploymentContext';
 import { useStore } from '../store/store';
 import { useShallow } from 'zustand/react/shallow';
 import { CHANNELS } from '../constants';
@@ -62,6 +63,9 @@ export function GoalsPage({
   const { currentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
+  const { mode } = useDeployment();
+  // Owner-only, cloud editions: KR-level "share with Mediagenix" toggle
+  const showSharing = mode !== 'desktop' && permissions.canDelete;
   const {
     goals, addGoal, checkInKR, updateGoal, deleteGoal, syncLiveKRBatch, setMonitor,
     goalTemplates, clients, users,
@@ -171,6 +175,7 @@ export function GoalsPage({
     status: 'behind' as const,
     liveConfig: kr.liveConfig,
     syncStatus: kr.liveConfig ? 'pending' : undefined,
+    sharedWithMediagenix: kr.sharedWithMediagenix,
   });
 
   const handleCreate = () => {
@@ -237,6 +242,7 @@ export function GoalsPage({
       start: kr.start,
       target: kr.target,
       liveConfig: kr.liveConfig,
+      sharedWithMediagenix: kr.sharedWithMediagenix,
     })));
     setEditClientIds(goal.clientIds ?? []);
     if (goal.channelScope?.type === 'selected') {
@@ -264,7 +270,8 @@ export function GoalsPage({
       const existing = kr.id ? existingGoal.keyResults.find((e) => e.id === kr.id) : undefined;
       // If nothing changed on this KR, preserve existing state
       if (existing && existing.title === kr.title && existing.start === kr.start && existing.target === kr.target
-        && JSON.stringify(existing.liveConfig) === JSON.stringify(kr.liveConfig)) {
+        && JSON.stringify(existing.liveConfig) === JSON.stringify(kr.liveConfig)
+        && !!existing.sharedWithMediagenix === !!kr.sharedWithMediagenix) {
         return existing;
       }
       const current = existing?.current ?? kr.start;
@@ -278,6 +285,7 @@ export function GoalsPage({
         progress,
         status: goalStatus(progress),
         liveConfig: kr.liveConfig,
+        sharedWithMediagenix: kr.sharedWithMediagenix,
         syncStatus: kr.liveConfig ? (existing?.syncStatus || 'pending') : undefined,
         syncError: kr.liveConfig ? existing?.syncError : undefined,
         lastSyncAt: kr.liveConfig ? existing?.lastSyncAt : undefined,
@@ -613,6 +621,7 @@ export function GoalsPage({
       <Modal open={createOpen} onClose={() => { setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannels([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <GoalFormFields
+            showSharing={showSharing}
             title={newTitle} setTitle={setNewTitle}
             channel={newChannel} setChannel={setNewChannel}
             owner={newOwner} setOwner={setNewOwner}
@@ -639,6 +648,7 @@ export function GoalsPage({
       <Modal open={!!editGoalId} onClose={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <GoalFormFields
+            showSharing={showSharing}
             title={editTitle} setTitle={setEditTitle}
             channel={editChannel} setChannel={setEditChannel}
             owner={editOwner} setOwner={setEditOwner}

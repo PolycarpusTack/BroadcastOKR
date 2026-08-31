@@ -19,6 +19,7 @@ interface GoalFormFieldsProps {
   setPeriod: (v: string) => void;
   krs: import('./GoalFormKRList').GoalFormKR[];
   setKRs: (v: import('./GoalFormKRList').GoalFormKR[]) => void;
+  showSharing?: boolean;
   theme: Theme;
   selectStyle: CSSProperties;
   /** Database connections available (empty = bridge not connected) */
@@ -43,7 +44,7 @@ const PERIODS = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Annual 2026'];
 
 export function GoalFormFields({
   title, setTitle, channel, setChannel, owner, setOwner,
-  period, setPeriod, krs, setKRs, theme, selectStyle,
+  period, setPeriod, krs, setKRs, theme, selectStyle, showSharing,
   connections = [], getTables, getColumns, previewQuery,
   clients = [],
   selectedClientIds = [], setSelectedClientIds,
@@ -107,6 +108,7 @@ export function GoalFormFields({
         krs={krs}
         setKRs={setKRs}
         selectStyle={selectStyle}
+        showSharing={showSharing}
         connections={connections}
         getTables={getTables}
         getColumns={getColumns}

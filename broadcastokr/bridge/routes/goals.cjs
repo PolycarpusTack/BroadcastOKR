@@ -30,6 +30,7 @@ function toGoalDTO(goalRow, krs, historyMap) {
       syncError: kr.sync_error || undefined,
       lastSyncAt: kr.last_sync_at || undefined,
       krTemplateId: kr.kr_template_id || undefined,
+      sharedWithMediagenix: !!kr.shared_with_mediagenix,
       history: historyMap.get(kr.id) || undefined,
     })),
   };
@@ -46,13 +47,14 @@ function upsertKeyResults(db, goalId, keyResults) {
   const incomingIds = new Set();
 
   const upsert = db.prepare(`
-    INSERT INTO key_results (id, goal_id, title, start_val, target_val, current_val, progress, status, live_config, sync_status, sync_error, last_sync_at, kr_template_id, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO key_results (id, goal_id, title, start_val, target_val, current_val, progress, status, live_config, sync_status, sync_error, last_sync_at, kr_template_id, shared_with_mediagenix, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       title=excluded.title, start_val=excluded.start_val, target_val=excluded.target_val,
       current_val=excluded.current_val, progress=excluded.progress, status=excluded.status,
       live_config=excluded.live_config, sync_status=excluded.sync_status, sync_error=excluded.sync_error,
-      last_sync_at=excluded.last_sync_at, kr_template_id=excluded.kr_template_id, sort_order=excluded.sort_order
+      last_sync_at=excluded.last_sync_at, kr_template_id=excluded.kr_template_id,
+      shared_with_mediagenix=excluded.shared_with_mediagenix, sort_order=excluded.sort_order
   `);
 
   keyResults.forEach((kr, idx) => {
@@ -61,7 +63,7 @@ function upsertKeyResults(db, goalId, keyResults) {
       kr.id, goalId, kr.title, kr.start, kr.target, kr.current, kr.progress, kr.status,
       kr.liveConfig ? JSON.stringify(kr.liveConfig) : null,
       kr.syncStatus || null, kr.syncError || null, kr.lastSyncAt || null,
-      kr.krTemplateId || null, idx
+      kr.krTemplateId || null, kr.sharedWithMediagenix ? 1 : 0, idx
     );
   });
 

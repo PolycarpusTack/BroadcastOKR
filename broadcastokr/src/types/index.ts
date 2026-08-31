@@ -95,6 +95,8 @@ export interface KeyResult {
   lastSyncAt?: string;
   krTemplateId?: string;
   history?: KRHistoryEntry[];
+  /** Client-Edition opt-in: this KR's value may be shared with Mediagenix */
+  sharedWithMediagenix?: boolean;
 }
 
 export interface Goal {
