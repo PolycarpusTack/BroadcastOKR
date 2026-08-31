@@ -1,20 +1,9 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-// assertSelectOnly is defined inside server.cjs and not exported.
-// We duplicate the logic here for testing. A future refactor should extract it.
-function assertSelectOnly(sql) {
-  const stripped = sql
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/--[^\n]*/g, '');
-  if (!stripped.trim().toUpperCase().startsWith('SELECT')) {
-    throw new Error('Only SELECT queries are allowed');
-  }
-  const noStrings = stripped.replace(/'[^']*'/g, '');
-  if (/;/.test(noStrings)) {
-    throw new Error('Multiple statements are not allowed');
-  }
-}
+// The real guard, extracted to whatson/core.cjs (this test previously carried
+// a duplicate because server.cjs didn't export it).
+const { assertSelectOnly } = require('../whatson/core.cjs');
 
 describe('assertSelectOnly', () => {
   it('allows a simple SELECT', () => {
