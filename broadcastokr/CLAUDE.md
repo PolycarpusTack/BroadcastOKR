@@ -134,8 +134,8 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 206 tests across 36 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 72 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
+- `npm test` — 210 tests across 39 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 93 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
 - `npm run lint` — 0 errors, gated in CI
 - After `npm run electron:build*`, run `npm rebuild better-sqlite3` — electron-builder rebuilds it for Electron's ABI, which breaks the dev bridge under system Node
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
