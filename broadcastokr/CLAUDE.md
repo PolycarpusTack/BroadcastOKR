@@ -134,7 +134,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 212 tests across 40 test files (vitest; not on PATH, use the npm script)
+- `npm test` — 210 tests across 40 test files (vitest; not on PATH, use the npm script)
 - `npm run test:bridge` — 108 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
 - `npm run lint` — 0 errors, gated in CI
 - After `npm run electron:build*`, run `npm rebuild better-sqlite3` — electron-builder rebuilds it for Electron's ABI, which breaks the dev bridge under system Node
@@ -167,4 +167,4 @@ Frontend-only persona switching (no backend auth). Three roles:
 1. Export history to file (if localStorage gets tight)
 2. TD-1: bridge writes for setMonitor/toggleSubtask/addBulkTasks + persisting live-KR sync results (see docs/gpm/state/hardening-backlog-2026-08-31.md)
 3. Phase 3 offline mutation queue (deferred — server convergence; note: first-connect migration now protects local data)
-4. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype
+4. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights; kept at repo root as a design asset) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype

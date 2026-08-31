@@ -1,11 +1,10 @@
 const express = require('express');
 const { parseCookies, serializeCookie, clearCookie } = require('../utils/cookies.cjs');
-const { createSession, getSession, deleteSession, upsertSsoUser } = require('../sessions.cjs');
+const { SESSION_COOKIE, createSession, getSession, deleteSession, upsertSsoUser } = require('../sessions.cjs');
 const { ROLE_PERMS } = require('../permissions.cjs');
 const { MODE } = require('../editions.cjs');
 const { audit } = require('../audit.cjs');
 
-const SESSION_COOKIE = 'brokr_session';
 const FLOW_COOKIE = 'brokr_auth_flow';
 
 /**

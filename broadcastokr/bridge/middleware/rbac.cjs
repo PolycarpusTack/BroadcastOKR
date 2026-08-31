@@ -1,4 +1,5 @@
 const { ROLE_PERMS } = require('../permissions.cjs');
+const { isSessionExempt } = require('./auth.cjs');
 
 /**
  * Server-enforced RBAC for cloud modes. One declarative policy table maps
@@ -54,10 +55,7 @@ const POLICY = [
 function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } = {}) {
   return function rbacMiddleware(req, res, next) {
     if (mode === 'desktop' || insecureNoAuth) return next();
-    if (!req.path.startsWith('/api/') || req.path === '/api/health' || req.path.startsWith('/api/auth/')) {
-      return next();
-    }
-    if (req.path === '/api/cockpit/ingest' || req.path.startsWith('/api/agent/')) return next();
+    if (isSessionExempt(req.path)) return next();
 
     const role = req.user?.role;
     if (!role) return res.status(401).json({ error: 'Not signed in' });
@@ -65,6 +63,9 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
     if (!perms) return res.status(403).json({ error: 'Unknown role' });
 
     // Role escalation is owner-only regardless of the general users policy
+    if (req.method === 'POST' && req.path === '/api/users' && req.body?.role === 'owner' && role !== 'owner') {
+      return res.status(403).json({ error: 'Only owners can create owners' });
+    }
     if (req.method === 'PUT' && /^\/api\/users\/[^/]+$/.test(req.path) && req.body?.role) {
       const targetId = Number(req.path.split('/').pop());
       const existing = db.prepare('SELECT role FROM users WHERE id = ?').get(targetId);
@@ -82,4 +83,4 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
   };
 }
 
-module.exports = { createRbacMiddleware, POLICY };
+module.exports = { createRbacMiddleware };

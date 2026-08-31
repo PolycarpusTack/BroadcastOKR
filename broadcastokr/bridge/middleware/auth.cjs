@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { parseCookies } = require('../utils/cookies.cjs');
-const { getSession } = require('../sessions.cjs');
+const { SESSION_COOKIE, getSession } = require('../sessions.cjs');
 
 /** Constant-time token comparison (length leak is acceptable; content is not). */
 function safeEqual(a, b) {
@@ -10,7 +10,19 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
-const SESSION_COOKIE = 'brokr_session';
+/**
+ * The single source of which paths session/RBAC middleware must NOT guard:
+ * static assets, the health probe, the auth flow itself, and the machine
+ * endpoints that carry their own credentials (share/agent tokens).
+ * auth and rbac middleware both consume this — the lists cannot drift.
+ */
+function isSessionExempt(path) {
+  return !path.startsWith('/api/')
+    || path === '/api/health'
+    || path.startsWith('/api/auth/')
+    || path === '/api/cockpit/ingest'
+    || path.startsWith('/api/agent/');
+}
 
 /**
  * Mode-conditional authentication.
@@ -22,13 +34,7 @@ const SESSION_COOKIE = 'brokr_session';
  */
 function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = false } = {}) {
   return function authMiddleware(req, res, next) {
-    // Only API routes are guarded — static app assets (cloud modes) are
-    // public; the data behind them is not. Health stays open for probes.
-    if (!req.path.startsWith('/api/')) return next();
-    if (req.path === '/api/health') return next();
-    if (req.path.startsWith('/api/auth/')) return next();
-    // Machine endpoints carry their own credentials (share/agent tokens)
-    if (req.path === '/api/cockpit/ingest' || req.path.startsWith('/api/agent/')) return next();
+    if (isSessionExempt(req.path)) return next();
 
     if (mode === 'desktop') {
       // If no API key configured, skip auth (development mode)
@@ -54,4 +60,4 @@ function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = f
   };
 }
 
-module.exports = { createAuthMiddleware };
+module.exports = { createAuthMiddleware, isSessionExempt };

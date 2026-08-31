@@ -139,6 +139,10 @@ describe('server-enforced RBAC (client mode)', () => {
 
     assert.equal((await fetch(`${BASE}/api/goals/g2`, json('DELETE', undefined, member))).status, 403);
     assert.equal((await fetch(`${BASE}/api/clients`, json('POST', { id: 'c9', name: 'X', connectionId: '', color: '#000', channels: [] }, member))).status, 403);
+
+    // A manager may create users, but never mint an owner
+    assert.equal((await fetch(`${BASE}/api/users`, json('POST', { name: 'Sneaky Owner', role: 'owner', av: 'S', color: '#000', dept: '', title: '' }, member))).status, 403);
+    assert.equal((await fetch(`${BASE}/api/users`, json('POST', { name: 'New Member', role: 'member', av: 'N', color: '#000', dept: '', title: '' }, member))).status, 201);
   });
 
   it('server-side audit recorded the sensitive actions with session actors', async () => {

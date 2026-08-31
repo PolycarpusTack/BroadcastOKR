@@ -49,8 +49,6 @@ interface AppStore {
   deleteGoal: (id: string) => void;
 
   // Live KR sync
-  syncLiveKR: (goalId: string, krId: string, current: number) => void;
-  syncLiveKRError: (goalId: string, krId: string, error: string, status?: SyncStatus) => void;
   syncLiveKRBatch: (results: Array<{ goalId: string; krId: string; current?: number; error?: string; status: SyncStatus }>) => void;
 
   setKPIs: (kpis: KPI[]) => void;
@@ -198,52 +196,6 @@ export const useStore = create<AppStore>()(
           if (full) bridgePut(`/api/clients/${id}`, full).catch(bridgeWriteFailed);
         }
       },
-
-      syncLiveKR: (goalId, krId, current) =>
-        set((s) => {
-          const goals = structuredClone(s.goals);
-          const goalIdx = goals.findIndex((g) => g.id === goalId);
-          if (goalIdx === -1) return {};
-          const goal = goals[goalIdx];
-          const kr = goal.keyResults.find((k) => k.id === krId);
-          if (!kr) return {};
-
-          kr.current = current;
-          kr.progress = krProgress(kr.start, kr.target, current);
-          kr.status = goalStatus(kr.progress);
-          kr.syncStatus = 'ok';
-          kr.syncError = undefined;
-          kr.lastSyncAt = new Date().toISOString();
-
-          const shouldRecord = isMonitorActive(goal.monitorUntil)
-            || goal.clientIds?.some((cid) => isMonitorActive(s.clients.find((c) => c.id === cid)?.monitorUntil));
-          if (shouldRecord) {
-            if (!kr.history) kr.history = [];
-            kr.history.push({
-              timestamp: new Date().toISOString(),
-              value: current,
-              actor: 'system',
-              source: 'sync',
-            });
-            kr.history = pruneHistory(kr.history);
-          }
-
-          goals[goalIdx] = recalcGoal(goal);
-          return { goals };
-        }),
-
-      syncLiveKRError: (goalId, krId, error, status = 'error') =>
-        set((s) => {
-          const goals = structuredClone(s.goals);
-          const goalIdx = goals.findIndex((g) => g.id === goalId);
-          if (goalIdx === -1) return {};
-          const kr = goals[goalIdx].keyResults.find((k) => k.id === krId);
-          if (!kr) return {};
-
-          kr.syncStatus = status;
-          kr.syncError = error;
-          return { goals };
-        }),
 
       syncLiveKRBatch: (results) =>
         set((s) => {

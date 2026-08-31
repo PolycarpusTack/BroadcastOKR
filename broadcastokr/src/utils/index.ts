@@ -1,6 +1,5 @@
-export { daysUntil, getUrgencyBadge, formatTime } from './dates';
-export { progressColor, statusIcon, kpiStatus } from './colors';
-export { nextTaskId, nextGoalId } from './ids';
+// Deliberately small barrel: only the exports actually consumed through it.
+// Everything else is deep-imported from its source module by convention.
+export { progressColor } from './colors';
+export { formatTime } from './dates';
 export { generateStressTasks } from './stressTest';
-export { safeUser, safeChannel } from './safeGet';
-export { cardStyle, selectStyle } from './styles';

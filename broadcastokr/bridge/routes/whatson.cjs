@@ -265,14 +265,18 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
 
     try {
       const rows = await core.runQuery(connConfig, kpi.sql, buildBinds(kpi));
-      const value = rows[0] ? Object.values(rows[0])[0] : 0;
+      if (!rows || rows.length === 0) {
+        // Match the execute-batch contract: no rows is no_data, never a fabricated 0
+        return res.json({ status: 'no_data', error: 'Query returned no rows' });
+      }
+      const value = Number(Object.values(rows[0])[0]);
       const history = loadHistory();
       if (!history[kpiId]) history[kpiId] = [];
-      history[kpiId].push({ timestamp: new Date().toISOString(), value: Number(value) });
+      history[kpiId].push({ timestamp: new Date().toISOString(), value });
       if (history[kpiId].length > 100) history[kpiId] = history[kpiId].slice(-100);
       saveHistory(history);
 
-      res.json({ value: Number(value), timestamp: new Date().toISOString() });
+      res.json({ value, timestamp: new Date().toISOString() });
     } catch (err) {
       console.error('KPI execute failed:', err);
       res.status(500).json({ error: 'KPI query execution failed' });
@@ -293,7 +297,11 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
       }
       try {
         const rows = await core.runQueryWithTimeout(connConfig, kpi.sql, buildBinds(kpi));
-        const value = rows[0] ? Number(Object.values(rows[0])[0]) : 0;
+        if (!rows || rows.length === 0) {
+          results.push({ id: kpi.id, name: kpi.name, error: 'Query returned no rows' });
+          continue;
+        }
+        const value = Number(Object.values(rows[0])[0]);
 
         if (!history[kpi.id]) history[kpi.id] = [];
         history[kpi.id].push({ timestamp: new Date().toISOString(), value });

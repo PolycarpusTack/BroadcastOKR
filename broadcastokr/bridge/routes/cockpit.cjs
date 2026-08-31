@@ -23,7 +23,7 @@ function createCockpitRouter(db) {
 
   // Owner mints a per-tenant write-only token (echoed exactly once)
   router.post('/tenants', cockpitOnly, (req, res) => {
-    const { clientId } = req.body;
+    const { clientId } = req.body || {};
     const client = db.prepare('SELECT id, name FROM clients WHERE id = ?').get(clientId);
     if (!client) return res.status(400).json({ error: 'Unknown client' });
 

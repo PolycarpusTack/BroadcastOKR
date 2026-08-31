@@ -77,7 +77,8 @@ app.use(createLoggingMiddleware());
 
 // Mounted in every mode: /me and /logout are OIDC-independent, and a desktop
 // /login correctly reports the identity provider as unavailable.
-const { createAuthRouter, SESSION_COOKIE: SESSION_COOKIE_NAME } = require('./routes/auth.cjs');
+const { createAuthRouter } = require('./routes/auth.cjs');
+const { SESSION_COOKIE: SESSION_COOKIE_NAME } = require('./sessions.cjs');
 app.use('/api/auth', createAuthRouter(db, OIDC_ENV));
 
 const { startBackupScheduler } = require('./utils/backup.cjs');

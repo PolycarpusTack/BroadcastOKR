@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 
+const SESSION_COOKIE = 'brokr_session';
+
 const SLIDING_MS = 8 * 60 * 60 * 1000;      // 8h sliding window
 const ABSOLUTE_MS = 7 * 24 * 60 * 60 * 1000; // 7d hard cap
 
@@ -52,4 +54,4 @@ function upsertSsoUser(db, { issuer, sub, name, email }) {
   return { id: Number(result.lastInsertRowid), role };
 }
 
-module.exports = { createSession, getSession, deleteSession, upsertSsoUser, SLIDING_MS };
+module.exports = { SESSION_COOKIE, createSession, getSession, deleteSession, upsertSsoUser };

@@ -39,3 +39,7 @@ bridge/broadcastokr.db-shm
 # Playwright
 test-results/
 playwright-report/
+
+# Office/editor lock files — never commit
+.~lock*
+**/.~lock*
