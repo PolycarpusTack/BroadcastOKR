@@ -1,4 +1,8 @@
 import { BRIDGE_URL, BRIDGE_API_KEY, PROTOCOL_VERSION } from '../constants/config';
+import { BUILD_EDITION } from '../editions/entitlements';
+
+// Cloud builds authenticate with session cookies; desktop keeps the API key.
+const IS_CLOUD = BUILD_EDITION !== 'desktop';
 import { logger } from '../utils/logger';
 import type { Goal, Task, Client, GoalTemplate, User, Team, KPI } from '../types';
 
@@ -81,9 +85,15 @@ export async function bridgeFetch<T>(
       const res = await fetch(`${BRIDGE_URL}${path}`, {
         ...options,
         signal: controller.signal,
+        credentials: IS_CLOUD ? 'include' : 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-BrOKR-Protocol': String(PROTOCOL_VERSION), ...authHeaders, ...options?.headers },
       });
       clearTimeout(timeout);
+
+      if (IS_CLOUD && res.status === 401 && !path.startsWith('/api/auth/')) {
+        // Session gone — let AuthContext flip to the sign-in screen
+        window.dispatchEvent(new CustomEvent('bridge-unauthenticated'));
+      }
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

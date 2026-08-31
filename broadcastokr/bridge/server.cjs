@@ -74,10 +74,10 @@ app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureN
 app.use(createRbacMiddleware({ mode: MODE, insecureNoAuth: INSECURE_NO_AUTH, db }));
 app.use(createLoggingMiddleware());
 
-if (OIDC_CONFIGURED) {
-  const { createAuthRouter } = require('./routes/auth.cjs');
-  app.use('/api/auth', createAuthRouter(db, OIDC_ENV));
-}
+// Mounted in every mode: /me and /logout are OIDC-independent, and a desktop
+// /login correctly reports the identity provider as unavailable.
+const { createAuthRouter } = require('./routes/auth.cjs');
+app.use('/api/auth', createAuthRouter(db, OIDC_ENV));
 
 const { startBackupScheduler } = require('./utils/backup.cjs');
 const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR

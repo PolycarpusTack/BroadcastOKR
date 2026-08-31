@@ -33,6 +33,8 @@ function collectFrontendApiPaths() {
       const normalized = match[1]
         .split('?')[0]
         .replace(/\$\{[^}]*\}/g, 'test-id');
+      // Prefix literals (e.g. startsWith('/api/auth/')) are not routes
+      if (normalized.endsWith('/')) continue;
       paths.add(normalized);
     }
   }

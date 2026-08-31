@@ -17,10 +17,11 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ defa
 const ClientsPage = FLEET_IN_BUILD ? lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage }))) : null;
 const ComparePage = FLEET_IN_BUILD ? lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage }))) : null;
 import { useBridge } from './hooks/useBridge';
+import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
-import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
+import { COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR } from './constants/config';
 import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
 import { useActivityLog } from './context/ActivityLogContext';
 import { DeploymentProvider } from './context/DeploymentContext';
@@ -58,6 +59,7 @@ export default function App() {
   const { theme } = useTheme();
   const { toast } = useToast();
   const { hydrateLog } = useActivityLog();
+  const { authStatus, signIn } = useAuth();
 
   // Tenancy: the bridge's health.mode wins over the build-time edition
   const mode: TenancyMode = useMemo(() => {
@@ -154,6 +156,32 @@ export default function App() {
       window.removeEventListener('bridge-write-conflict', handleWriteConflict);
     };
   }, [toast]);
+
+  // Cloud editions gate on the server session; desktop is always 'ready'
+  if (authStatus !== 'ready') {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: theme.bg, color: theme.text }}>
+        <div style={{ textAlign: 'center', padding: 40, borderRadius: 14, border: `1px solid ${theme.border}`, background: theme.bgCard, maxWidth: 360 }}>
+          <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>BroadcastOKR</div>
+          {authStatus === 'loading' ? (
+            <div role="status" style={{ color: theme.textMuted, fontSize: 14 }}>Checking your session…</div>
+          ) : (
+            <>
+              <p style={{ color: theme.textMuted, fontSize: 14, margin: '0 0 20px' }}>
+                Sign in with your organisation account to continue.
+              </p>
+              <button
+                onClick={signIn}
+                style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Sign in with SSO
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DeploymentProvider mode={mode}>
