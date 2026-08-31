@@ -19,7 +19,7 @@ import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
-import { fetchState, fetchChanges } from './store/bridgeSync';
+import { performInitialSync, fetchChanges } from './store/bridgeSync';
 import { logger } from './utils/logger';
 
 export default function App() {
@@ -70,12 +70,24 @@ export default function App() {
     if (!connected) return;
 
     let lastSync = new Date().toISOString();
-    fetchState()
+    const local = useStore.getState();
+    performInitialSync({
+      goals: local.goals,
+      tasks: local.tasks,
+      clients: local.clients,
+      goalTemplates: local.goalTemplates,
+      users: local.users,
+      teams: local.teams,
+    })
       .then((state) => {
         useStore.getState()._initFromBridge(state);
         lastSync = state.timestamp || lastSync;
       })
-      .catch((err) => logger.error('Failed to fetch initial bridge state', err));
+      .catch((err) => {
+        // Local state is deliberately left untouched on failure.
+        logger.error('Initial bridge sync failed', err);
+        toast('Bridge sync failed — keeping local data', COLOR_WARNING, '⚠️');
+      });
 
     const pollInterval = setInterval(() => {
       fetchChanges(lastSync)
@@ -87,7 +99,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [connected]);
+  }, [connected, toast]);
 
   // Global error handlers
   useEffect(() => {

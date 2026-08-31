@@ -101,3 +101,48 @@ export function bridgeDelete(path: string): Promise<unknown> {
 export function migrateFromLocal(data: unknown): Promise<unknown> {
   return bridgePost('/api/sync/migrate-from-local', data);
 }
+
+export interface LocalSlices {
+  goals: Goal[];
+  tasks: Task[];
+  clients: Client[];
+  goalTemplates: GoalTemplate[];
+  users: User[];
+  teams: Team[];
+}
+
+export function isBridgeEmpty(state: BridgeState): boolean {
+  return state.users.length === 0 && state.goals.length === 0 && state.tasks.length === 0;
+}
+
+export function hasLocalData(local: LocalSlices): boolean {
+  return local.goals.length > 0 || local.tasks.length > 0;
+}
+
+/**
+ * First-connect sync: adopt bridge state as truth, EXCEPT when the bridge DB is
+ * empty and local state is not — then migrate local data up first, so connecting
+ * to a fresh bridge never wipes existing local data. Migration inserts users
+ * before goals/tasks, which also satisfies the owner/assignee FK constraints.
+ */
+export async function performInitialSync(
+  local: LocalSlices,
+  deps: {
+    fetchState: () => Promise<BridgeState>;
+    migrateFromLocal: (data: unknown) => Promise<unknown>;
+  } = { fetchState, migrateFromLocal },
+): Promise<BridgeState> {
+  const state = await deps.fetchState();
+  if (isBridgeEmpty(state) && hasLocalData(local)) {
+    await deps.migrateFromLocal({
+      users: local.users,
+      teams: local.teams,
+      clients: local.clients,
+      goalTemplates: local.goalTemplates,
+      goals: local.goals,
+      tasks: local.tasks,
+    });
+    return deps.fetchState();
+  }
+  return state;
+}
