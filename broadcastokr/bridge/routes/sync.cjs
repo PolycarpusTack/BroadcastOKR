@@ -191,7 +191,7 @@ function createSyncRouter(db, dbPath) {
       res.json({ ok: true, counts });
     } catch (err) {
       console.error('Migration failed:', err);
-      res.status(500).json({ error: 'Migration failed', detail: err.message });
+      res.status(500).json({ error: 'Migration failed' });
     }
   });
 

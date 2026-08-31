@@ -92,12 +92,18 @@ function saveHistory(history) {
 
 // ── Connection Pools ──
 
+// One ceiling for a KR/KPI query, enforced DB-side (callTimeout /
+// statement_timeout) so the database cancels runaway queries instead of the
+// bridge merely abandoning the promise.
+const QUERY_TIMEOUT_MS = 15000;
+
 const oraclePools = new Map();
 const pgPools = new Map();
 
 async function getOraclePool(connConfig) {
   if (!oracledb) throw new Error('oracledb driver not installed. Run: npm install oracledb');
-  const key = `oracle:${connConfig.host}:${connConfig.port}/${connConfig.service}`;
+  // Key includes the user: same host/service under different credentials must not share a pool
+  const key = `oracle:${connConfig.user}@${connConfig.host}:${connConfig.port}/${connConfig.service}`;
   if (oraclePools.has(key)) return oraclePools.get(key);
 
   try {
@@ -120,7 +126,7 @@ async function getOraclePool(connConfig) {
 
 function getPgPool(connConfig) {
   if (!pg) throw new Error('pg driver not installed. Run: npm install pg');
-  const key = `pg:${connConfig.host}:${connConfig.port}/${connConfig.service}`;
+  const key = `pg:${connConfig.user}@${connConfig.host}:${connConfig.port}/${connConfig.service}`;
   if (pgPools.has(key)) return pgPools.get(key);
 
   const password = BRIDGE_API_KEY ? decrypt(connConfig.password, BRIDGE_API_KEY) : connConfig.password;
@@ -132,6 +138,7 @@ function getPgPool(connConfig) {
     password,
     max: 4,
     idleTimeoutMillis: 30000,
+    statement_timeout: QUERY_TIMEOUT_MS,
   });
   pgPools.set(key, pool);
   return pool;
@@ -167,6 +174,7 @@ async function runQuery(connConfig, sql, binds = {}) {
 async function runOracleQuery(connConfig, sql, binds = {}) {
   const pool = await getOraclePool(connConfig);
   const conn = await pool.getConnection();
+  conn.callTimeout = QUERY_TIMEOUT_MS;
   try {
     const result = await conn.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
     return result.rows;
@@ -563,7 +571,7 @@ app.get('/api/kpi/poll', async (req, res) => {
       continue;
     }
     try {
-      const TIMEOUT_MS = 15000;
+      const TIMEOUT_MS = QUERY_TIMEOUT_MS;
       const queryPromise = runQuery(connConfig, kpi.sql, buildBinds(kpi));
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Query timed out')), TIMEOUT_MS)
@@ -604,7 +612,7 @@ app.post('/api/kpi/execute-batch', async (req, res) => {
   }
 
   const config = loadConfig();
-  const TIMEOUT_MS = 15000;
+  const TIMEOUT_MS = QUERY_TIMEOUT_MS;
   const CONCURRENCY = 10;
   const results = [];
 
@@ -797,7 +805,9 @@ app.use(globalErrorHandler);
 // ── Start Server ──
 
 const PORT = process.env.BRIDGE_PORT || 3001;
-const HOST = process.env.BRIDGE_HOST || '0.0.0.0';
+// Local-only by default; deployments that need LAN/container exposure opt in
+// explicitly via BRIDGE_HOST=0.0.0.0 (docker-compose does).
+const HOST = process.env.BRIDGE_HOST || '127.0.0.1';
 app.listen(PORT, HOST, () => {
   console.log(`\n  BroadcastOKR Bridge Service`);
   console.log(`  ──────────────────────────`);

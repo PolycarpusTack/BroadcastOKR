@@ -6,7 +6,7 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON (PSI) e
 ## Tech Stack
 - **Frontend**: React 19, TypeScript 5.9, Vite 7, Zustand 5, React Router 7 (HashRouter for Electron)
 - **Desktop**: Electron 41 + electron-builder
-- **Bridge**: Express.js on port 3001 (binds 0.0.0.0 by default; `BRIDGE_HOST` to restrict) — read-only Oracle/PostgreSQL proxy + SQLite CRUD/sync layer
+- **Bridge**: Express.js on port 3001 (binds 127.0.0.1 by default; `BRIDGE_HOST=0.0.0.0` to expose — Docker sets it) — read-only Oracle/PostgreSQL proxy + SQLite CRUD/sync layer
 - **DB Drivers**: `oracledb` (optional), `pg` (optional) — loaded at runtime
 - **Testing**: Vitest + React Testing Library
 
