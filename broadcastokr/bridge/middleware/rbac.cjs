@@ -46,6 +46,8 @@ const POLICY = [
   { method: 'DELETE', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
   { method: 'POST', path: /^\/api\/sync\/migrate-from-local$/, perm: 'ownerOnly' },
   { method: 'POST', path: /^\/api\/cockpit\/tenants$/, perm: 'ownerOnly' },
+  { method: 'POST', path: /^\/api\/agents\/enrol-token$/, perm: 'ownerOnly' },
+  { method: 'DELETE', path: /^\/api\/agents(\/|$)/, perm: 'ownerOnly' },
   { method: 'GET', path: /^\/api\/sync\/backup$/, perm: 'ownerOnly' },
 ];
 

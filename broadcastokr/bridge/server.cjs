@@ -108,6 +108,11 @@ app.use('/api/activity', createActivityRouter(db));
 const { createCockpitRouter } = require('./routes/cockpit.cjs');
 app.use('/api/cockpit', createCockpitRouter(db));
 
+const { createAgentRouters } = require('./routes/agent.cjs');
+const agentRouters = createAgentRouters(db);
+app.use('/api/agents', agentRouters.ops);
+app.use('/api/agent', agentRouters.machine);
+
 // Client instances push their opted-in metrics to the cockpit (T2-3)
 if (MODE === 'client' && process.env.BRIDGE_COCKPIT_URL && process.env.BRIDGE_SHARE_TOKEN) {
   const { startSharePushLoop } = require('./cockpit/pushLoop.cjs');

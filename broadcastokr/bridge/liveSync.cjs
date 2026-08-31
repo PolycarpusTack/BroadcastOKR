@@ -25,6 +25,27 @@ function isMonitored(db, goalRow) {
 }
 
 /**
+ * The single write path for an externally-produced KR value (bridge loop or
+ * agent ingest): raw facts + monitored history; progress stays client-owned.
+ * `kr` needs id, monitor_until, client_ids (the goal join columns).
+ */
+function applySyncedValue(db, kr, value, timestamp = new Date().toISOString()) {
+  db.prepare('UPDATE key_results SET current_val=?, sync_status=?, sync_error=NULL, last_sync_at=? WHERE id=?')
+    .run(value, 'ok', timestamp, kr.id);
+
+  if (isMonitored(db, kr)) {
+    db.prepare('INSERT INTO kr_history (kr_id, timestamp, value, actor, source) VALUES (?, ?, ?, ?, ?)')
+      .run(kr.id, timestamp, value, 'system', 'sync');
+    const count = db.prepare('SELECT COUNT(*) AS c FROM kr_history WHERE kr_id = ?').get(kr.id).c;
+    if (count > HISTORY_CAP) {
+      db.prepare(`DELETE FROM kr_history WHERE id IN (
+        SELECT id FROM kr_history WHERE kr_id = ? ORDER BY timestamp ASC LIMIT ?
+      )`).run(kr.id, count - HISTORY_PRUNE_TO);
+    }
+  }
+}
+
+/**
  * One sync pass over every live KR. `executeQuery({connectionId, sql,
  * timeframeDays, binds})` resolves to `{status, current?, error?}` — injected
  * so the loop is testable and reusable by the future connector agent.
@@ -57,19 +78,7 @@ async function runKRSyncOnce(db, { executeQuery }) {
 
     const now = new Date().toISOString();
     if (result.status === 'ok' && typeof result.current === 'number') {
-      db.prepare('UPDATE key_results SET current_val=?, sync_status=?, sync_error=NULL, last_sync_at=? WHERE id=?')
-        .run(result.current, 'ok', now, kr.id);
-
-      if (isMonitored(db, kr)) {
-        db.prepare('INSERT INTO kr_history (kr_id, timestamp, value, actor, source) VALUES (?, ?, ?, ?, ?)')
-          .run(kr.id, now, result.current, 'system', 'sync');
-        const count = db.prepare('SELECT COUNT(*) AS c FROM kr_history WHERE kr_id = ?').get(kr.id).c;
-        if (count > HISTORY_CAP) {
-          db.prepare(`DELETE FROM kr_history WHERE id IN (
-            SELECT id FROM kr_history WHERE kr_id = ? ORDER BY timestamp ASC LIMIT ?
-          )`).run(kr.id, count - HISTORY_PRUNE_TO);
-        }
-      }
+      applySyncedValue(db, kr, result.current, now);
       synced++;
     } else {
       db.prepare('UPDATE key_results SET sync_status=?, sync_error=? WHERE id=?')
@@ -96,4 +105,4 @@ function startKRSyncLoop(db, { executeQuery, intervalMs = 15 * 60 * 1000 }) {
   return () => clearInterval(timer);
 }
 
-module.exports = { runKRSyncOnce, startKRSyncLoop };
+module.exports = { runKRSyncOnce, startKRSyncLoop, applySyncedValue };
