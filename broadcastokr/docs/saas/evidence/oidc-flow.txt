@@ -1,0 +1,14 @@
+# Generated 2026-08-31T18:12:05Z — OIDC sign-in + fail-closed identity (bridge/__tests__/auth-oidc.test.cjs)
+  # Subtest: OIDC sign-in (client mode)
+      ok 1 - unauthenticated API calls are refused; health stays open but trimmed
+      ok 2 - completes the code+PKCE flow; the first user becomes owner
+      ok 3 - subsequent users join as members
+      ok 4 - returning users keep their identity (no duplicate rows)
+      ok 5 - logout invalidates the session server-side
+  ok 1 - OIDC sign-in (client mode)
+  # Subtest: cloud modes fail closed without identity
+      ok 1 - refuses to start with no OIDC config and no explicit escape
+  ok 2 - cloud modes fail closed without identity
+  # tests 6
+  # pass 6
+  # fail 0
