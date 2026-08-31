@@ -8,6 +8,7 @@ import { PersonaPanel } from '../dev/PersonaPanel';
 const ImportExportModal = lazy(() => import('../data/ImportExportModal').then((m) => ({ default: m.ImportExportModal })));
 // Lazy — help content is large prose, only needed when opened.
 const HelpModal = lazy(() => import('../help/HelpModal').then((m) => ({ default: m.HelpModal })));
+const DeveloperGuideModal = lazy(() => import('../help/DeveloperGuideModal').then((m) => ({ default: m.DeveloperGuideModal })));
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -36,6 +37,7 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
   const [logOpen, setLogOpen] = useState(false);
   const [importExportOpen, setImportExportOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [devGuideOpen, setDevGuideOpen] = useState(false);
 
   const handleStress = () => {
     const st = generateStressTasks(60);
@@ -117,7 +119,17 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
       )}
       {helpOpen && (
         <Suspense fallback={null}>
-          <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} theme={theme} />
+          <HelpModal
+            open={helpOpen}
+            onClose={() => setHelpOpen(false)}
+            theme={theme}
+            onOpenDevGuide={() => { setHelpOpen(false); setDevGuideOpen(true); }}
+          />
+        </Suspense>
+      )}
+      {devGuideOpen && (
+        <Suspense fallback={null}>
+          <DeveloperGuideModal open={devGuideOpen} onClose={() => setDevGuideOpen(false)} theme={theme} />
         </Suspense>
       )}
       <ActivityLog log={log} open={logOpen} onClose={() => setLogOpen(false)} theme={theme} />
