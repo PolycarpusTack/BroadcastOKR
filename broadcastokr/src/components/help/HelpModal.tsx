@@ -164,7 +164,7 @@ export function HelpModal({ open, onClose, theme, onOpenDevGuide }: HelpModalPro
           <Sub>Manual vs. Live Key Results</Sub>
           <P>Each Key Result can work one of two ways:</P>
           <Jargon term="Manual">You type the current value when you check in. Good for things WHATS'ON doesn't track.</Jargon>
-          <Jargon term="Live">The app runs a SQL query against your WHATS'ON database and fills the number in for you, on a schedule. Set it once, forget it.</Jargon>
+          <Jargon term="Live">The bridge runs a SQL query against your WHATS'ON database and fills the number in for you, on a schedule — even while the app is closed. Set it once, forget it.</Jargon>
           <Callout kind="watch">
             A Key Result becomes "Live" the moment you give it a database connection + SQL. There's no separate
             on/off switch — presence of the query <i>is</i> the switch. Remove the query and it's manual again.
@@ -217,7 +217,7 @@ export function HelpModal({ open, onClose, theme, onOpenDevGuide }: HelpModalPro
             <>In <b>Settings</b>, add a database <b>connection</b> (host, service, user, password).</>,
             <>Test it — you want a green tick before moving on.</>,
             <>On a Key Result, choose that connection and write the SQL that returns your number.</>,
-            <>The app syncs it on a schedule (every 15 minutes by default).</>,
+            <>The bridge syncs it on a schedule (every 15 minutes by default) — even while the app is closed.</>,
           ]} />
           <Callout kind="watch">
             If the header dot is red, the bridge isn't reachable. Your goals and history are safe (they're stored

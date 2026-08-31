@@ -134,14 +134,19 @@ electron/   main.cjs (forks the bridge) + preload.cjs (contextBridge API)`}</Cod
             [<>KR identity</>, <>KRs are matched by <C>kr.id</C>, never by array index. Batch results re-attach krIds via <C>src/utils/liveSync.ts</C>.</>],
             [<>structuredClone</>, <>Store actions clone state before mutating; <C>recalcGoal()</C> re-derives goal progress from KRs.</>],
             [<>Timestamps</>, <>The bridge stores sqlite <C>datetime('now')</C> (UTC, no 'T'). Anything comparing frontend ISO strings must normalize — see <C>normalizeSince</C> in bridge/routes/sync.cjs.</>],
+            [<>Editions</>, <>One codebase, three deployment forms (desktop/client/cockpit). Only <C>src/editions/</C> reads <C>VITE_EDITION</C> and only <C>bridge/editions.cjs</C> reads <C>BRIDGE_MODE</C> — everything gates through them (guardrail-tested). New sensitive routes go in the <C>rbac.cjs</C> POLICY table.</>],
+            [<>Protocol</>, <>Every bridge call sends <C>X-BrOKR-Protocol</C>; versions below <C>MIN_SUPPORTED</C> get 426. Migrations stay additive unless marked <C>-- BREAKING:</C> with a floor bump; golden v1 fixtures replay in CI.</>],
           ]} />
           <Sub>Multi-user sync</Sub>
           <P>
-            Writes are optimistic: the store mutates locally, then fires a fire-and-forget bridge write
-            (failures surface as a toast via <C>bridgeWriteFailed</C>). Reads flow the other way — a full
-            <C>/api/sync/state</C> on connect, then <C>/api/sync/changes?since=</C> every 5 seconds, merged
-            by id. First connect to an <i>empty</i> bridge migrates local data up (users first, for FK order)
-            instead of adopting the empty state.
+            Writes are optimistic: the store mutates locally, then writes to the bridge — goals and
+            tasks with version-checked compare-and-swap PUTs (a lost race 409s, merges the server row,
+            and toasts); other writes fire-and-forget with failures surfacing via <C>bridgeWriteFailed</C>.
+            Reads flow the other way — a full <C>/api/sync/state</C> on connect, then
+            <C>/api/sync/changes?since=</C> every 5 seconds, merged by id with progress recomputed
+            client-side. First connect to an <i>empty</i> bridge migrates local data up (users first,
+            for FK order). Live-KR queries run in a bridge-side loop (15 min default), so values stay
+            fresh with no browser open.
           </P>
         </>
       ),
@@ -164,7 +169,10 @@ electron/   main.cjs (forks the bridge) + preload.cjs (contextBridge API)`}</Cod
             [<>/api/test-connection, /api/tables, /api/columns, /api/preview-query, /api/channels</>, <>Schema browsing and query preview against client databases.</>],
             [<>/api/kpi/*</>, <>KPI definitions, polling, execute-batch (live KR sync), per-dialect SQL templates.</>],
             [<>/api/goals, /api/tasks, /api/clients, /api/users, /api/teams, /api/goal-templates</>, <>SQLite-backed CRUD (bridge/routes/*.cjs). Check-in records history and bumps updated_at only.</>],
-            [<>/api/sync/*</>, <>state, changes, migrate-from-local, backup download.</>],
+            [<>/api/sync/*</>, <>state, changes, migrate-from-local (auto on first connect to an empty bridge), backup snapshot download.</>],
+            [<>/api/auth/*</>, <>Cloud modes: OIDC login/callback/logout + /me (session identity). Desktop keeps API-key auth; the strategy switches on BRIDGE_MODE in one middleware.</>],
+            [<>/api/agents, /api/agent/*</>, <>Connector-agent operator surface (enrol tokens, list, revoke — owner-only) and machine surface (enroll, scalar-only ingest with per-agent tokens).</>],
+            [<>/api/cockpit/*</>, <>Cockpit mode: per-tenant share tokens, strict push-only metrics ingest, fleet read.</>],
           ]} />
           <Note kind="warning">
             The frontend↔bridge path contract is CI-enforced: <C>bridge/__tests__/route-contract.test.cjs</C>{' '}
@@ -181,8 +189,8 @@ electron/   main.cjs (forks the bridge) + preload.cjs (contextBridge API)`}</Cod
           <H>Testing &amp; Quality</H>
           <Rule />
           <Table rows={[
-            [<>npm test</>, <>Vitest unit suite (~190 tests). Store logic, utils, and component smokes.</>],
-            [<>npm run test:bridge</>, <>node:test suite (~52 tests) — DB operations, middleware, the route contract, check-in propagation, packaging paths.</>],
+            [<>npm test</>, <>Vitest unit suite (~210 tests). Store logic, utils, editions/guardrails, and component smokes.</>],
+            [<>npm run test:bridge</>, <>node:test suite (~108 tests) — DB operations, middleware, the route contract, OIDC flow (mock IdP), RBAC bypass battery, agent lifecycle, cockpit channel, protocol fixtures.</>],
             [<>npm run test:e2e</>, <>Playwright against a real bridge with an in-memory DB.</>],
             [<>npm run lint</>, <>ESLint, zero-error policy — a CI gate.</>],
             [<>npm run build</>, <><C>tsc -b &amp;&amp; vite build</C> — must pass before committing; plain <C>tsc --noEmit</C> misses noUnusedLocals.</>],
