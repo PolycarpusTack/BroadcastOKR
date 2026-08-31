@@ -20,7 +20,8 @@ import { krProgress } from '../utils/progress';
 import { nextGoalId } from '../utils/ids';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO, COLOR_WARNING, STALE_SYNC_THRESHOLD_MS } from '../constants/config';
 import { formatTimeAgo } from '../utils/dates';
-import type { Goal, KeyResult, SyncStatus, GoalTemplate, ScopedChannelRef } from '../types';
+import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
+import type { Goal, KeyResult, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
 
 interface GoalsPageProps {
@@ -97,6 +98,8 @@ export function GoalsPage({
     }
   }, [bridgeConnected, getConnections]);
 
+  // Syncs from the bridge (async fetch); the disconnected branch clears state synchronously
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(refreshConnections, [refreshConnections]);
 
   // View toggle: goals vs templates
@@ -143,6 +146,8 @@ export function GoalsPage({
 
   // Re-fetch connections when create/edit modal opens (picks up new connections from KPIConfigModal)
   useEffect(() => {
+    // Same sync-from-bridge callback as above
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (createOpen || editGoalId) refreshConnections();
   }, [createOpen, editGoalId, refreshConnections]);
 
@@ -322,27 +327,14 @@ export function GoalsPage({
   /** Sync all live KRs for a single goal */
   const syncGoal = useCallback(async (goalId: string, keyResults: KeyResult[]) => {
     if (!executeBatch) return;
-    const queries = keyResults
-      .filter((kr) => kr.liveConfig)
-      .map((kr, idx) => ({
-        goalId,
-        krIndex: idx,
-        krId: kr.id,
-        connectionId: kr.liveConfig!.connectionId,
-        sql: kr.liveConfig!.sql,
-        timeframeDays: kr.liveConfig!.timeframeDays,
-      }));
+    const queries = buildLiveKRQueries([{ id: goalId, keyResults }]);
 
     if (queries.length === 0) return;
 
     setSyncingGoalId(goalId);
     try {
       const { results } = await executeBatch(queries);
-      syncLiveKRBatch(results.map((r, i) => ({
-        ...r,
-        krId: queries[i]?.krId ?? '',
-        status: r.status as SyncStatus,
-      })));
+      syncLiveKRBatch(mapResultsToKrIds(results, queries));
       const ok = results.filter((r) => r.status === 'ok').length;
       const err = results.filter((r) => r.status !== 'ok').length;
       if (err > 0) {
@@ -360,39 +352,13 @@ export function GoalsPage({
   /** Sync all live KRs across all goals */
   const syncAllLiveKRs = useCallback(async () => {
     if (!executeBatch) return;
-    const queries: Array<{
-      goalId: string;
-      krIndex: number;
-      krId: string;
-      connectionId: string;
-      sql: string;
-      timeframeDays?: number;
-    }> = [];
-    for (const goal of goals) {
-      for (let i = 0; i < goal.keyResults.length; i++) {
-        const kr = goal.keyResults[i];
-        if (kr.liveConfig) {
-          queries.push({
-            goalId: goal.id,
-            krIndex: i,
-            krId: kr.id,
-            connectionId: kr.liveConfig.connectionId,
-            sql: kr.liveConfig.sql,
-            timeframeDays: kr.liveConfig.timeframeDays,
-          });
-        }
-      }
-    }
+    const queries = buildLiveKRQueries(goals);
     if (queries.length === 0) { toast('No live KRs to sync', COLOR_INFO, '\u{1F4E1}'); return; }
 
     setSyncingGoalId('all');
     try {
       const { results } = await executeBatch(queries);
-      syncLiveKRBatch(results.map((r, i) => ({
-        ...r,
-        krId: queries[i]?.krId ?? '',
-        status: r.status as SyncStatus,
-      })));
+      syncLiveKRBatch(mapResultsToKrIds(results, queries));
       const ok = results.filter((r) => r.status === 'ok').length;
       toast(`Synced ${ok}/${results.length} live KRs`, ok === results.length ? COLOR_SUCCESS : COLOR_DANGER, '\u{1F4E1}');
     } catch (e) {
@@ -459,7 +425,7 @@ export function GoalsPage({
     setDeleteTemplateId(null);
   };
 
-  // Oldest live-KR sync timestamp, only when past the staleness threshold
+  // Oldest live-KR sync timestamp, only when past the staleness threshold.
   const stalestSyncAt = useMemo(() => {
     let oldest: string | null = null;
     for (const g of goals) {
@@ -468,6 +434,8 @@ export function GoalsPage({
       }
     }
     if (!oldest) return null;
+    // Date.now() is deliberate: staleness re-evaluates when goals change; no live clock needed.
+    // eslint-disable-next-line react-hooks/purity
     return Date.now() - new Date(oldest).getTime() > STALE_SYNC_THRESHOLD_MS ? oldest : null;
   }, [goals]);
 

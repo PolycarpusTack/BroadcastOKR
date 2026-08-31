@@ -19,7 +19,7 @@ import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
-import { fetchState, fetchChanges } from './store/bridgeSync';
+import { performInitialSync, fetchChanges } from './store/bridgeSync';
 import { logger } from './utils/logger';
 
 export default function App() {
@@ -70,12 +70,24 @@ export default function App() {
     if (!connected) return;
 
     let lastSync = new Date().toISOString();
-    fetchState()
+    const local = useStore.getState();
+    performInitialSync({
+      goals: local.goals,
+      tasks: local.tasks,
+      clients: local.clients,
+      goalTemplates: local.goalTemplates,
+      users: local.users,
+      teams: local.teams,
+    })
       .then((state) => {
         useStore.getState()._initFromBridge(state);
         lastSync = state.timestamp || lastSync;
       })
-      .catch((err) => logger.error('Failed to fetch initial bridge state', err));
+      .catch((err) => {
+        // Local state is deliberately left untouched on failure.
+        logger.error('Initial bridge sync failed', err);
+        toast('Bridge sync failed — keeping local data', COLOR_WARNING, '⚠️');
+      });
 
     const pollInterval = setInterval(() => {
       fetchChanges(lastSync)
@@ -87,7 +99,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [connected]);
+  }, [connected, toast]);
 
   // Global error handlers
   useEffect(() => {
@@ -109,14 +121,25 @@ export default function App() {
       toast('Storage is full. Export your data to free space.', COLOR_WARNING, '⚠️');
     };
 
+    // Debounced so a burst of failed writes (bridge down) shows one toast
+    let lastWriteFailToast = 0;
+    const handleBridgeWriteFailed = () => {
+      const now = Date.now();
+      if (now - lastWriteFailToast < 5000) return;
+      lastWriteFailToast = now;
+      toast('Change not saved to server — kept locally', COLOR_WARNING, '⚠️');
+    };
+
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     window.addEventListener('error', handleError);
     window.addEventListener('storage-quota-exceeded', handleStorageQuota);
+    window.addEventListener('bridge-write-failed', handleBridgeWriteFailed);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleError);
       window.removeEventListener('storage-quota-exceeded', handleStorageQuota);
+      window.removeEventListener('bridge-write-failed', handleBridgeWriteFailed);
     };
   }, [toast]);
 

@@ -8,7 +8,7 @@ import { goalStatus } from '../utils/colors';
 import { krProgress } from '../utils/progress';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
-import { bridgePost, bridgePut, bridgeDelete } from './bridgeSync';
+import { bridgePost, bridgePut, bridgeDelete, bridgeWriteFailed } from './bridgeSync';
 
 /** Recalculate goal progress and status from its KRs */
 function recalcGoal(goal: Goal): Goal {
@@ -92,7 +92,7 @@ export const useStore = create<AppStore>()(
 
       addGoal: (goal) => {
         set((s) => ({ goals: [goal, ...s.goals] }));
-        bridgePost('/api/goals', goal).catch(console.error);
+        bridgePost('/api/goals', goal).catch(bridgeWriteFailed);
       },
       setGoals: (goals) => set({ goals }),
 
@@ -125,7 +125,12 @@ export const useStore = create<AppStore>()(
 
           return { goals };
         });
-        bridgePost(`/api/goals/${goalId}/check-in`, { krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor }).catch(console.error);
+        const updated = get().goals.find((g) => g.id === goalId);
+        if (!updated?.keyResults.some((k) => k.id === krId)) return;
+        bridgePost(`/api/goals/${goalId}/check-in`, { krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor }).catch(bridgeWriteFailed);
+        // The client owns progress semantics (krProgress); the PUT persists the
+        // recalculated goal and bumps updated_at so other clients' polls see it.
+        bridgePut(`/api/goals/${goalId}`, updated).catch(bridgeWriteFailed);
       },
 
       setMonitor: (type, id, days) =>
@@ -243,7 +248,7 @@ export const useStore = create<AppStore>()(
 
       addTask: (task) => {
         set((s) => ({ tasks: [task, ...s.tasks] }));
-        bridgePost('/api/tasks', task).catch(console.error);
+        bridgePost('/api/tasks', task).catch(bridgeWriteFailed);
       },
       setTasks: (tasks) => set({ tasks }),
 
@@ -252,7 +257,7 @@ export const useStore = create<AppStore>()(
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, status } : t)),
         }));
         const full = get().tasks.find((t) => t.id === id);
-        if (full) bridgePut(`/api/tasks/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/tasks/${id}`, full).catch(bridgeWriteFailed);
       },
 
       toggleSubtask: (taskId, subtaskIndex) =>
@@ -272,14 +277,14 @@ export const useStore = create<AppStore>()(
           tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         }));
         const full = get().tasks.find((t) => t.id === id);
-        if (full) bridgePut(`/api/tasks/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/tasks/${id}`, full).catch(bridgeWriteFailed);
       },
 
       deleteTask: (id) => {
         set((s) => ({
           tasks: s.tasks.filter((t) => t.id !== id),
         }));
-        bridgeDelete(`/api/tasks/${id}`).catch(console.error);
+        bridgeDelete(`/api/tasks/${id}`).catch(bridgeWriteFailed);
       },
 
       updateGoal: (id, updates) => {
@@ -291,19 +296,19 @@ export const useStore = create<AppStore>()(
           return { goals };
         });
         const full = get().goals.find((g) => g.id === id);
-        if (full) bridgePut(`/api/goals/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/goals/${id}`, full).catch(bridgeWriteFailed);
       },
 
       deleteGoal: (id) => {
         set((s) => ({
           goals: s.goals.filter((g) => g.id !== id),
         }));
-        bridgeDelete(`/api/goals/${id}`).catch(console.error);
+        bridgeDelete(`/api/goals/${id}`).catch(bridgeWriteFailed);
       },
 
       addClient: (client) => {
         set((s) => ({ clients: [...s.clients, client] }));
-        bridgePost('/api/clients', client).catch(console.error);
+        bridgePost('/api/clients', client).catch(bridgeWriteFailed);
       },
 
       updateClient: (id, updates) => {
@@ -351,7 +356,7 @@ export const useStore = create<AppStore>()(
           return { clients: updatedClients };
         });
         const full = get().clients.find((c) => c.id === id);
-        if (full) bridgePut(`/api/clients/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/clients/${id}`, full).catch(bridgeWriteFailed);
       },
 
       deleteClient: (id, cascade) => {
@@ -382,12 +387,12 @@ export const useStore = create<AppStore>()(
             ? { ...t, clientIds: t.clientIds.filter((cid) => cid !== id) }
             : t),
         }));
-        bridgeDelete(`/api/clients/${id}`).catch(console.error);
+        bridgeDelete(`/api/clients/${id}`).catch(bridgeWriteFailed);
       },
 
       addUser: (user) => {
         set((s) => ({ users: [...s.users, user] }));
-        bridgePost('/api/users', user).catch(console.error);
+        bridgePost('/api/users', user).catch(bridgeWriteFailed);
       },
 
       updateUser: (id, updates) => {
@@ -395,7 +400,7 @@ export const useStore = create<AppStore>()(
           users: s.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
         }));
         const full = get().users.find((u) => u.id === id);
-        if (full) bridgePut(`/api/users/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/users/${id}`, full).catch(bridgeWriteFailed);
       },
 
       deleteUser: (id, reassignTo) => {
@@ -414,12 +419,12 @@ export const useStore = create<AppStore>()(
             })),
           };
         });
-        bridgeDelete(`/api/users/${id}`).catch(console.error);
+        bridgeDelete(`/api/users/${id}`).catch(bridgeWriteFailed);
       },
 
       addTeam: (team) => {
         set((s) => ({ teams: [...s.teams, team] }));
-        bridgePost('/api/teams', team).catch(console.error);
+        bridgePost('/api/teams', team).catch(bridgeWriteFailed);
       },
 
       updateTeam: (id, updates) => {
@@ -434,19 +439,19 @@ export const useStore = create<AppStore>()(
           }),
         }));
         const full = get().teams.find((t) => t.id === id);
-        if (full) bridgePut(`/api/teams/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/teams/${id}`, full).catch(bridgeWriteFailed);
       },
 
       deleteTeam: (id) => {
         set((s) => ({
           teams: s.teams.filter((t) => t.id !== id),
         }));
-        bridgeDelete(`/api/teams/${id}`).catch(console.error);
+        bridgeDelete(`/api/teams/${id}`).catch(bridgeWriteFailed);
       },
 
       addGoalTemplate: (template) => {
         set((s) => ({ goalTemplates: [...s.goalTemplates, template] }));
-        bridgePost('/api/goal-templates', template).catch(console.error);
+        bridgePost('/api/goal-templates', template).catch(bridgeWriteFailed);
       },
 
       updateGoalTemplate: (id, updates) => {
@@ -454,7 +459,7 @@ export const useStore = create<AppStore>()(
           goalTemplates: s.goalTemplates.map((t) => (t.id === id ? { ...t, ...updates } : t)),
         }));
         const full = get().goalTemplates.find((t) => t.id === id);
-        if (full) bridgePut(`/api/goal-templates/${id}`, full).catch(console.error);
+        if (full) bridgePut(`/api/goal-templates/${id}`, full).catch(bridgeWriteFailed);
       },
 
       deleteGoalTemplate: (id, cascade) => {
@@ -464,58 +469,60 @@ export const useStore = create<AppStore>()(
             ? s.goals.filter((g) => g.templateId !== id)
             : s.goals.map((g) => g.templateId === id ? { ...g, templateId: undefined } : g),
         }));
-        bridgeDelete(`/api/goal-templates/${id}`).catch(console.error);
+        bridgeDelete(`/api/goal-templates/${id}`).catch(bridgeWriteFailed);
       },
 
       materializeTemplate: (templateId, clientIds, ownerIndex = 0) => {
-        set((s) => {
-          const template = s.goalTemplates.find((t) => t.id === templateId);
-          if (!template) return {};
-          const existingPairs = new Set(
-            s.goals
-              .filter((g) => g.templateId === templateId)
-              .flatMap((g) => g.clientIds ?? []),
-          );
-          const newGoals: Goal[] = [];
-          for (const clientId of clientIds) {
-            if (existingPairs.has(clientId)) continue;
-            const client = s.clients.find((c) => c.id === clientId);
-            if (!client) continue;
-            const overrides = client.sqlOverrides?.[templateId] || {};
-            newGoals.push({
+        const s = get();
+        const template = s.goalTemplates.find((t) => t.id === templateId);
+        if (!template) return;
+        const existingPairs = new Set(
+          s.goals
+            .filter((g) => g.templateId === templateId)
+            .flatMap((g) => g.clientIds ?? []),
+        );
+        const newGoals: Goal[] = [];
+        for (const clientId of clientIds) {
+          if (existingPairs.has(clientId)) continue;
+          const client = s.clients.find((c) => c.id === clientId);
+          if (!client) continue;
+          const overrides = client.sqlOverrides?.[templateId] || {};
+          newGoals.push({
+            id: crypto.randomUUID(),
+            title: `${template.title} — ${client.name}`,
+            status: 'behind',
+            progress: 0,
+            owner: ownerIndex,
+            channel: 0,
+            period: template.period,
+            clientIds: [clientId],
+            channelScope: { type: 'all' },
+            templateId,
+            keyResults: template.krTemplates.map((krt) => ({
               id: crypto.randomUUID(),
-              title: `${template.title} — ${client.name}`,
-              status: 'behind',
+              title: krt.title,
+              start: krt.start,
+              target: krt.target,
+              current: krt.start,
               progress: 0,
-              owner: ownerIndex,
-              channel: 0,
-              period: template.period,
-              clientIds: [clientId],
-              channelScope: { type: 'all' },
-              templateId,
-              keyResults: template.krTemplates.map((krt) => ({
-                id: crypto.randomUUID(),
-                title: krt.title,
-                start: krt.start,
-                target: krt.target,
-                current: krt.start,
-                progress: 0,
-                status: 'behind' as const,
-                krTemplateId: krt.id,
-                liveConfig: {
-                  connectionId: client.connectionId,
-                  sql: overrides[krt.id] || krt.sql,
-                  unit: krt.unit,
-                  direction: krt.direction,
-                  timeframeDays: krt.timeframeDays,
-                },
-                syncStatus: 'pending' as const,
-              })),
-            });
-          }
-          return { goals: [...newGoals, ...s.goals] };
-        });
-        bridgePost(`/api/goal-templates/${templateId}/materialize`, { clientIds, ownerIndex }).catch(console.error);
+              status: 'behind' as const,
+              krTemplateId: krt.id,
+              liveConfig: {
+                connectionId: client.connectionId,
+                sql: overrides[krt.id] || krt.sql,
+                unit: krt.unit,
+                direction: krt.direction,
+                timeframeDays: krt.timeframeDays,
+              },
+              syncStatus: 'pending' as const,
+            })),
+          });
+        }
+        if (newGoals.length === 0) return;
+        set((cur) => ({ goals: [...newGoals, ...cur.goals] }));
+        for (const goal of newGoals) {
+          bridgePost('/api/goals', goal).catch(bridgeWriteFailed);
+        }
       },
 
       syncTemplateToGoals: (templateId) => {
@@ -585,7 +592,9 @@ export const useStore = create<AppStore>()(
           }
           return { goals };
         });
-        bridgePost(`/api/goal-templates/${templateId}/sync`, {}).catch(console.error);
+        for (const goal of get().goals.filter((g) => g.templateId === templateId)) {
+          bridgePut(`/api/goals/${goal.id}`, goal).catch(bridgeWriteFailed);
+        }
       },
 
       // Bridge sync actions

@@ -1,5 +1,19 @@
 import { BRIDGE_URL, BRIDGE_API_KEY } from '../constants/config';
+import { logger } from '../utils/logger';
 import type { Goal, Task, Client, GoalTemplate, User, Team, KPI } from '../types';
+
+/**
+ * Rejection handler for fire-and-forget store writes. Local state stays
+ * authoritative (optimistic update already applied); this makes the divergence
+ * visible instead of silently swallowing it — App.tsx listens for the event
+ * and shows a debounced toast.
+ */
+export function bridgeWriteFailed(err: unknown): void {
+  logger.error('Bridge write failed', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('bridge-write-failed'));
+  }
+}
 
 export interface BridgeState {
   goals: Goal[];
@@ -100,4 +114,49 @@ export function bridgeDelete(path: string): Promise<unknown> {
 /** POST /api/sync/migrate-from-local — migrate localStorage data to bridge */
 export function migrateFromLocal(data: unknown): Promise<unknown> {
   return bridgePost('/api/sync/migrate-from-local', data);
+}
+
+export interface LocalSlices {
+  goals: Goal[];
+  tasks: Task[];
+  clients: Client[];
+  goalTemplates: GoalTemplate[];
+  users: User[];
+  teams: Team[];
+}
+
+export function isBridgeEmpty(state: BridgeState): boolean {
+  return state.users.length === 0 && state.goals.length === 0 && state.tasks.length === 0;
+}
+
+export function hasLocalData(local: LocalSlices): boolean {
+  return local.goals.length > 0 || local.tasks.length > 0;
+}
+
+/**
+ * First-connect sync: adopt bridge state as truth, EXCEPT when the bridge DB is
+ * empty and local state is not — then migrate local data up first, so connecting
+ * to a fresh bridge never wipes existing local data. Migration inserts users
+ * before goals/tasks, which also satisfies the owner/assignee FK constraints.
+ */
+export async function performInitialSync(
+  local: LocalSlices,
+  deps: {
+    fetchState: () => Promise<BridgeState>;
+    migrateFromLocal: (data: unknown) => Promise<unknown>;
+  } = { fetchState, migrateFromLocal },
+): Promise<BridgeState> {
+  const state = await deps.fetchState();
+  if (isBridgeEmpty(state) && hasLocalData(local)) {
+    await deps.migrateFromLocal({
+      users: local.users,
+      teams: local.teams,
+      clients: local.clients,
+      goalTemplates: local.goalTemplates,
+      goals: local.goals,
+      tasks: local.tasks,
+    });
+    return deps.fetchState();
+  }
+  return state;
 }

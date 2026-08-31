@@ -7,7 +7,25 @@ let mainWindow = null;
 let bridgeProcess = null;
 
 const isDev = !app.isPackaged;
+// In a packaged build this path points inside app.asar; Electron's fork()
+// children get asar support, and module resolution must start inside the
+// archive to reach node_modules (verified: from app.asar.unpacked it cannot).
 const BRIDGE_SCRIPT = path.join(__dirname, '..', 'bridge', 'server.cjs');
+
+// Packaged builds must write DB/config/history/logs to userData — the install
+// directory (asar) is read-only.
+function bridgeEnv() {
+  if (isDev) return { ...process.env, BRIDGE_PORT: '3001' };
+  const dataDir = path.join(app.getPath('userData'), 'bridge');
+  return {
+    ...process.env,
+    BRIDGE_PORT: '3001',
+    BRIDGE_DB_PATH: path.join(dataDir, 'broadcastokr.db'),
+    BRIDGE_CONFIG_PATH: path.join(dataDir, 'config.json'),
+    BRIDGE_HISTORY_PATH: path.join(dataDir, 'kpi-history.json'),
+    BRIDGE_LOG_DIR: path.join(dataDir, 'logs'),
+  };
+}
 
 // ── Bridge Process Management ──
 
@@ -15,8 +33,11 @@ function startBridge() {
   if (bridgeProcess) return { ok: true, message: 'Bridge already running' };
 
   try {
+    if (!isDev) {
+      require('fs').mkdirSync(path.join(app.getPath('userData'), 'bridge'), { recursive: true });
+    }
     bridgeProcess = fork(BRIDGE_SCRIPT, [], {
-      env: { ...process.env, BRIDGE_PORT: '3001' },
+      env: bridgeEnv(),
       silent: true,
     });
 

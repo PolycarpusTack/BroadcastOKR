@@ -39,7 +39,7 @@ export function MemberInlineDetail({
     else if (filter === 'overdue')
       list = tasks.filter((t) => t.status !== 'done' && new Date(t.due) < now);
     return list.slice(0, MAX_ITEMS);
-  }, [tasks, goals, filter, now]);
+  }, [tasks, filter, now]);
 
   const filteredGoals = useMemo(() => {
     if (filter !== 'goals') return [];

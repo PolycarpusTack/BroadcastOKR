@@ -6,7 +6,7 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON (PSI) e
 ## Tech Stack
 - **Frontend**: React 19, TypeScript 5.9, Vite 7, Zustand 5, React Router 7 (HashRouter for Electron)
 - **Desktop**: Electron 41 + electron-builder
-- **Bridge**: Express.js on localhost:3001 — read-only Oracle/PostgreSQL proxy
+- **Bridge**: Express.js on port 3001 (binds 0.0.0.0 by default; `BRIDGE_HOST` to restrict) — read-only Oracle/PostgreSQL proxy + SQLite CRUD/sync layer
 - **DB Drivers**: `oracledb` (optional), `pg` (optional) — loaded at runtime
 - **Testing**: Vitest + React Testing Library
 
@@ -113,8 +113,11 @@ components/
 | POST | `/api/kpi/execute-batch` | Batch KR queries |
 | GET | `/api/kpi/history/:id` | KPI history |
 | GET | `/api/kpi/templates` | KPI SQL templates |
+| GET | `/api/sync/state`, `/api/sync/changes?since=` | Full/incremental state for the 5s change poll |
+| POST | `/api/sync/migrate-from-local` | Upload local state (auto-run on first connect to an empty bridge) |
+| CRUD | `/api/goals` (+`/:id/check-in`), `/api/tasks`, `/api/clients`, `/api/users`, `/api/teams`, `/api/goal-templates` | SQLite-backed entity CRUD (bridge/routes/*.cjs) |
 
-All SQL execution is SELECT-only (enforced at bridge level).
+All SQL execution is SELECT-only (enforced at bridge level). Check-in semantics: the bridge records history and bumps `updated_at` only — the client owns progress (`krProgress`) and PUTs the recalculated goal. Bridge timestamps are sqlite `datetime('now')` format (UTC, no 'T'); `/api/sync/changes` normalizes the ISO `since` before comparing.
 
 ## Auth & Permissions
 Frontend-only persona switching (no backend auth). Three roles:
@@ -130,8 +133,10 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 169 tests across 30 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 48 bridge tests (node --test)
+- `npm test` — 189 tests across 32 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 52 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
+- `npm run lint` — 0 errors, gated in CI
+- After `npm run electron:build*`, run `npm rebuild better-sqlite3` — electron-builder rebuilds it for Electron's ABI, which breaks the dev bridge under system Node
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
 - Key test files: `store.test.ts` (core actions), `history.test.ts` (checkInKR, setMonitor, monitoring sync), `clients.test.ts` (client CRUD, templates, materialization), `progress.test.ts` (krProgress direction/hold-the-line)
 
@@ -155,8 +160,10 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Code-split bundle (1.21MB → 67KB main), 0 npm vulns, Playwright E2E in CI
 - localStorage quota-exceeded handler
 
+- 2026-08-31 hardening pass (GPM, `docs/gpm/state/`): goal-template route contract fixed + contract-tested in CI, first-connect migration replaces the data-wipe path, bridge ships in packaged Electron builds (fork from inside app.asar, writable paths → userData), check-in propagation fixed (updated_at bump + ISO-vs-sqlite `since` normalization), bridge-write failures toast, audit 24→0, lint 0 + CI gate, shared live-KR batch builder (`src/utils/liveSync.ts`)
+
 ### Next steps
-1. Date range filtering on report views
-2. Export history to file (if localStorage gets tight)
-3. Phase 3 offline mutation queue (deferred — server convergence, not data loss)
+1. Export history to file (if localStorage gets tight)
+2. TD-1: bridge writes for setMonitor/toggleSubtask/addBulkTasks + persisting live-KR sync results (see docs/gpm/state/hardening-backlog-2026-08-31.md)
+3. Phase 3 offline mutation queue (deferred — server convergence; note: first-connect migration now protects local data)
 4. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype

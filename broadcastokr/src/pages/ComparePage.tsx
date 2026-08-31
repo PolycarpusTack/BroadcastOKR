@@ -5,6 +5,8 @@ import { useStore } from '../store/store';
 import { useShallow } from 'zustand/react/shallow';
 import { PillBadge } from '../components/ui/PillBadge';
 import { goalStatus, progressColor } from '../utils/colors';
+import { krProgress } from '../utils/progress';
+import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
 import {
   PRIMARY_COLOR,
   COLOR_WARNING,
@@ -172,34 +174,12 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
 
   const handleSyncAll = useCallback(async () => {
     if (!executeBatch || !selectedTemplate) return;
-    const queries: (ExecuteBatchQuery & { krId: string })[] = [];
-    for (const row of filteredRows) {
-      row.goal.keyResults.forEach((kr, krIndex) => {
-        if (kr.liveConfig) {
-          queries.push({
-            goalId: row.goal.id,
-            krIndex,
-            krId: kr.id,
-            connectionId: kr.liveConfig.connectionId,
-            sql: kr.liveConfig.sql,
-            timeframeDays: kr.liveConfig.timeframeDays,
-          });
-        }
-      });
-    }
+    const queries = buildLiveKRQueries(filteredRows.map((row) => row.goal));
     if (queries.length === 0) return;
     setSyncing(true);
     try {
       const { results } = await executeBatch(queries);
-      syncLiveKRBatch(
-        results.map((r, i) => ({
-          goalId: r.goalId,
-          krId: queries[i]?.krId ?? '',
-          current: r.current,
-          error: r.error,
-          status: r.status,
-        })),
-      );
+      syncLiveKRBatch(mapResultsToKrIds(results, queries));
     } finally {
       setSyncing(false);
     }
@@ -536,7 +516,7 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
                   return (
                     <td key={krt.id} style={summaryTdStyle}>
                       {avg !== undefined ? (
-                        <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: progressColor(avg / (krt.target || 1)) }}>
+                        <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: progressColor(krProgress(krt.start, krt.target, avg)) }}>
                           {formatValue(avg, krt.unit)}
                         </span>
                       ) : (

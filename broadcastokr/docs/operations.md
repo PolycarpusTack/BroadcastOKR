@@ -76,13 +76,27 @@ cp bridge/broadcastokr.db backups/broadcastokr-$(date +%Y%m%d).db
 
 ### Data migration from localStorage
 
-If upgrading from a standalone (non-shared) installation:
+Migration is automatic: on first connect to a bridge whose database is empty,
+the app uploads its local data (users first, then teams, clients, templates,
+goals, tasks) before adopting bridge state. If the upload fails, local data is
+kept untouched and a toast reports the failure.
 
-1. Open the app while connected to the bridge
-2. Open browser DevTools console
-3. Run: `fetch('/api/sync/migrate-from-local', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer <KEY>' }, body: localStorage.getItem('broadcastokr-data') })`
-4. Verify the response shows correct entity counts
-5. Clear localStorage: `localStorage.removeItem('broadcastokr-data')`
+Manual fallback (e.g. migrating into a bridge that already has data — the
+endpoint only inserts missing rows). The endpoint expects the state slices at
+the top level, NOT the persisted `{"state":…,"version":…}` envelope, and must
+be addressed at the bridge URL:
+
+1. Open the app, open browser DevTools console
+2. Run:
+   ```js
+   const { state } = JSON.parse(localStorage.getItem('broadcastokr-data'));
+   fetch('http://localhost:3001/api/sync/migrate-from-local', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer <KEY>' },
+     body: JSON.stringify(state),
+   }).then(r => r.json()).then(console.log)
+   ```
+3. Verify the response shows correct entity counts
 
 ### Bridge database is corrupted
 

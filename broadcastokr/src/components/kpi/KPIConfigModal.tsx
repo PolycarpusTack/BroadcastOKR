@@ -196,6 +196,8 @@ export function KPIConfigModal({
     try {
       setStatus('Adding KPI from template...');
       await saveKPI({
+        // Runs in a click handler, not during render; Date.now() generates the KPI id
+        // eslint-disable-next-line react-hooks/purity
         id: `kpi_${Date.now()}`,
         name: tmpl.name,
         connectionId: matchConn.id,
