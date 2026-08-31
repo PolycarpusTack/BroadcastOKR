@@ -1,4 +1,5 @@
 const express = require('express');
+const { isFleetAllowed } = require('../editions.cjs');
 
 function toClientDTO(row) {
   return {
@@ -21,6 +22,11 @@ function createClientsRouter(db) {
 
   router.post('/', (req, res) => {
     const c = req.body;
+    // Single-tenant instances are pinned to exactly one client row
+    if (!isFleetAllowed) {
+      const count = db.prepare('SELECT COUNT(*) AS c FROM clients').get().c;
+      if (count >= 1) return res.status(403).json({ error: 'single_tenant' });
+    }
     db.prepare(`INSERT INTO clients (id, name, connection_id, logo, color, tags, channels, sql_overrides, monitor_until)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(c.id, c.name, c.connectionId || '', c.logo || null, c.color,
@@ -44,6 +50,10 @@ function createClientsRouter(db) {
   });
 
   router.delete('/:id', (req, res) => {
+    if (!isFleetAllowed) {
+      const count = db.prepare('SELECT COUNT(*) AS c FROM clients').get().c;
+      if (count <= 1) return res.status(403).json({ error: 'single_tenant' });
+    }
     db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
   });

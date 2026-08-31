@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import './styles/accessibility.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
@@ -21,6 +21,8 @@ import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
 import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
 import { useActivityLog } from './context/ActivityLogContext';
+import { DeploymentProvider } from './context/DeploymentContext';
+import { BUILD_EDITION, setRuntimeMode, hasFeature, type TenancyMode } from './editions/entitlements';
 import { logger } from './utils/logger';
 
 export default function App() {
@@ -56,6 +58,14 @@ export default function App() {
   const { toast } = useToast();
   const { hydrateLog } = useActivityLog();
   const syncLiveKRBatch = useStore((s) => s.syncLiveKRBatch);
+
+  // Tenancy: the bridge's health.mode wins over the build-time edition
+  const mode: TenancyMode = useMemo(() => {
+    const m = health?.mode;
+    return m === 'desktop' || m === 'client' || m === 'cockpit' ? m : BUILD_EDITION;
+  }, [health?.mode]);
+  useEffect(() => { setRuntimeMode(mode); }, [mode]);
+  const fleet = hasFeature('fleet', mode);
 
   // Start periodic auto-sync for live KRs when bridge is connected
   useEffect(() => {
@@ -156,6 +166,7 @@ export default function App() {
   }, [toast]);
 
   return (
+    <DeploymentProvider mode={mode}>
     <AppShell onCreateTask={() => setCreateTaskOpen(true)} connected={connected} bridgeRunning={bridgeRunning}>
       <ErrorBoundary>
         <Suspense fallback={
@@ -190,10 +201,14 @@ export default function App() {
             />
           } />
           <Route path="/clients" element={
-            <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
+            fleet
+              ? <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
+              : <Navigate to="/dashboard" replace />
           } />
           <Route path="/compare" element={
-            <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
+            fleet
+              ? <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
+              : <Navigate to="/dashboard" replace />
           } />
           <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
           <Route path="/team" element={<TeamPage />} />
@@ -220,5 +235,6 @@ export default function App() {
         deleteConnection={deleteConnection}
       />
     </AppShell>
+    </DeploymentProvider>
   );
 }

@@ -38,6 +38,7 @@ app.use(createRateLimitMiddleware());
 app.use(createAuthMiddleware(BRIDGE_API_KEY));
 app.use(createLoggingMiddleware());
 
+const { MODE } = require('./editions.cjs');
 const { atomicWriteJSON } = require('./utils/atomicWrite.cjs');
 const { encrypt, decrypt } = require('./utils/crypto.cjs');
 
@@ -295,6 +296,7 @@ app.get('/api/health', (req, res) => {
 
   res.json({
     status: 'ok',
+    mode: MODE,
     timestamp: new Date().toISOString(),
     uptime,
     drivers: {

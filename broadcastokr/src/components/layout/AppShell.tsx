@@ -10,6 +10,7 @@ const ImportExportModal = lazy(() => import('../data/ImportExportModal').then((m
 const HelpModal = lazy(() => import('../help/HelpModal').then((m) => ({ default: m.HelpModal })));
 const DeveloperGuideModal = lazy(() => import('../help/DeveloperGuideModal').then((m) => ({ default: m.DeveloperGuideModal })));
 import { useTheme } from '../../context/ThemeContext';
+import { useDeployment } from '../../context/DeploymentContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useActivityLog } from '../../context/ActivityLogContext';
@@ -26,6 +27,7 @@ interface AppShellProps {
 
 export function AppShell({ children, onCreateTask, connected, bridgeRunning }: AppShellProps) {
   const { theme } = useTheme();
+  const { can } = useDeployment();
   const { currentUser, setCurrentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { log, logAction } = useActivityLog();
@@ -134,7 +136,7 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
       )}
       <ActivityLog log={log} open={logOpen} onClose={() => setLogOpen(false)} theme={theme} />
       <ToastContainer />
-      {import.meta.env.DEV && (
+      {import.meta.env.DEV && can('personaPanel') && (
         <PersonaPanel
           currentUser={currentUser}
           setCurrentUser={(u) => {

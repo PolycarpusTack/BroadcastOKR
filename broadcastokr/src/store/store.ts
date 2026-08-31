@@ -9,6 +9,7 @@ import { krProgress } from '../utils/progress';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
 import { bridgePost, bridgePut, bridgePutEntity, bridgeDelete, bridgeWriteFailed } from './bridgeSync';
+import { hasFeature, getRuntimeMode } from '../editions/entitlements';
 
 /** Recalculate goal progress and status from its KRs */
 function recalcGoal(goal: Goal): Goal {
@@ -509,6 +510,7 @@ export const useStore = create<AppStore>()(
       },
 
       materializeTemplate: (templateId, clientIds, ownerIndex = 0) => {
+        if (!hasFeature('fleet', getRuntimeMode())) return;
         const s = get();
         const template = s.goalTemplates.find((t) => t.id === templateId);
         if (!template) return;
@@ -562,6 +564,7 @@ export const useStore = create<AppStore>()(
       },
 
       syncTemplateToGoals: (templateId) => {
+        if (!hasFeature('fleet', getRuntimeMode())) return;
         set((s) => {
           const template = s.goalTemplates.find((t) => t.id === templateId);
           if (!template) return {};
