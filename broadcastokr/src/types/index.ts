@@ -179,6 +179,20 @@ export interface Toast {
   exiting: boolean;
 }
 
+/** A WHATS'ON database connection as stored on the bridge */
+export interface DBConnection {
+  id: string;
+  name: string;
+  type: 'oracle' | 'postgres';
+  host: string;
+  port: number;
+  service: string;
+  schema: string;
+  user: string;
+  password: string;
+  clientDir?: string;
+}
+
 export interface ActivityEntry {
   id: number;
   text: string;

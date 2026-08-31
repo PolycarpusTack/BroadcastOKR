@@ -12,8 +12,10 @@ const GoalsPage = lazy(() => import('./pages/GoalsPage').then((m) => ({ default:
 const TasksPage = lazy(() => import('./pages/TasksPage').then((m) => ({ default: m.TasksPage })));
 const TeamPage = lazy(() => import('./pages/TeamPage').then((m) => ({ default: m.TeamPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const ClientsPage = lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage })));
-const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })));
+// Fleet pages are excluded from client-edition bundles at build time
+// (FLEET_IN_BUILD folds to false), and gated at runtime everywhere else.
+const ClientsPage = FLEET_IN_BUILD ? lazy(() => import('./pages/ClientsPage').then((m) => ({ default: m.ClientsPage }))) : null;
+const ComparePage = FLEET_IN_BUILD ? lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage }))) : null;
 import { useBridge } from './hooks/useBridge';
 import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
@@ -22,7 +24,7 @@ import { COLOR_DANGER, COLOR_WARNING } from './constants/config';
 import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
 import { useActivityLog } from './context/ActivityLogContext';
 import { DeploymentProvider } from './context/DeploymentContext';
-import { BUILD_EDITION, setRuntimeMode, hasFeature, type TenancyMode } from './editions/entitlements';
+import { BUILD_EDITION, FLEET_IN_BUILD, setRuntimeMode, hasFeature, type TenancyMode } from './editions/entitlements';
 import { logger } from './utils/logger';
 
 export default function App() {
@@ -200,16 +202,20 @@ export default function App() {
               executeBatch={executeBatch}
             />
           } />
-          <Route path="/clients" element={
-            fleet
-              ? <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
-              : <Navigate to="/dashboard" replace />
-          } />
-          <Route path="/compare" element={
-            fleet
-              ? <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
-              : <Navigate to="/dashboard" replace />
-          } />
+          {FLEET_IN_BUILD && ClientsPage && (
+            <Route path="/clients" element={
+              fleet
+                ? <ClientsPage bridgeConnected={connected} bridgeRunning={bridgeRunning} testConnection={testConnection} getConnections={getConnections} getChannels={getChannels} saveConnection={saveConnection} onStartBridge={startBridge} onStopBridge={stopBridge} />
+                : <Navigate to="/dashboard" replace />
+            } />
+          )}
+          {FLEET_IN_BUILD && ComparePage && (
+            <Route path="/compare" element={
+              fleet
+                ? <ComparePage bridgeConnected={connected} executeBatch={executeBatch} />
+                : <Navigate to="/dashboard" replace />
+            } />
+          )}
           <Route path="/tasks" element={<TasksPage createOpen={createTaskOpen} setCreateOpen={setCreateTaskOpen} />} />
           <Route path="/team" element={<TeamPage />} />
           <Route path="/reports" element={<ReportsPage />} />

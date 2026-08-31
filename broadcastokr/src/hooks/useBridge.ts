@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BRIDGE_POLL_INTERVAL_MS } from '../constants/config';
-import type { Goal, SyncStatus } from '../types';
+import type { Goal, SyncStatus, DBConnection } from '../types';
 import { buildLiveKRQueries, mapResultsToKrIds, type LiveKRBatchResult } from '../utils/liveSync';
 import { bridgeFetch } from '../store/bridgeSync';
 
@@ -55,18 +55,7 @@ export interface KPIDefinition {
   binds?: Record<string, unknown>;
 }
 
-export interface DBConnection {
-  id: string;
-  name: string;
-  type: 'oracle' | 'postgres';
-  host: string;
-  port: number;
-  service: string;
-  schema: string;
-  user: string;
-  password: string;
-  clientDir?: string;
-}
+export type { DBConnection } from '../types';
 
 export interface TableInfo {
   TABLE_NAME: string;

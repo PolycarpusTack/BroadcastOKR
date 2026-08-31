@@ -22,6 +22,12 @@ function normalize(value: unknown): TenancyMode | null {
 
 export const BUILD_EDITION: TenancyMode = normalize(import.meta.env.VITE_EDITION) ?? 'desktop';
 
+/**
+ * Statically foldable (direct env comparison, no function call) so Rollup can
+ * dead-code-eliminate fleet page chunks out of client-edition bundles.
+ */
+export const FLEET_IN_BUILD: boolean = import.meta.env.VITE_EDITION !== 'client';
+
 let runtimeMode: TenancyMode = BUILD_EDITION;
 
 /** Fed from /api/health by App; non-modes are ignored. */

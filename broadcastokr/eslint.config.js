@@ -32,4 +32,31 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // FF-2: the domain layer stays UI- and edition-neutral. An edition branch
+    // inside krProgress() would be the beginning of the fork.
+    // (Known debt: utils/importExport imports the store — tracked, not fenced yet.)
+    files: ['src/utils/**/*.ts', 'src/types/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['**/pages/**', '**/components/**', '**/context/**', '**/editions/**', '**/hooks/**'],
+          message: 'Domain layer (utils/types) must not import UI or edition code.',
+        }],
+      }],
+    },
+  },
+  {
+    // The store may consume the entitlements gate, but never UI.
+    files: ['src/store/**/*.ts'],
+    ignores: ['src/store/__tests__/**'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['**/pages/**', '**/components/**', '**/context/**', '**/hooks/**'],
+          message: 'The store must not import UI code.',
+        }],
+      }],
+    },
+  },
 ])

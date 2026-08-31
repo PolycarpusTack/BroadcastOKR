@@ -45,6 +45,37 @@ jobs:
         # references and noUnusedLocals checks run, matching local `npm run build`.
         run: npm run build
 
+      - name: Edition bundle check (desktop)
+        working-directory: broadcastokr
+        run: node scripts/check-edition-bundle.mjs desktop
+
+  editions:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        edition: [client, internal]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: broadcastokr/package-lock.json
+
+      - name: Install dependencies
+        working-directory: broadcastokr
+        run: npm ci
+
+      - name: Build ${{ matrix.edition }} edition
+        working-directory: broadcastokr
+        run: VITE_EDITION=${{ matrix.edition }} npx vite build
+
+      - name: Edition bundle check (FF-1)
+        working-directory: broadcastokr
+        run: node scripts/check-edition-bundle.mjs ${{ matrix.edition }}
+
   e2e:
     runs-on: ubuntu-latest
     steps:
