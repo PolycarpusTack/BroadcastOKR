@@ -49,6 +49,13 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 const db = createDB(DB_PATH);
 runMigrations(db, MIGRATIONS_DIR);
 
+const { startBackupScheduler } = require('./utils/backup.cjs');
+const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR
+  || (DB_PATH !== ':memory:' ? path.join(path.dirname(DB_PATH), 'backups') : null);
+if (DB_PATH !== ':memory:' && BACKUP_DIR) {
+  startBackupScheduler(db, BACKUP_DIR);
+}
+
 const { createGoalsRouter } = require('./routes/goals.cjs');
 app.use('/api/goals', createGoalsRouter(db));
 

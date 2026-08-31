@@ -152,11 +152,12 @@ export const useStore = create<AppStore>()(
             ),
           };
         });
+        const base = type === 'goal' ? '/api/goals' : '/api/clients';
         const full = type === 'goal'
           ? get().goals.find((g) => g.id === id)
           : get().clients.find((c) => c.id === id);
         if (full) {
-          bridgePut(`/api/${type === 'goal' ? 'goals' : 'clients'}/${id}`, full).catch(bridgeWriteFailed);
+          bridgePut(`${base}/${id}`, full).catch(bridgeWriteFailed);
         }
       },
 

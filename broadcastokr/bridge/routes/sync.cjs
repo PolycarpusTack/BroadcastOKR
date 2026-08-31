@@ -195,12 +195,21 @@ function createSyncRouter(db, dbPath) {
     }
   });
 
-  // GET /api/sync/backup — download SQLite database file
-  router.get('/backup', (req, res) => {
-    if (!dbPath || !fs.existsSync(dbPath)) {
-      return res.status(404).json({ error: 'Database file not found' });
+  // GET /api/sync/backup — download a fresh online snapshot (never the
+  // WAL-hot live file, which can be mid-checkpoint and inconsistent)
+  router.get('/backup', async (req, res) => {
+    const os = require('os');
+    const { runBackupOnce } = require('../utils/backup.cjs');
+    try {
+      const tmpDir = fs.mkdtempSync(require('path').join(os.tmpdir(), 'brokr-snap-'));
+      const snapshot = await runBackupOnce(db, tmpDir, { keep: 1 });
+      res.download(snapshot, `broadcastokr-backup-${new Date().toISOString().slice(0, 10)}.db`, () => {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      });
+    } catch (err) {
+      console.error('Backup snapshot failed:', err);
+      res.status(500).json({ error: 'Backup failed' });
     }
-    res.download(dbPath, `broadcastokr-backup-${new Date().toISOString().slice(0, 10)}.db`);
   });
 
   return router;

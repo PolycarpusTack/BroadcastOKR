@@ -24,6 +24,7 @@ function bridgeEnv() {
     BRIDGE_CONFIG_PATH: path.join(dataDir, 'config.json'),
     BRIDGE_HISTORY_PATH: path.join(dataDir, 'kpi-history.json'),
     BRIDGE_LOG_DIR: path.join(dataDir, 'logs'),
+    BRIDGE_BACKUP_DIR: path.join(dataDir, 'backups'),
   };
 }
 

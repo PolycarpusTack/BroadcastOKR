@@ -28,7 +28,12 @@ node server.cjs
 
 ### Automatic Backups
 
-The bridge does not yet auto-backup. Set up a cron job:
+The bridge snapshots its database automatically: an online backup at startup
+and then daily, to `BRIDGE_BACKUP_DIR` (default: a `backups/` directory next
+to the database file; the desktop app uses its user-data directory), pruned to
+the newest 14. Snapshots use SQLite's online backup API, so they are consistent
+even while writes are happening. For off-machine copies, still ship the backup
+directory elsewhere with a cron job:
 
 ```bash
 # Daily backup at 2 AM
