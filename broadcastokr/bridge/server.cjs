@@ -69,8 +69,8 @@ app.use('/api/sync', createSyncRouter(db, DB_PATH));
 
 // ── Config ──
 
-const CONFIG_PATH = path.join(__dirname, 'config.json');
-const HISTORY_PATH = path.join(__dirname, 'kpi-history.json');
+const CONFIG_PATH = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'config.json');
+const HISTORY_PATH = process.env.BRIDGE_HISTORY_PATH || path.join(__dirname, 'kpi-history.json');
 
 function loadConfig() {
   try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); }

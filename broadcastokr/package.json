@@ -3,7 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "description": "Broadcast Operations OKR Management Platform",
-  "author": "BroadcastOKR",
+  "author": {
+    "name": "BroadcastOKR",
+    "email": "yannick.verrydt@gmail.com"
+  },
+  "homepage": "https://github.com/PolycarpusTack/BroadcastOKR",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -31,6 +35,14 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "bridge/**/*",
+      "!bridge/__tests__/**",
+      "!bridge/*.db",
+      "!bridge/.env",
+      "!bridge/config.json",
+      "!bridge/kpi-history.json",
+      "!bridge/logs/**",
+      "!bridge/Dockerfile",
       "public/icon.ico",
       "public/icon.png"
     ],
@@ -61,7 +73,7 @@
         "deb"
       ],
       "category": "Office",
-      "icon": "public/icon.ico"
+      "icon": "public/icon.png"
     },
     "mac": {
       "target": [
