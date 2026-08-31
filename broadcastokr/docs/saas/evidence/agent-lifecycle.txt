@@ -1,0 +1,11 @@
+# Generated 2026-08-31T19:04:18Z — connector agent: enrolment, scalar-only ingest, revocation (bridge/__tests__/agent.test.cjs)
+  # Subtest: connector agent
+      ok 1 - enrols via the CLI with a one-time token; identity file is written 0600
+      ok 2 - an agent pass executes local bindings and its values land + propagate
+      ok 3 - rejects out-of-contract ingest payloads
+      ok 4 - reports unknown KR ids without failing the batch
+      ok 5 - revocation cuts the agent off
+  ok 1 - connector agent
+  # tests 5
+  # pass 5
+  # fail 0

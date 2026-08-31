@@ -45,6 +45,9 @@ const POLICY = [
   { method: 'POST', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
   { method: 'DELETE', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
   { method: 'POST', path: /^\/api\/sync\/migrate-from-local$/, perm: 'ownerOnly' },
+  { method: 'POST', path: /^\/api\/cockpit\/tenants$/, perm: 'ownerOnly' },
+  { method: 'POST', path: /^\/api\/agents\/enrol-token$/, perm: 'ownerOnly' },
+  { method: 'DELETE', path: /^\/api\/agents(\/|$)/, perm: 'ownerOnly' },
   { method: 'GET', path: /^\/api\/sync\/backup$/, perm: 'ownerOnly' },
 ];
 
@@ -54,6 +57,7 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
     if (!req.path.startsWith('/api/') || req.path === '/api/health' || req.path.startsWith('/api/auth/')) {
       return next();
     }
+    if (req.path === '/api/cockpit/ingest' || req.path.startsWith('/api/agent/')) return next();
 
     const role = req.user?.role;
     if (!role) return res.status(401).json({ error: 'Not signed in' });

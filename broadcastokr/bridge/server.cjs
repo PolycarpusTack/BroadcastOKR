@@ -105,6 +105,24 @@ app.use('/api/teams', createTeamsRouter(db));
 app.use('/api/sync', createSyncRouter(db, DB_PATH));
 app.use('/api/activity', createActivityRouter(db));
 
+const { createCockpitRouter } = require('./routes/cockpit.cjs');
+app.use('/api/cockpit', createCockpitRouter(db));
+
+const { createAgentRouters } = require('./routes/agent.cjs');
+const agentRouters = createAgentRouters(db);
+app.use('/api/agents', agentRouters.ops);
+app.use('/api/agent', agentRouters.machine);
+
+// Client instances push their opted-in metrics to the cockpit (T2-3)
+if (MODE === 'client' && process.env.BRIDGE_COCKPIT_URL && process.env.BRIDGE_SHARE_TOKEN) {
+  const { startSharePushLoop } = require('./cockpit/pushLoop.cjs');
+  startSharePushLoop(db, {
+    cockpitUrl: process.env.BRIDGE_COCKPIT_URL,
+    shareToken: process.env.BRIDGE_SHARE_TOKEN,
+    intervalMs: Number(process.env.BRIDGE_SHARE_INTERVAL_MS) || 5 * 60 * 1000,
+  });
+}
+
 // ── WHATS'ON access (the agent core) ──
 
 const { createWhatsonCore, oracledb, pg } = require('./whatson/core.cjs');

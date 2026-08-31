@@ -1,2 +1,2 @@
-# Generated 2026-08-31T18:12:08Z — client-edition bundle exclusion (FF-1 sentinel scan)
+# Generated 2026-08-31T19:04:05Z — client-edition bundle exclusion (FF-1 sentinel scan)
 OK: client bundle sentinel check passed (22 chunks scanned)

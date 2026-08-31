@@ -12,6 +12,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { PillBadge } from '../components/ui/PillBadge';
 import { LiveKPIPanel } from '../components/kpi/LiveKPIPanel';
 import { SystemHealthPanel } from '../components/dashboard/SystemHealthPanel';
+import { FleetMetricsPanel } from '../components/dashboard/FleetMetricsPanel';
 import { progressColor, statusIcon, kpiStatus } from '../utils/colors';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
 import { cardStyle as makeCardStyle } from '../utils/styles';
@@ -86,6 +87,7 @@ export function DashboardPage({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <FleetMetricsPanel connected={bridgeConnected} />
       {/* Stat Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         {statCards.map((s) => (

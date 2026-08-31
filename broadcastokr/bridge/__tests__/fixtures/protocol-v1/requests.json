@@ -1,0 +1,48 @@
+{
+  "protocol": 1,
+  "capturedAt": "2026-08-31",
+  "note": "Canonical v1 client requests. A future server must accept every one of these until MIN_SUPPORTED passes 1 (FF-5). Placeholders: {{AGENT_TOKEN}}, {{SHARE_TOKEN}} are provisioned by the replay test.",
+  "requests": [
+    {
+      "name": "app: full state fetch",
+      "method": "GET", "path": "/api/sync/state",
+      "expectStatus": 200, "expectKeys": ["goals", "tasks", "clients", "goalTemplates", "users", "teams", "kpis", "timestamp"]
+    },
+    {
+      "name": "app: incremental changes with ISO since",
+      "method": "GET", "path": "/api/sync/changes?since=2026-01-01T00:00:00.000Z",
+      "expectStatus": 200, "expectKeys": ["goals", "tasks", "timestamp"]
+    },
+    {
+      "name": "app: goal create (v1 shape)",
+      "method": "POST", "path": "/api/goals",
+      "body": { "id": "fx-g1", "title": "Fixture goal", "status": "behind", "progress": 0, "owner": 1, "channel": 0, "period": "Q1", "keyResults": [{ "id": "fx-kr1", "title": "KR", "start": 0, "target": 100, "current": 0, "progress": 0, "status": "behind" }] },
+      "expectStatus": 201, "expectKeys": ["ok", "id"]
+    },
+    {
+      "name": "app: versionless legacy PUT stays last-write-wins",
+      "method": "PUT", "path": "/api/goals/fx-g1",
+      "body": { "title": "Fixture goal edited", "status": "behind", "progress": 0, "owner": 1, "channel": 0, "period": "Q1" },
+      "expectStatus": 200, "expectKeys": ["ok", "version"]
+    },
+    {
+      "name": "app: KR check-in",
+      "method": "POST", "path": "/api/goals/fx-g1/check-in",
+      "body": { "krId": "fx-kr1", "value": 42, "actor": "fixture" },
+      "expectStatus": 200, "expectKeys": ["ok"]
+    },
+    {
+      "name": "app: activity post",
+      "method": "POST", "path": "/api/activity",
+      "body": { "actor": "fixture", "text": "did a thing" },
+      "expectStatus": 201, "expectKeys": ["ok", "id"]
+    },
+    {
+      "name": "agent: scalar ingest",
+      "method": "POST", "path": "/api/agent/ingest",
+      "headers": { "X-Agent-Token": "{{AGENT_TOKEN}}" },
+      "body": { "results": [{ "krId": "fx-kr1", "value": 55, "timestamp": "2026-08-31T12:00:00.000Z" }] },
+      "expectStatus": 200, "expectKeys": ["ok", "applied", "unknown"]
+    }
+  ]
+}
