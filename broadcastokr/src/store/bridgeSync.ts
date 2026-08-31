@@ -1,5 +1,19 @@
 import { BRIDGE_URL, BRIDGE_API_KEY } from '../constants/config';
+import { logger } from '../utils/logger';
 import type { Goal, Task, Client, GoalTemplate, User, Team, KPI } from '../types';
+
+/**
+ * Rejection handler for fire-and-forget store writes. Local state stays
+ * authoritative (optimistic update already applied); this makes the divergence
+ * visible instead of silently swallowing it — App.tsx listens for the event
+ * and shows a debounced toast.
+ */
+export function bridgeWriteFailed(err: unknown): void {
+  logger.error('Bridge write failed', err);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('bridge-write-failed'));
+  }
+}
 
 export interface BridgeState {
   goals: Goal[];

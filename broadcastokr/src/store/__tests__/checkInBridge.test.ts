@@ -4,6 +4,7 @@ vi.mock('../bridgeSync', () => ({
   bridgePost: vi.fn().mockResolvedValue({ ok: true }),
   bridgePut: vi.fn().mockResolvedValue({ ok: true }),
   bridgeDelete: vi.fn().mockResolvedValue({ ok: true }),
+  bridgeWriteFailed: vi.fn(),
 }));
 
 import { useStore } from '../store';

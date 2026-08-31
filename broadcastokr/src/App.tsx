@@ -121,14 +121,25 @@ export default function App() {
       toast('Storage is full. Export your data to free space.', COLOR_WARNING, '⚠️');
     };
 
+    // Debounced so a burst of failed writes (bridge down) shows one toast
+    let lastWriteFailToast = 0;
+    const handleBridgeWriteFailed = () => {
+      const now = Date.now();
+      if (now - lastWriteFailToast < 5000) return;
+      lastWriteFailToast = now;
+      toast('Change not saved to server — kept locally', COLOR_WARNING, '⚠️');
+    };
+
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     window.addEventListener('error', handleError);
     window.addEventListener('storage-quota-exceeded', handleStorageQuota);
+    window.addEventListener('bridge-write-failed', handleBridgeWriteFailed);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleError);
       window.removeEventListener('storage-quota-exceeded', handleStorageQuota);
+      window.removeEventListener('bridge-write-failed', handleBridgeWriteFailed);
     };
   }, [toast]);
 

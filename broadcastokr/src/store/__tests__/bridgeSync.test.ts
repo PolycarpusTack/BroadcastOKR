@@ -103,6 +103,22 @@ const localEmpty = {
   goals: [], tasks: [], clients: [], goalTemplates: [], users: [], teams: [],
 } as unknown as Parameters<typeof performInitialSync>[0];
 
+describe('bridgeWriteFailed', () => {
+  it('dispatches a bridge-write-failed event for the App toast handler', async () => {
+    const { bridgeWriteFailed } = await import('../bridgeSync');
+    const dispatched: Event[] = [];
+    const spy = vi.spyOn(window, 'dispatchEvent').mockImplementation((e) => {
+      dispatched.push(e);
+      return true;
+    });
+
+    bridgeWriteFailed(new Error('boom'));
+
+    expect(dispatched.some((e) => e.type === 'bridge-write-failed')).toBe(true);
+    spy.mockRestore();
+  });
+});
+
 describe('isBridgeEmpty', () => {
   it('is true when bridge has no users, goals, or tasks', () => {
     expect(isBridgeEmpty(emptyBridge)).toBe(true);
