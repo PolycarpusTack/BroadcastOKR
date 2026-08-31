@@ -8,8 +8,17 @@ function toTaskDTO(row, subtasks) {
     clientIds: row.client_ids ? JSON.parse(row.client_ids) : undefined,
     channelScope: row.channel_scope ? JSON.parse(row.channel_scope) : undefined,
     goalId: row.goal_id || undefined,
+    version: row.version ?? 0,
     subtasks: subtasks.map(s => ({ text: s.text, done: !!s.done })),
   };
+}
+
+/** Full DTO for one task, or null when it doesn't exist. */
+function getTaskDTO(db, id) {
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
+  if (!task) return null;
+  const subs = db.prepare('SELECT * FROM subtasks WHERE task_id = ? ORDER BY sort_order').all(id);
+  return toTaskDTO(task, subs);
 }
 
 function upsertSubtasks(db, taskId, subtasks) {
@@ -44,16 +53,30 @@ function createTasksRouter(db) {
     res.status(201).json({ ok: true, id: t.id });
   });
 
+  // Version-carrying bodies are compare-and-swap (stale → 409 with current row);
+  // versionless bodies keep last-write-wins for older clients.
   router.put('/:id', (req, res) => {
     const t = req.body;
-    db.prepare(`UPDATE tasks SET title=?, description=?, status=?, priority=?, assignee=?, channel=?, due=?, task_type=?,
-      client_ids=?, channel_scope=?, goal_id=?, updated_at=datetime('now') WHERE id=?`)
+    const existing = db.prepare('SELECT id FROM tasks WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Task not found' });
+
+    const checked = typeof t.version === 'number';
+    const result = db.prepare(`UPDATE tasks SET title=?, description=?, status=?, priority=?, assignee=?, channel=?, due=?, task_type=?,
+      client_ids=?, channel_scope=?, goal_id=?, version=version+1, updated_at=datetime('now')
+      WHERE id=?${checked ? ' AND version=?' : ''}`)
       .run(t.title, t.description || null, t.status, t.priority, t.assignee, t.channel, t.due, t.taskType,
         t.clientIds ? JSON.stringify(t.clientIds) : null,
         t.channelScope ? JSON.stringify(t.channelScope) : null,
-        t.goalId || null, req.params.id);
+        t.goalId || null,
+        ...(checked ? [req.params.id, t.version] : [req.params.id]));
+
+    if (result.changes === 0) {
+      return res.status(409).json({ error: 'version_conflict', current: getTaskDTO(db, req.params.id) });
+    }
+
     if (t.subtasks) upsertSubtasks(db, req.params.id, t.subtasks);
-    res.json({ ok: true });
+    const row = db.prepare('SELECT version FROM tasks WHERE id = ?').get(req.params.id);
+    res.json({ ok: true, version: row.version });
   });
 
   router.delete('/:id', (req, res) => {

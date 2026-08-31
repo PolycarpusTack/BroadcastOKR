@@ -110,6 +110,8 @@ export interface Goal {
   channelScope?: ChannelScope;
   templateId?: string;
   monitorUntil?: string;
+  /** Optimistic-concurrency counter, maintained by the bridge */
+  version?: number;
 }
 
 export interface Subtask {
@@ -131,6 +133,8 @@ export interface Task {
   clientIds?: string[];
   channelScope?: ChannelScope;
   goalId?: string;
+  /** Optimistic-concurrency counter, maintained by the bridge */
+  version?: number;
 }
 
 export interface KPI {

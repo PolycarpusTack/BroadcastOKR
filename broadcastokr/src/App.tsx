@@ -136,16 +136,22 @@ export default function App() {
       toast('Change not saved to server — kept locally', COLOR_WARNING, '⚠️');
     };
 
+    const handleWriteConflict = () => {
+      toast('Updated elsewhere — refreshed with the latest version', COLOR_WARNING, '🔄');
+    };
+
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
     window.addEventListener('error', handleError);
     window.addEventListener('storage-quota-exceeded', handleStorageQuota);
     window.addEventListener('bridge-write-failed', handleBridgeWriteFailed);
+    window.addEventListener('bridge-write-conflict', handleWriteConflict);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       window.removeEventListener('error', handleError);
       window.removeEventListener('storage-quota-exceeded', handleStorageQuota);
       window.removeEventListener('bridge-write-failed', handleBridgeWriteFailed);
+      window.removeEventListener('bridge-write-conflict', handleWriteConflict);
     };
   }, [toast]);
 

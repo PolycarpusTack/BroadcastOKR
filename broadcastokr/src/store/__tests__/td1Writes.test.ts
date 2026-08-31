@@ -3,12 +3,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('../bridgeSync', () => ({
   bridgePost: vi.fn().mockResolvedValue({ ok: true }),
   bridgePut: vi.fn().mockResolvedValue({ ok: true }),
+  bridgePutEntity: vi.fn().mockResolvedValue(undefined),
   bridgeDelete: vi.fn().mockResolvedValue({ ok: true }),
   bridgeWriteFailed: vi.fn(),
 }));
 
 import { useStore } from '../store';
-import { bridgePost, bridgePut } from '../bridgeSync';
+import { bridgePost, bridgePut, bridgePutEntity } from '../bridgeSync';
 import type { Goal, Task, Client } from '../../types';
 
 const goal: Goal = {
@@ -28,8 +29,9 @@ describe('TD-1: previously unsynced mutations reach the bridge', () => {
 
   it('setMonitor on a goal PUTs the goal with monitorUntil set', () => {
     useStore.getState().setMonitor('goal', 'g1', 7);
-    expect(bridgePut).toHaveBeenCalledWith('/api/goals/g1',
-      expect.objectContaining({ id: 'g1', monitorUntil: expect.any(String) }));
+    expect(bridgePutEntity).toHaveBeenCalledWith('goals',
+      expect.objectContaining({ id: 'g1', monitorUntil: expect.any(String) }),
+      expect.anything());
   });
 
   it('setMonitor(null) on a client PUTs the client with monitorUntil cleared', () => {
@@ -40,8 +42,9 @@ describe('TD-1: previously unsynced mutations reach the bridge', () => {
 
   it('toggleSubtask PUTs the full task with the flipped subtask', () => {
     useStore.getState().toggleSubtask('t1', 0);
-    expect(bridgePut).toHaveBeenCalledWith('/api/tasks/t1',
-      expect.objectContaining({ id: 't1', subtasks: [expect.objectContaining({ done: true })] }));
+    expect(bridgePutEntity).toHaveBeenCalledWith('tasks',
+      expect.objectContaining({ id: 't1', subtasks: [expect.objectContaining({ done: true })] }),
+      expect.anything());
   });
 
   it('addBulkTasks POSTs each task', () => {

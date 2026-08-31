@@ -3,12 +3,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('../bridgeSync', () => ({
   bridgePost: vi.fn().mockResolvedValue({ ok: true }),
   bridgePut: vi.fn().mockResolvedValue({ ok: true }),
+  bridgePutEntity: vi.fn().mockResolvedValue(undefined),
   bridgeDelete: vi.fn().mockResolvedValue({ ok: true }),
   bridgeWriteFailed: vi.fn(),
 }));
 
 import { useStore } from '../store';
-import { bridgePost, bridgePut } from '../bridgeSync';
+import { bridgePost, bridgePutEntity } from '../bridgeSync';
 import type { Goal } from '../../types';
 
 const goal: Goal = {
@@ -32,12 +33,13 @@ describe('checkInKR bridge writes', () => {
 
     const updated = useStore.getState().goals.find((g) => g.id === 'g1');
     expect(updated?.keyResults[0].progress).toBe(0.8);
-    expect(bridgePut).toHaveBeenCalledWith('/api/goals/g1',
-      expect.objectContaining({ id: 'g1', progress: updated?.progress }));
+    expect(bridgePutEntity).toHaveBeenCalledWith('goals',
+      expect.objectContaining({ id: 'g1', progress: updated?.progress }),
+      expect.anything());
   });
 
   it('does not touch the bridge when the goal or KR is unknown', () => {
     useStore.getState().checkInKR('missing', 'kr1', { value: 80, actor: 'alice' });
-    expect(bridgePut).not.toHaveBeenCalled();
+    expect(bridgePutEntity).not.toHaveBeenCalled();
   });
 });
