@@ -67,9 +67,11 @@ const { createAuthMiddleware } = require('./middleware/auth.cjs');
 const { createLoggingMiddleware } = require('./middleware/logging.cjs');
 const { createProtocolMiddleware } = require('./middleware/protocol.cjs');
 
+const { createRbacMiddleware } = require('./middleware/rbac.cjs');
 app.use(createRateLimitMiddleware());
 app.use(createProtocolMiddleware());
 app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureNoAuth: INSECURE_NO_AUTH }));
+app.use(createRbacMiddleware({ mode: MODE, insecureNoAuth: INSECURE_NO_AUTH, db }));
 app.use(createLoggingMiddleware());
 
 if (OIDC_CONFIGURED) {
