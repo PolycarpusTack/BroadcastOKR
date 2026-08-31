@@ -1,0 +1,39 @@
+{
+  "realm": "brokr",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "brokr-local",
+      "secret": "brokr-local-dev-secret",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3100/api/auth/callback",
+        "http://localhost:3101/api/auth/callback"
+      ],
+      "webOrigins": ["http://localhost:3100", "http://localhost:3101"]
+    }
+  ],
+  "users": [
+    {
+      "username": "owner",
+      "email": "owner@brokr.local",
+      "firstName": "Olive",
+      "lastName": "Owner",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "owner", "temporary": false }]
+    },
+    {
+      "username": "member",
+      "email": "member@brokr.local",
+      "firstName": "Max",
+      "lastName": "Member",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "member", "temporary": false }]
+    }
+  ]
+}

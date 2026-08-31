@@ -1,0 +1,15 @@
+# Local OIDC provider for the R1 validation rig — no corporate tenant needed.
+#   docker compose -f scripts/local-rig/keycloak-compose.yml up -d
+# Issuer for the instances:  http://localhost:8080/realms/brokr
+# Dev-only credentials; never reuse anywhere real.
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./brokr-realm.json:/opt/keycloak/data/import/brokr-realm.json:ro
