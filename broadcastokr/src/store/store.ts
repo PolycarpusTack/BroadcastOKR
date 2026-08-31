@@ -468,54 +468,56 @@ export const useStore = create<AppStore>()(
       },
 
       materializeTemplate: (templateId, clientIds, ownerIndex = 0) => {
-        set((s) => {
-          const template = s.goalTemplates.find((t) => t.id === templateId);
-          if (!template) return {};
-          const existingPairs = new Set(
-            s.goals
-              .filter((g) => g.templateId === templateId)
-              .flatMap((g) => g.clientIds ?? []),
-          );
-          const newGoals: Goal[] = [];
-          for (const clientId of clientIds) {
-            if (existingPairs.has(clientId)) continue;
-            const client = s.clients.find((c) => c.id === clientId);
-            if (!client) continue;
-            const overrides = client.sqlOverrides?.[templateId] || {};
-            newGoals.push({
+        const s = get();
+        const template = s.goalTemplates.find((t) => t.id === templateId);
+        if (!template) return;
+        const existingPairs = new Set(
+          s.goals
+            .filter((g) => g.templateId === templateId)
+            .flatMap((g) => g.clientIds ?? []),
+        );
+        const newGoals: Goal[] = [];
+        for (const clientId of clientIds) {
+          if (existingPairs.has(clientId)) continue;
+          const client = s.clients.find((c) => c.id === clientId);
+          if (!client) continue;
+          const overrides = client.sqlOverrides?.[templateId] || {};
+          newGoals.push({
+            id: crypto.randomUUID(),
+            title: `${template.title} — ${client.name}`,
+            status: 'behind',
+            progress: 0,
+            owner: ownerIndex,
+            channel: 0,
+            period: template.period,
+            clientIds: [clientId],
+            channelScope: { type: 'all' },
+            templateId,
+            keyResults: template.krTemplates.map((krt) => ({
               id: crypto.randomUUID(),
-              title: `${template.title} — ${client.name}`,
-              status: 'behind',
+              title: krt.title,
+              start: krt.start,
+              target: krt.target,
+              current: krt.start,
               progress: 0,
-              owner: ownerIndex,
-              channel: 0,
-              period: template.period,
-              clientIds: [clientId],
-              channelScope: { type: 'all' },
-              templateId,
-              keyResults: template.krTemplates.map((krt) => ({
-                id: crypto.randomUUID(),
-                title: krt.title,
-                start: krt.start,
-                target: krt.target,
-                current: krt.start,
-                progress: 0,
-                status: 'behind' as const,
-                krTemplateId: krt.id,
-                liveConfig: {
-                  connectionId: client.connectionId,
-                  sql: overrides[krt.id] || krt.sql,
-                  unit: krt.unit,
-                  direction: krt.direction,
-                  timeframeDays: krt.timeframeDays,
-                },
-                syncStatus: 'pending' as const,
-              })),
-            });
-          }
-          return { goals: [...newGoals, ...s.goals] };
-        });
-        bridgePost(`/api/goal-templates/${templateId}/materialize`, { clientIds, ownerIndex }).catch(console.error);
+              status: 'behind' as const,
+              krTemplateId: krt.id,
+              liveConfig: {
+                connectionId: client.connectionId,
+                sql: overrides[krt.id] || krt.sql,
+                unit: krt.unit,
+                direction: krt.direction,
+                timeframeDays: krt.timeframeDays,
+              },
+              syncStatus: 'pending' as const,
+            })),
+          });
+        }
+        if (newGoals.length === 0) return;
+        set((cur) => ({ goals: [...newGoals, ...cur.goals] }));
+        for (const goal of newGoals) {
+          bridgePost('/api/goals', goal).catch(console.error);
+        }
       },
 
       syncTemplateToGoals: (templateId) => {
@@ -585,7 +587,9 @@ export const useStore = create<AppStore>()(
           }
           return { goals };
         });
-        bridgePost(`/api/goal-templates/${templateId}/sync`, {}).catch(console.error);
+        for (const goal of get().goals.filter((g) => g.templateId === templateId)) {
+          bridgePut(`/api/goals/${goal.id}`, goal).catch(console.error);
+        }
       },
 
       // Bridge sync actions
