@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
 
 function toUserDTO(row) {
@@ -12,7 +12,7 @@ function toUserDTO(row) {
 }
 
 function createUsersRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   router.get('/', (req, res) => {
     res.json(db.prepare('SELECT * FROM users ORDER BY id').all().map(toUserDTO));

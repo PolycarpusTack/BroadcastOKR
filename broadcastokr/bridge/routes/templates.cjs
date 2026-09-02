@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 
 function toTemplateDTO(row, krTemplates) {
   return {
@@ -32,7 +32,7 @@ function upsertKRTemplates(db, templateId, krTemplates) {
 }
 
 function createTemplatesRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   router.get('/', (req, res) => {
     const templates = db.prepare('SELECT * FROM goal_templates ORDER BY title').all();

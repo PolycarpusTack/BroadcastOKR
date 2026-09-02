@@ -10,6 +10,10 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
+// Exact paths only. The sub-routers are strict and case-sensitive too
+// (utils/router.cjs); these two settings cover the mounts and /api/health.
+app.set('case sensitive routing', true);
+app.set('strict routing', true);
 const { MODE } = require('./editions.cjs');
 const { version: APP_VERSION } = require('./package.json');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
@@ -223,7 +227,9 @@ if (MODE !== 'desktop') {
   const APP_DIR = process.env.BRIDGE_APP_DIR || path.join(__dirname, '..', 'dist');
   app.use(express.static(APP_DIR));
   // SPA fallback for everything that isn't the API
-  app.get(/^\/(?!api\/).*/, (req, res) => {
+  // Case-insensitive on purpose: `/API/…` must 404 as an unknown API path,
+  // not come back as index.html with a 200 (which read as "reachable").
+  app.get(/^\/(?!api(\/|$)).*/i, (req, res) => {
     res.sendFile(path.join(APP_DIR, 'index.html'));
   });
 }

@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const crypto = require('crypto');
 const { audit } = require('../audit.cjs');
 const { applySyncedValue } = require('../liveSync.cjs');
@@ -17,8 +17,8 @@ const MAX_RESULTS = 500;
  * /api/agent/*  = machine surface (agent-token auth, session middleware skips it).
  */
 function createAgentRouters(db) {
-  const ops = express.Router();
-  const machine = express.Router();
+  const ops = createRouter();
+  const machine = createRouter();
 
   // ── Operator surface ──
 

@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { canonicalPath } = require('./auth.cjs');
 
 /**
  * API rate limiting middleware (defense-in-depth).
@@ -17,7 +18,7 @@ function createRateLimitMiddleware({ sessionKeyed = false } = {}) {
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path === '/api/health',
+    skip: (req) => canonicalPath(req.path) === '/api/health',
     // Behind the cloud load balancer all traffic shares an IP — key on the
     // session cookie when present so one user can't throttle the tenant.
     ...(sessionKeyed ? {

@@ -11,17 +11,35 @@ function safeEqual(a, b) {
 }
 
 /**
+ * The one shape every path-keyed decision is made against.
+ *
+ * Express routes case-insensitively and tolerates a trailing slash by
+ * default, so `/API/KPI/EXECUTE-BATCH` and `/api/kpi/execute-batch/` both
+ * reach the execute-batch handler. Middleware that compares `req.path` to a
+ * literal or a $-anchored regex sees neither of them — which is how an
+ * unauthenticated caller could run SQL and download the tenant database
+ * (review 2026-09-02, F1). Canonicalise once, here, before any comparison.
+ * The routers are also strict and case-sensitive (utils/router.cjs), so the
+ * odd shapes 404 — this is the layer that holds if that one ever slips.
+ */
+function canonicalPath(path) {
+  const stripped = String(path || '').toLowerCase().replace(/\/+$/, '');
+  return stripped || '/';
+}
+
+/**
  * The single source of which paths session/RBAC middleware must NOT guard:
  * static assets, the health probe, the auth flow itself, and the machine
  * endpoints that carry their own credentials (share/agent tokens).
  * auth and rbac middleware both consume this — the lists cannot drift.
  */
 function isSessionExempt(path) {
-  return !path.startsWith('/api/')
-    || path === '/api/health'
-    || path.startsWith('/api/auth/')
-    || path === '/api/cockpit/ingest'
-    || path.startsWith('/api/agent/');
+  const p = canonicalPath(path);
+  return !/^\/api(\/|$)/.test(p)
+    || p === '/api/health'
+    || p.startsWith('/api/auth/')
+    || p === '/api/cockpit/ingest'
+    || p.startsWith('/api/agent/');
 }
 
 /**
@@ -60,4 +78,4 @@ function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = f
   };
 }
 
-module.exports = { createAuthMiddleware, isSessionExempt };
+module.exports = { createAuthMiddleware, isSessionExempt, canonicalPath };

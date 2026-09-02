@@ -1,4 +1,5 @@
 const { MIN_SUPPORTED, PROTOCOL_VERSION } = require('../protocol.cjs');
+const { canonicalPath } = require('./auth.cjs');
 
 /**
  * Rejects clients below the protocol floor with 426 so outdated desktops and
@@ -8,7 +9,7 @@ const { MIN_SUPPORTED, PROTOCOL_VERSION } = require('../protocol.cjs');
  */
 function createProtocolMiddleware() {
   return function protocolMiddleware(req, res, next) {
-    if (req.path === '/api/health') return next();
+    if (canonicalPath(req.path) === '/api/health') return next();
 
     const raw = req.headers['x-brokr-protocol'];
     if (raw === undefined) {

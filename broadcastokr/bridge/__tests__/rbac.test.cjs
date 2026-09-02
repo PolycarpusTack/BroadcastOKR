@@ -126,6 +126,32 @@ describe('server-enforced RBAC (client mode)', () => {
     assert.equal((await fetch(`${BASE}/api/sync/backup`, { headers: { Cookie: member } })).status, 403);
   });
 
+  it('path shape cannot route around the policy (case, trailing slash)', async () => {
+    // Review 2026-09-02 F1: with default Express routing, `/API/…` skipped the
+    // session check entirely and `…/` skipped every $-anchored rule. Both must
+    // now be refused — by the router (404) or the policy (401/403) — and never
+    // reach a handler.
+    const batch = { queries: [{ goalId: 'g1', krIndex: 0, connectionId: 'x', sql: 'SELECT 1' }] };
+    for (const [who, cookie] of [['no session', null], ['member', member]]) {
+      for (const [method, url, body] of [
+        ['POST', '/API/KPI/EXECUTE-BATCH', batch],
+        ['POST', '/api/kpi/execute-batch/', batch],
+        ['POST', '/API/KPI/EXECUTE-BATCH/', batch],
+        ['POST', '/api/preview-query/', { connectionId: 'x', sql: 'SELECT 1' }],
+        ['GET', '/API/SYNC/BACKUP', undefined],
+        ['GET', '/api/sync/backup/', undefined],
+        ['GET', '/API/CONNECTIONS', undefined],
+        ['DELETE', '/API/GOALS/g1', undefined],
+      ]) {
+        const res = await fetch(`${BASE}${url}`, json(method, body, cookie));
+        assert.ok([401, 403, 404].includes(res.status),
+          `${who}: ${method} ${url} returned ${res.status} — must never reach a handler`);
+      }
+    }
+    // …and the goal the DELETE variant aimed at is still there.
+    assert.equal((await fetch(`${BASE}/api/goals/g1`, { headers: { Cookie: owner } })).status, 200);
+  });
+
   it('role escalation is owner-only, even for self', async () => {
     const users = await (await fetch(`${BASE}/api/users`, { headers: { Cookie: owner } })).json();
     const me = users.find((u) => u.id === memberUserId);

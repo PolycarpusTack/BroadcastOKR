@@ -64,3 +64,28 @@ describe('auth middleware', () => {
     assert.equal(nextCalled, true);
   });
 });
+
+// ── Path canonicalisation (review 2026-09-02, F1) ──
+// Express routes case-insensitively and tolerates a trailing slash; every
+// path-keyed decision must see the same shape the handler will.
+const { canonicalPath, isSessionExempt } = require('../middleware/auth.cjs');
+
+describe('canonicalPath / isSessionExempt', () => {
+  it('lowercases and strips trailing slashes', () => {
+    assert.equal(canonicalPath('/API/KPI/EXECUTE-BATCH'), '/api/kpi/execute-batch');
+    assert.equal(canonicalPath('/api/kpi/execute-batch/'), '/api/kpi/execute-batch');
+    assert.equal(canonicalPath('/api/goals//'), '/api/goals');
+    assert.equal(canonicalPath('/'), '/');
+    assert.equal(canonicalPath(''), '/');
+  });
+
+  it('never exempts an API path because of its case or a trailing slash', () => {
+    for (const p of ['/API/KPI/EXECUTE-BATCH', '/api/sync/backup/', '/Api/Connections', '/API']) {
+      assert.equal(isSessionExempt(p), false, `${p} must be guarded`);
+    }
+    assert.equal(isSessionExempt('/api/health/'), true);
+    assert.equal(isSessionExempt('/API/HEALTH'), true);
+    assert.equal(isSessionExempt('/index.html'), true);
+    assert.equal(isSessionExempt('/apix/anything'), true);
+  });
+});

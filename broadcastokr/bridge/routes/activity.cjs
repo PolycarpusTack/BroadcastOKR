@@ -1,11 +1,11 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const { MODE } = require('../editions.cjs');
 const { actorName } = require('../audit.cjs');
 
 const RETENTION_DAYS = 90;
 
 function createActivityRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   // GET /api/activity?limit=100 — newest first
   router.get('/', (req, res) => {

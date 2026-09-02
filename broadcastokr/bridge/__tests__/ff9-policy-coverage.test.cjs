@@ -84,6 +84,22 @@ describe('FF-9: data-plane routes are policy-covered', () => {
     }
   });
 
+  it('coverage survives the shapes Express would also dispatch (case, trailing slash)', () => {
+    // The 2026-09-02 review found `/API/KPI/EXECUTE-BATCH` and
+    // `/api/kpi/execute-batch/` reaching the handler past every $-anchored
+    // rule. rbac now canonicalises before matching; this pins that the
+    // canonical form of every accepted shape lands on the same rule.
+    const { canonicalPath } = require('../middleware/auth.cjs');
+    const routes = mountedRoutes(buildDataPlaneRouter());
+    for (const { method, path } of routes) {
+      const expected = POLICY.find((r) => r.method === method && r.path.test(path));
+      for (const variant of [`${path}/`, path.toUpperCase(), `${path.toUpperCase()}/`]) {
+        const rule = POLICY.find((r) => r.method === method && r.path.test(canonicalPath(variant)));
+        assert.equal(rule, expected, `${method} ${variant} must resolve to the same rule as ${path}`);
+      }
+    }
+  });
+
   it('fails when a data-plane route is mounted without a rule (open-loop proof)', () => {
     const planted = [{ method: 'POST', path: '/api/totally-new-sql-surface' }];
     assert.deepEqual(uncoveredRoutes(planted, POLICY), planted,

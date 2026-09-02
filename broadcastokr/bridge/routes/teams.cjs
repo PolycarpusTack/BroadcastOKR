@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 
 function toTeamDTO(row, members) {
   return {
@@ -10,7 +10,7 @@ function toTeamDTO(row, members) {
 }
 
 function createTeamsRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   router.get('/', (req, res) => {
     const teams = db.prepare('SELECT * FROM teams ORDER BY name').all();

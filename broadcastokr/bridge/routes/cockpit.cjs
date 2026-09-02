@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const crypto = require('crypto');
 const { MODE } = require('../editions.cjs');
 const { audit } = require('../audit.cjs');
@@ -14,7 +14,7 @@ const MAX_METRICS = 500;
  * and lands numeric facts under the tenant's client row.
  */
 function createCockpitRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   const cockpitOnly = (req, res, next) => {
     if (MODE !== 'cockpit') return res.status(403).json({ error: 'cockpit_only' });

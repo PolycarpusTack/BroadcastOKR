@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const {
   oracledb, pg, QUERY_TIMEOUT_MS, assertSelectOnly, buildBinds,
   getTablesQuery, getColumnsQuery, wrapPreviewQuery, getTestQuery,
@@ -17,7 +17,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   const { audit } = require('../audit.cjs');
   const cloud = mode !== 'desktop';
   const auditSql = (req, what) => { if (cloud && db) audit(db, req, what); };
-  const router = express.Router();
+  const router = createRouter();
   const { loadConfig, saveConfig, loadHistory, saveHistory } = store;
 
   // Get/save config
