@@ -23,9 +23,11 @@ interface AppShellProps {
   onCreateTask?: () => void;
   connected?: boolean;
   bridgeRunning?: boolean;
+  /** Re-run the first-run setup wizard (offered from Help). */
+  onRunSetupWizard?: () => void;
 }
 
-export function AppShell({ children, onCreateTask, connected, bridgeRunning }: AppShellProps) {
+export function AppShell({ children, onCreateTask, connected, bridgeRunning, onRunSetupWizard }: AppShellProps) {
   const { theme } = useTheme();
   const { can } = useDeployment();
   const { currentUser, setCurrentUser, permissions } = useAuth();
@@ -126,6 +128,7 @@ export function AppShell({ children, onCreateTask, connected, bridgeRunning }: A
             onClose={() => setHelpOpen(false)}
             theme={theme}
             onOpenDevGuide={() => { setHelpOpen(false); setDevGuideOpen(true); }}
+            onRunSetupWizard={onRunSetupWizard && (() => { setHelpOpen(false); onRunSetupWizard(); })}
           />
         </Suspense>
       )}
