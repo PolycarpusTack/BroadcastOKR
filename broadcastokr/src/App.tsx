@@ -168,6 +168,10 @@ export default function App() {
       toast(reason || 'The bridge stopped unexpectedly.', COLOR_DANGER, '⚠️');
     };
 
+    const handleBridgeWarning = (e: Event) => {
+      toast((e as CustomEvent<string>).detail, COLOR_WARNING, '🔑');
+    };
+
     const handleWriteConflict = () => {
       toast('Updated elsewhere — refreshed with the latest version', COLOR_WARNING, '🔄');
     };
@@ -178,6 +182,7 @@ export default function App() {
     window.addEventListener('bridge-write-failed', handleBridgeWriteFailed);
     window.addEventListener('bridge-write-conflict', handleWriteConflict);
     window.addEventListener('bridge-start-failed', handleBridgeStartFailed);
+    window.addEventListener('bridge-warning', handleBridgeWarning);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -186,6 +191,7 @@ export default function App() {
       window.removeEventListener('bridge-write-failed', handleBridgeWriteFailed);
       window.removeEventListener('bridge-write-conflict', handleWriteConflict);
       window.removeEventListener('bridge-start-failed', handleBridgeStartFailed);
+      window.removeEventListener('bridge-warning', handleBridgeWarning);
     };
   }, [toast]);
 

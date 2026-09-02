@@ -1,8 +1,8 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
-const { appendFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } = require('fs');
-const { randomBytes } = require('crypto');
+const { appendFileSync, mkdirSync } = require('fs');
+const { loadOrCreateCredentialKey } = require('./credentialKey.cjs');
 
 // Keep a global reference so the window isn't garbage collected
 let mainWindow = null;
@@ -29,31 +29,20 @@ const BRIDGE_SCRIPT = path.join(__dirname, '..', 'bridge', 'server.cjs');
  * still better than the alternative — it raises "read the config" from
  * "open a JSON file" to "read two files as this user" — and we say so rather
  * than implying protection we do not have.
+ *
+ * The file handling itself lives in credentialKey.cjs (testable without
+ * Electron). Anything it could not do silently is kept here and sent to the
+ * renderer with the bridge status, because a main-process console.error is
+ * invisible in a packaged app.
  */
+let credentialKeyWarning;
 function credentialKey() {
-  const dataDir = path.join(app.getPath('userData'), 'bridge');
-  const keyFile = path.join(dataDir, 'credential-key');
-  mkdirSync(dataDir, { recursive: true });
-
-  const sealed = safeStorage.isEncryptionAvailable?.();
-  try {
-    if (existsSync(keyFile)) {
-      const raw = readFileSync(keyFile);
-      return sealed ? safeStorage.decryptString(raw) : raw.toString('utf8').trim();
-    }
-  } catch (err) {
-    // An unreadable key is not recoverable — a new one cannot decrypt what the
-    // old one wrote. Say so plainly instead of silently minting a replacement.
-    console.error(`[bridge] Stored credential key could not be read (${err.message}). `
-      + 'Existing database passwords will need re-entering.');
-  }
-
-  const key = randomBytes(32).toString('hex');
-  try {
-    writeFileSync(keyFile, sealed ? safeStorage.encryptString(key) : key, { mode: 0o600 });
-  } catch (err) {
-    console.error(`[bridge] Could not persist the credential key: ${err.message}`);
-  }
+  const { key, warning } = loadOrCreateCredentialKey({
+    dataDir: path.join(app.getPath('userData'), 'bridge'),
+    safeStorage,
+  });
+  credentialKeyWarning = warning;
+  if (warning) console.error(`[bridge] ${warning}`);
   return key;
 }
 
@@ -158,7 +147,7 @@ function startBridge() {
     // Give it a moment to start, then notify renderer
     setTimeout(() => {
       if (bridgeProcess) {
-        mainWindow?.webContents.send('bridge:status', { running: true });
+        mainWindow?.webContents.send('bridge:status', { running: true, warning: credentialKeyWarning });
       }
     }, 1000);
 

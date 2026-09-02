@@ -10,7 +10,7 @@ interface ElectronAPI {
   bridgeStart: () => Promise<{ ok: boolean; message: string }>;
   bridgeStop: () => Promise<{ ok: boolean; message: string }>;
   bridgeStatus: () => Promise<{ running: boolean }>;
-  onBridgeStatus: (callback: (data: { running: boolean; error?: string }) => void) => () => void;
+  onBridgeStatus: (callback: (data: { running: boolean; error?: string; warning?: string }) => void) => () => void;
 }
 
 declare global {
@@ -210,6 +210,12 @@ export function useBridge() {
     if (isElectron()) {
       const cleanup = window.electronAPI!.onBridgeStatus((data) => {
         setBridgeRunning(data.running);
+        // The bridge is up but something on the way there deserves a look —
+        // a credential key that could not be read, say. Main-process logs are
+        // invisible in a packaged app, so this is the only route to the user.
+        if (data.warning) {
+          window.dispatchEvent(new CustomEvent('bridge-warning', { detail: data.warning }));
+        }
         if (!data.running) {
           setConnected(false);
           setLiveKPIs([]);
