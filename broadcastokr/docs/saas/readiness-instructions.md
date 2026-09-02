@@ -18,6 +18,13 @@ spot-check at the end (R1b) — testing stays local.
 credentials; Node 22. Nothing corporate.
 
 **Steps:**
+0. **Prerequisites, in the shell you will actually use:** `docker info` succeeds
+   (2026-09-02: the CLI was not on the Git-Bash PATH); `node --version` ≥ 22;
+   `npm run rebuild:node` if the dev bridge fails on the better-sqlite3 ABI;
+   `git check-ignore local-rig` prints the path. Day-by-day plan and the
+   "verify last review's fixes on the rig" checklist:
+   `docs/gpm/state/r1-backlog-2026-09-03.md`; findings go to
+   `docs/saas/readiness/r1-findings.md` as they happen.
 1. **IdP:** `docker compose -f scripts/local-rig/keycloak-compose.yml up -d` — a
    Keycloak with realm `brokr` pre-imported: client `brokr-local` (secret
    `brokr-local-dev-secret`, redirect URIs for ports 3100/3101) and users
@@ -33,7 +40,10 @@ credentials; Node 22. Nothing corporate.
    Build the app bundles (`VITE_EDITION=internal npx vite build --outDir local-rig/cockpit/app`,
    `VITE_EDITION=client npx vite build --outDir local-rig/tenant0/app`), set
    `BRIDGE_APP_DIR` to each in the generated `.env`s plus `BRIDGE_PORT=3100`/`3101`,
-   `BRIDGE_HOST=127.0.0.1`, and start both bridges with their env files.
+   `BRIDGE_HOST=127.0.0.1` (the script writes 3001 / 0.0.0.0), and start both bridges
+   with their env files. Since 2026-09-02 the script also emits a dedicated
+   `BRIDGE_ENCRYPTION_KEY`; read the startup lines — they report stored passwords
+   re-encrypted, unprotected, or unreadable.
 4. **Sign in** at http://localhost:3100 and :3101 with `owner` — first sign-in
    becomes instance owner (verify), then `member` (verify member role). Any claim
    mapping fixes go in `upsertSsoUser` (bridge/routes/auth.cjs).

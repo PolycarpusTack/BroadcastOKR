@@ -1,5 +1,39 @@
 # Pickup Prompt — Next Session
 
+## 2026-09-03 — R1 day one (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). Today is **R1, the local
+validation rig** — the first time the product runs against a real database and a real
+IdP. Read, in order: `docs/gpm/state/r1-backlog-2026-09-03.md` (today's plan, stories
+R1-0 → R1-7, with what to verify from yesterday's review fixes), then
+`docs/saas/readiness-instructions.md` §R1 (the exact commands). Log every discrepancy
+in `docs/saas/readiness/r1-findings.md` as it happens. `CLAUDE.md` is current.
+
+**Where we are:** main is `8ca9140` (CI green): the 2026-09-02 data-plane hardening,
+the setup wizard, 0.9.0, and the adversarial review's nine findings all merged —
+`docs/gpm/state/REVIEW-FINDINGS-2026-09-02.md` has the findings and their commits.
+Suites: 252 vitest · 140 bridge (139 on Windows — the `0600` case) · lint 0.
+Branch for today: `readiness/r1-local-rig` (already carries the provisioning fix and
+these docs). Rig state under `./local-rig/` is gitignored — verify at R1-0.
+
+**Target for the day:** R1-0 through R1-4 — one real login on each instance, one real
+number per dialect pushed by the agent. R1-5 (yesterday's fixes exercised through the
+real UI) if the afternoon allows. The 7–14-day clock starts the day the agent pushes
+its first value; D-3's decision spike and R6-1 (admin UIs) are the parallel work.
+
+**Known before starting:** Docker CLI was not on the assistant shell's PATH last night
+— check Docker Desktop first. The provisioning script writes port 3001 / host 0.0.0.0;
+set 3100/3101 and 127.0.0.1 by hand in each `.env`. Oracle Instant Client on this PC
+has never been exercised by the bridge; Postgres-only is a legitimate day one (R1-4b).
+Run `npm run rebuild:node` if the dev bridge complains about the better-sqlite3 ABI.
+
+**Working discipline:** unchanged — GPM, commit per story on the branch, suites +
+lint + build green before each commit, findings logged as found, not at the end.
+
+---
+
+## 2026-08-31 pickup (superseded — kept for context)
+
 Paste (or point Claude at) the block below to resume exactly where 2026-08-31 ended.
 
 ---

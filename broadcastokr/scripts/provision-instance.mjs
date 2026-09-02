@@ -71,6 +71,9 @@ BRIDGE_HISTORY_PATH=${join(instanceDir, 'kpi-history.json')}
 BRIDGE_LOG_DIR=${join(instanceDir, 'logs')}
 BRIDGE_BACKUP_DIR=${join(instanceDir, 'backups')}
 BRIDGE_API_KEY=${crypto.randomBytes(24).toString('hex')}
+# Credentials at rest — dedicated, so "who may call the API" and "what unlocks
+# stored passwords" rotate independently (docs/operations.md, Credentials).
+BRIDGE_ENCRYPTION_KEY=${crypto.randomBytes(32).toString('hex')}
 BRIDGE_CORS_ORIGINS=${baseUrl}
 
 # Identity — the instance refuses to start until these are real
