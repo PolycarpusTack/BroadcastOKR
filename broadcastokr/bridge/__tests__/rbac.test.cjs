@@ -53,6 +53,9 @@ describe('server-enforced RBAC (client mode)', () => {
         BRIDGE_BASE_URL: BASE,
         BRIDGE_DB_PATH: ':memory:', BRIDGE_PORT: String(PORT),
         BRIDGE_HOST: '127.0.0.1', BRIDGE_API_KEY: '',
+        // This suite asserts the no-key refusal path; state it rather than
+        // inheriting whatever the developer happens to have configured.
+        BRIDGE_ENCRYPTION_KEY: '',
       },
       stdio: 'ignore',
     });

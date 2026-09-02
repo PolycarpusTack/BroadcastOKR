@@ -17,7 +17,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:bridge": "node --test bridge/__tests__/*.test.cjs",
+    "test:bridge": "node bridge/__tests__/run.cjs",
     "test:e2e": "npx playwright test",
     "bridge": "node bridge/server.cjs",
     "electron:dev": "vite & wait-on http://localhost:5173 && electron .",

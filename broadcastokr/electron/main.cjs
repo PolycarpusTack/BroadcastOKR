@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
-const { appendFileSync, mkdirSync } = require('fs');
+const { appendFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } = require('fs');
+const { randomBytes } = require('crypto');
 
 // Keep a global reference so the window isn't garbage collected
 let mainWindow = null;
@@ -12,6 +13,49 @@ const isDev = !app.isPackaged;
 // children get asar support, and module resolution must start inside the
 // archive to reach node_modules (verified: from app.asar.unpacked it cannot).
 const BRIDGE_SCRIPT = path.join(__dirname, '..', 'bridge', 'server.cjs');
+
+/**
+ * Provide the bridge's credential-encryption key on desktop.
+ *
+ * The key otherwise comes from an environment variable, which a desktop user
+ * has no way to set — so every desktop install stored WHATS'ON passwords in
+ * cleartext forever. The app generates one on first run instead, and the bridge
+ * encrypts stored credentials from that point on (re-wrapping any that were
+ * already written in the clear).
+ *
+ * Where the key itself lives is the whole question. Where the OS offers a
+ * keychain, `safeStorage` binds it to the user account, so copying the file off
+ * the machine yields nothing. Without one, a 0600 file beside the database is
+ * still better than the alternative — it raises "read the config" from
+ * "open a JSON file" to "read two files as this user" — and we say so rather
+ * than implying protection we do not have.
+ */
+function credentialKey() {
+  const dataDir = path.join(app.getPath('userData'), 'bridge');
+  const keyFile = path.join(dataDir, 'credential-key');
+  mkdirSync(dataDir, { recursive: true });
+
+  const sealed = safeStorage.isEncryptionAvailable?.();
+  try {
+    if (existsSync(keyFile)) {
+      const raw = readFileSync(keyFile);
+      return sealed ? safeStorage.decryptString(raw) : raw.toString('utf8').trim();
+    }
+  } catch (err) {
+    // An unreadable key is not recoverable — a new one cannot decrypt what the
+    // old one wrote. Say so plainly instead of silently minting a replacement.
+    console.error(`[bridge] Stored credential key could not be read (${err.message}). `
+      + 'Existing database passwords will need re-entering.');
+  }
+
+  const key = randomBytes(32).toString('hex');
+  try {
+    writeFileSync(keyFile, sealed ? safeStorage.encryptString(key) : key, { mode: 0o600 });
+  } catch (err) {
+    console.error(`[bridge] Could not persist the credential key: ${err.message}`);
+  }
+  return key;
+}
 
 // Packaged builds must write DB/config/history/logs to userData — the install
 // directory (asar) is read-only.
@@ -26,6 +70,8 @@ function bridgeEnv() {
     BRIDGE_HISTORY_PATH: path.join(dataDir, 'kpi-history.json'),
     BRIDGE_LOG_DIR: path.join(dataDir, 'logs'),
     BRIDGE_BACKUP_DIR: path.join(dataDir, 'backups'),
+    // Only supply ours if the operator has not set one themselves.
+    BRIDGE_ENCRYPTION_KEY: process.env.BRIDGE_ENCRYPTION_KEY || credentialKey(),
   };
 }
 
