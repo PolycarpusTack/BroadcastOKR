@@ -129,3 +129,22 @@ describe('connector agent', () => {
     assert.equal(res.status, 401);
   });
 });
+
+// ── Stored-password shapes (review 2026-09-02, F9) ──
+const { agentDecrypt } = require('../agent.cjs');
+const { encrypt: encryptForAgent } = require('../utils/crypto.cjs');
+
+describe('agentDecrypt', () => {
+  const key = 'agent-data-key';
+  it('accepts a value exactly as encrypt() produces it', () => {
+    assert.equal(agentDecrypt(encryptForAgent('pw', key), key), 'pw');
+  });
+  it('still accepts the original enc:+blob convention', () => {
+    const blob = encryptForAgent('pw', key).slice('enc:v1:'.length);
+    assert.equal(agentDecrypt(`enc:${blob}`, key), 'pw');
+  });
+  it('passes plaintext through, and everything through when no key is set', () => {
+    assert.equal(agentDecrypt('plain', key), 'plain');
+    assert.equal(agentDecrypt('enc:v1:whatever', undefined), 'enc:v1:whatever');
+  });
+});

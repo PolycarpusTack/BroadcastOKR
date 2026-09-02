@@ -88,6 +88,10 @@ export interface BridgeHealth {
   uptime: number;
   drivers: DriverStatus;
   database: { size: string; tables: number } | null;
+  /** Stored connection passwords the bridge's current key cannot decrypt —
+   *  a backup restored elsewhere, or a rotated key. Otherwise invisible: every
+   *  live KR on that connection just fails with a generic query error. */
+  credentials?: { unreadable: number };
 }
 
 export function useBridge() {

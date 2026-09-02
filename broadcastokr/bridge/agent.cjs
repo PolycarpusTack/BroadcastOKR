@@ -11,13 +11,28 @@
  *   agent-config.json    connections + KR bindings + interval (operator-owned;
  *                        every query the agent will ever run is in this file)
  *   agent-identity.json  agentId + agentToken (0600, written by enroll)
- *   AGENT_DATA_KEY env   optional: decrypts `enc:`-prefixed connection passwords
+ *   AGENT_DATA_KEY env   optional: decrypts stored connection passwords — values
+ *                        as `encrypt()` writes them (`enc:v1:…`), or the older
+ *                        `enc:` + raw-blob convention
  */
 const fs = require('fs');
 const path = require('path');
 const { runAgentPass, enrollAgent } = require('./agentCore.cjs');
 const { createWhatsonCore, buildBinds } = require('./whatson/core.cjs');
 const { decrypt } = require('./utils/crypto.cjs');
+
+/**
+ * Stored agent passwords come in three shapes: plaintext, `enc:v1:…` as the
+ * bridge's own `encrypt()` produces (the natural thing to paste), and the
+ * original agent convention of `enc:` in front of a raw blob. Slicing a fixed
+ * `enc:` off the first of those left `v1:…` behind and handed it to the
+ * database as the password (review 2026-09-02, F9) — so let `decrypt` decide.
+ */
+function agentDecrypt(password, dataKey) {
+  if (typeof password !== 'string' || !dataKey) return password;
+  const legacy = password.startsWith('enc:') && !password.startsWith('enc:v1:');
+  return decrypt(legacy ? password.slice(4) : password, dataKey);
+}
 
 function arg(name, fallback) {
   const idx = process.argv.indexOf(`--${name}`);
@@ -55,12 +70,7 @@ async function main() {
     const identity = JSON.parse(fs.readFileSync(identityPath, 'utf8'));
     const dataKey = process.env.AGENT_DATA_KEY;
 
-    const core = createWhatsonCore({
-      decryptPassword: (password) =>
-        (typeof password === 'string' && password.startsWith('enc:') && dataKey
-          ? decrypt(password.slice(4), dataKey)
-          : password),
-    });
+    const core = createWhatsonCore({ decryptPassword: (password) => agentDecrypt(password, dataKey) });
 
     // Shares the bridge's scalar contract; only the wording differs, because
     // these land in a local operator log rather than an API response.
@@ -94,4 +104,8 @@ async function main() {
   process.exit(2);
 }
 
-main().catch((err) => { console.error(err.message); process.exit(1); });
+if (require.main === module) {
+  main().catch((err) => { console.error(err.message); process.exit(1); });
+}
+
+module.exports = { agentDecrypt };
