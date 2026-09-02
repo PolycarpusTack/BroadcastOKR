@@ -3,6 +3,7 @@ import { Modal } from '../ui/Modal';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
 import { PRIMARY_COLOR, COLOR_DANGER, FONT_BODY, FONT_MONO } from '../../constants/config';
 import type { GoalTemplate, KRTemplate, Theme } from '../../types';
+import { currentPeriod } from '../../utils/periods';
 
 interface TemplateFormProps {
   open: boolean;
@@ -83,7 +84,7 @@ function TemplateFormContent({
 }: Pick<TemplateFormProps, 'theme' | 'template' | 'onClose' | 'onSave'>) {
   const [title, setTitle] = useState(() => template?.title ?? '');
   const [category, setCategory] = useState(() => template?.category ?? 'Health Check');
-  const [period, setPeriod] = useState(() => template?.period ?? 'Q1 2026');
+  const [period, setPeriod] = useState(() => template?.period ?? currentPeriod());
   const [krs, setKRs] = useState<KRFormRow[]>(() => buildFormRows(template));
 
   const updateKR = <K extends keyof KRFormRow>(idx: number, key: K, value: KRFormRow[K]) => {

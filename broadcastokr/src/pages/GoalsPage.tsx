@@ -24,6 +24,7 @@ import { formatTimeAgo } from '../utils/dates';
 import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
 import type { Goal, KeyResult, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
+import { currentPeriod } from '../utils/periods';
 
 interface GoalsPageProps {
   /** Bridge connected? */
@@ -131,7 +132,7 @@ export function GoalsPage({
   const [newTitle, setNewTitle] = useState('');
   const [newChannel, setNewChannel] = useState(0);
   const [newOwner, setNewOwner] = useState(currentUser.id);
-  const [newPeriod, setNewPeriod] = useState('Q1 2026');
+  const [newPeriod, setNewPeriod] = useState(currentPeriod());
   const [newKRs, setNewKRs] = useState<GoalFormKR[]>([{ title: '', start: 0, target: 100 }]);
   const [newClientIds, setNewClientIds] = useState<string[]>([]);
   const [newChannelScopeType, setNewChannelScopeType] = useState<'all' | 'selected'>('all');

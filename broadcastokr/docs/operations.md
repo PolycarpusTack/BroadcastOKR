@@ -32,8 +32,29 @@ The bridge snapshots its database automatically: an online backup at startup
 and then daily, to `BRIDGE_BACKUP_DIR` (default: a `backups/` directory next
 to the database file; the desktop app uses its user-data directory), pruned to
 the newest 14. Snapshots use SQLite's online backup API, so they are consistent
-even while writes are happening. For off-machine copies, still ship the backup
-directory elsewhere with a cron job:
+even while writes are happening.
+
+**Each snapshot is a pair.** The connection store lives outside SQLite, so every
+run writes two files under one timestamp:
+
+```
+broadcastokr-<stamp>.db            the tenant database (goals, tasks, history)
+broadcastokr-<stamp>.config.json   the connection store (WHATS'ON connections, KPI definitions)
+```
+
+They are pruned together, so a restore is always a matched pair. Restoring the
+`.db` alone brings the OKRs back without the database connections that feed
+them — take both.
+
+> **The backup directory holds credentials.** The config copy carries stored
+> connection passwords, encrypted exactly as `config.json` holds them (i.e. only
+> if `BRIDGE_ENCRYPTION_KEY` is set — see Credentials below). Give the backup
+> directory the same protection as the bridge's data directory, and note that
+> restoring to an instance with a *different* encryption key will not decrypt
+> them: keep the key with the backup policy, not in it.
+
+For off-machine copies, still ship the backup directory elsewhere with a cron
+job:
 
 ```bash
 # Daily backup at 2 AM
@@ -55,6 +76,32 @@ cp bridge/broadcastokr.db backups/broadcastokr-$(date +%Y%m%d).db
 1. Stop the bridge
 2. Replace `broadcastokr.db` with the backup file
 3. Start the bridge
+
+## Credentials
+
+Database connection passwords are encrypted at rest with AES-256-GCM, under a key
+derived (PBKDF2, 100k iterations) from `BRIDGE_ENCRYPTION_KEY`. `BRIDGE_API_KEY`
+is accepted as a fallback so existing desktop installs keep working.
+
+```bash
+# Generate one (keep it with your secrets, not in the repo)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**Without a key:**
+
+| Mode | Behaviour |
+|---|---|
+| `desktop` | Passwords are stored in the clear. Documented and accepted — single user, single machine. A startup warning names the count. |
+| `client` / `cockpit` | `POST /api/connections` refuses a new password with **503**. Existing connections keep working; nothing new is written unprotected. |
+
+Stored ciphertext carries an `enc:v1:` marker, which is what lets the bridge tell
+"never encrypted" apart from "encrypted with a key we no longer have". On startup
+any unmarked password is re-encrypted in place and the count is logged.
+
+**Rotation** is not automatic: there is no re-wrap path in v1. To change the key,
+re-enter each connection password after setting the new one. A wrong or missing
+key fails loudly rather than handing ciphertext to the database as a password.
 
 ## Log Files
 

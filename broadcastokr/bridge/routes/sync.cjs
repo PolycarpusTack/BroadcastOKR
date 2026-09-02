@@ -202,8 +202,8 @@ function createSyncRouter(db, dbPath) {
     const { runBackupOnce } = require('../utils/backup.cjs');
     try {
       const tmpDir = fs.mkdtempSync(require('path').join(os.tmpdir(), 'brokr-snap-'));
-      const snapshot = await runBackupOnce(db, tmpDir, { keep: 1 });
-      res.download(snapshot, `broadcastokr-backup-${new Date().toISOString().slice(0, 10)}.db`, () => {
+      const { dbPath } = await runBackupOnce(db, tmpDir, { keep: 1 });
+      res.download(dbPath, `broadcastokr-backup-${new Date().toISOString().slice(0, 10)}.db`, () => {
         fs.rmSync(tmpDir, { recursive: true, force: true });
       });
     } catch (err) {

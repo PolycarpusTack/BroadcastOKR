@@ -5,6 +5,7 @@ import type { Theme, Client, ScopedChannelRef } from '../../types';
 import type { DBConnection, TableInfo, ColumnInfo } from '../../hooks/useBridge';
 import { GoalFormKRList } from './GoalFormKRList';
 import { GoalFormChannelScope } from './GoalFormChannelScope';
+import { periodOptionsIncluding } from '../../utils/periods';
 
 export type { GoalFormKR } from './GoalFormKRList';
 
@@ -40,7 +41,6 @@ interface GoalFormFieldsProps {
   setSelectedChannels?: (v: ScopedChannelRef[]) => void;
 }
 
-const PERIODS = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Annual 2026'];
 
 export function GoalFormFields({
   title, setTitle, channel, setChannel, owner, setOwner,
@@ -98,7 +98,7 @@ export function GoalFormFields({
         <div>
           <label style={labelStyle}>Period</label>
           <select aria-label="Period" value={period} onChange={(e) => setPeriod(e.target.value)} style={{ ...selectStyle, width: '100%', padding: '10px 12px' }}>
-            {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+            {periodOptionsIncluding(period).map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
       </div>
