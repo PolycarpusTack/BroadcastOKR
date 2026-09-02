@@ -12,7 +12,7 @@ const path = require('path');
 const app = express();
 const { MODE } = require('./editions.cjs');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
-const { encrypt, decrypt } = require('./utils/crypto.cjs');
+const { createCredentialCipher } = require('./utils/credentials.cjs');
 
 const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
   .split(',')
@@ -134,18 +134,28 @@ const CONFIG_PATH = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'conf
 const HISTORY_PATH = process.env.BRIDGE_HISTORY_PATH || path.join(__dirname, 'kpi-history.json');
 
 const store = createConfigStore({ configPath: CONFIG_PATH, historyPath: HISTORY_PATH });
-const core = createWhatsonCore({
-  decryptPassword: (password) => (BRIDGE_API_KEY ? decrypt(password, BRIDGE_API_KEY) : password),
-});
 
-app.use('/api', createWhatsonRouter({
-  db,
-  mode: MODE,
-  core,
-  store,
-  encrypt: (password) => (BRIDGE_API_KEY ? encrypt(password, BRIDGE_API_KEY) : password),
-  decrypt: (password) => (BRIDGE_API_KEY ? decrypt(password, BRIDGE_API_KEY) : password),
-}));
+// Credentials-at-rest. A dedicated key is preferred — it decouples "who may
+// call the API" from "what unlocks stored credentials" — with BRIDGE_API_KEY
+// kept as the fallback so existing desktop installs keep working.
+const CREDENTIAL_KEY = process.env.BRIDGE_ENCRYPTION_KEY || BRIDGE_API_KEY;
+const cipher = createCredentialCipher({ key: CREDENTIAL_KEY, mode: MODE });
+
+// Upgrade anything written before credentials were marked, then say plainly
+// what is unprotected. Startup is the only moment an operator reliably reads.
+const { rewrapped, unprotected } = cipher.rewrapStoredConnections(store);
+if (rewrapped > 0) {
+  console.log(`  Encrypted ${rewrapped} stored connection password(s) at rest.`);
+}
+if (unprotected > 0) {
+  const how = cipher.enforced ? 'REFUSED until' : 'stored in cleartext because';
+  console.warn(`  WARNING: ${unprotected} connection password(s) are not encrypted. `
+    + `New credentials will be ${how} BRIDGE_ENCRYPTION_KEY is set.`);
+}
+
+const core = createWhatsonCore({ decryptPassword: cipher.decrypt });
+
+app.use('/api', createWhatsonRouter({ db, mode: MODE, core, store, cipher }));
 
 // ── Bridge-side live-KR sync loop ──
 

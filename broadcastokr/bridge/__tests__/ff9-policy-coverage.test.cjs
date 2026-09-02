@@ -58,7 +58,7 @@ function buildDataPlaneRouter() {
   };
   return createWhatsonRouter({
     db: null, mode: 'client', core: {}, store,
-    encrypt: (v) => v, decrypt: (v) => v,
+    cipher: { available: true, enforced: false, unprotected: false, encrypt: (v) => v, decrypt: (v) => v },
   });
 }
 

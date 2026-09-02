@@ -8,10 +8,12 @@ const { getKpiTemplates } = require('../whatson/templates.cjs');
 /**
  * The WHATS'ON-facing route family: connection management, schema browsing,
  * query preview, and KPI/live-KR execution. Mounted at /api. `core` comes
- * from createWhatsonCore, `store` from createConfigStore; `encrypt`/`decrypt`
- * handle credential storage (no-ops when no key is configured).
+ * from createWhatsonCore, `store` from createConfigStore, and `cipher` from
+ * createCredentialCipher — when the cipher reports itself unavailable, routes
+ * that would persist a new secret refuse rather than storing it in the clear.
  */
-function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decrypt }) {
+function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher }) {
+  const { encrypt, decrypt } = cipher;
   const { audit } = require('../audit.cjs');
   const cloud = mode !== 'desktop';
   const auditSql = (req, what) => { if (cloud && db) audit(db, req, what); };
@@ -87,10 +89,21 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
     }
   });
 
+  /** Refuse to persist a secret we cannot protect (D-2). */
+  const CREDENTIALS_UNPROTECTED = {
+    error: 'Credential encryption is not configured on this instance. '
+      + 'Set BRIDGE_ENCRYPTION_KEY before storing database credentials.',
+  };
+
   // Save connection
   router.post('/connections', (req, res) => {
-    const config = loadConfig();
     const conn = req.body;
+    // A masked password means "keep the existing one" — no new secret arrives,
+    // so renaming or re-tagging a connection stays possible without a key.
+    if (cipher.unprotected && conn.password && conn.password !== '***') {
+      return res.status(503).json(CREDENTIALS_UNPROTECTED);
+    }
+    const config = loadConfig();
     if (!conn.id) conn.id = `conn_${Date.now()}`;
     const idx = (config.connections || []).findIndex(c => c.id === conn.id);
     if (idx >= 0) {

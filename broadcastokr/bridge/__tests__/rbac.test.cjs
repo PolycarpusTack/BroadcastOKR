@@ -165,6 +165,24 @@ describe('server-enforced RBAC (client mode)', () => {
     assert.equal(roleEntry.actor, 'Owner One', 'actor must come from the session, not a body claim');
   });
 
+  it('refuses to store a credential it cannot protect (cloud, no encryption key)', async () => {
+    // This instance runs with BRIDGE_API_KEY='' and no BRIDGE_ENCRYPTION_KEY,
+    // so even an owner must not be able to park a plaintext password on disk.
+    const res = await fetch(`${BASE}/api/connections`, json('POST', {
+      id: 'c-secret', name: 'Prod', type: 'postgres', host: 'db', port: 5432,
+      service: 'whatson', user: 'psi', password: 'hunter2',
+    }, owner));
+    assert.equal(res.status, 503);
+    assert.match((await res.json()).error, /BRIDGE_ENCRYPTION_KEY/);
+
+    // A masked password carries no new secret, so metadata edits still work.
+    const masked = await fetch(`${BASE}/api/connections`, json('POST', {
+      id: 'c-secret', name: 'Renamed', type: 'postgres', host: 'db', port: 5432,
+      service: 'whatson', user: 'psi', password: '***',
+    }, owner));
+    assert.equal(masked.status, 200);
+  });
+
   it('owners can do all of it', async () => {
     assert.equal((await fetch(`${BASE}/api/goals/g1`, json('DELETE', undefined, owner))).status, 200);
     const client = await fetch(`${BASE}/api/clients`, json('POST', { id: 'c1', name: 'Pinned', connectionId: '', color: '#000', channels: [] }, owner));
