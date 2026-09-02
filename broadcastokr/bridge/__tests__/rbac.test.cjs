@@ -108,6 +108,12 @@ describe('server-enforced RBAC (client mode)', () => {
       ['POST', '/api/config', { pollIntervalMs: 1 }],
       ['POST', '/api/preview-query', { connectionId: 'x', sql: 'SELECT 1' }],
       ['POST', '/api/tables', { connectionId: 'x' }],
+      // Raw-SQL surfaces: SQL arrives in the body, so these are credential-grade
+      ['POST', '/api/kpi/execute-batch', { queries: [{ goalId: 'g1', krIndex: 0, connectionId: 'x', sql: 'SELECT 1' }] }],
+      ['POST', '/api/channels', { connectionId: 'x' }],
+      ['POST', '/api/kpi/execute', { kpiId: 'x' }],
+      // Operational trigger against client databases — manager grade
+      ['POST', '/api/kpi/sync-now', {}],
       ['POST', '/api/sync/migrate-from-local', { users: [] }],
       ['POST', '/api/users', { name: 'Ghost', role: 'owner', av: 'G', color: '#000', dept: '', title: '' }],
     ]) {
@@ -143,6 +149,11 @@ describe('server-enforced RBAC (client mode)', () => {
     // A manager may create users, but never mint an owner
     assert.equal((await fetch(`${BASE}/api/users`, json('POST', { name: 'Sneaky Owner', role: 'owner', av: 'S', color: '#000', dept: '', title: '' }, member))).status, 403);
     assert.equal((await fetch(`${BASE}/api/users`, json('POST', { name: 'New Member', role: 'member', av: 'N', color: '#000', dept: '', title: '' }, member))).status, 201);
+
+    // Managers may trigger a sync pass (stored SQL only) but never supply SQL themselves
+    assert.notEqual((await fetch(`${BASE}/api/kpi/sync-now`, json('POST', {}, member))).status, 403);
+    assert.equal((await fetch(`${BASE}/api/kpi/execute-batch`,
+      json('POST', { queries: [{ goalId: 'g1', krIndex: 0, connectionId: 'x', sql: 'SELECT 1' }] }, member))).status, 403);
   });
 
   it('server-side audit recorded the sensitive actions with session actors', async () => {

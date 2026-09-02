@@ -10,6 +10,13 @@ const { isSessionExempt } = require('./auth.cjs');
  *
  * Defaults: GETs need only authentication; unlisted mutations too. Listing is
  * therefore additive hardening — new sensitive routes must be added here.
+ *
+ * EXCEPTION — the data plane (routes that reach a *client* Oracle/PostgreSQL
+ * database, mounted by routes/whatson.cjs): allow-when-unlisted is the wrong
+ * default there, so FF-9 (`__tests__/ff9-policy-coverage.test.cjs`) makes a
+ * POLICY entry mandatory for every one of them. `perm: 'authenticated'` is a
+ * valid, deliberate answer meaning "any signed-in role" — the point is that the
+ * decision is written down rather than inferred from an omission.
  */
 const POLICY = [
   // Goals — check-in is member-grade; structural changes are not
@@ -45,6 +52,25 @@ const POLICY = [
   { method: 'POST', path: /^\/api\/(preview-query|tables|columns|test-connection)$/, perm: 'ownerOnly' },
   { method: 'POST', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
   { method: 'DELETE', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
+
+  // ── Data plane (FF-9 requires an entry for every route in routes/whatson.cjs) ──
+  // Raw-SQL surfaces: SQL arrives in the request body, so these are credential-grade.
+  { method: 'POST', path: /^\/api\/kpi\/execute-batch$/, perm: 'ownerOnly' },
+  // Executes a stored definition, but on an ad-hoc caller-chosen trigger, and
+  // /api/channels feeds updateClient — itself ownerOnly — so nothing regresses.
+  { method: 'POST', path: /^\/api\/kpi\/execute$/, perm: 'ownerOnly' },
+  { method: 'POST', path: /^\/api\/channels$/, perm: 'ownerOnly' },
+  // Operational trigger over stored SQL only; real load on client databases.
+  { method: 'POST', path: /^\/api\/kpi\/sync-now$/, perm: 'canEdit' },
+  // Deliberately open to any signed-in role: the dashboard KPI panel polls on a
+  // timer for every session, and these read stored definitions or local files.
+  { method: 'GET', path: /^\/api\/kpi\/(poll|templates)$/, perm: 'authenticated' },
+  { method: 'GET', path: /^\/api\/kpi\/history(\/|$)/, perm: 'authenticated' },
+  { method: 'GET', path: /^\/api\/kpis(\/|$)/, perm: 'authenticated' },
+  // Both mask credentials before responding; the live-KR editor needs the list.
+  // Tightening these to canEdit is a candidate follow-up, not a behaviour change here.
+  { method: 'GET', path: /^\/api\/config$/, perm: 'authenticated' },
+  { method: 'GET', path: /^\/api\/connections(\/|$)/, perm: 'authenticated' },
   { method: 'POST', path: /^\/api\/sync\/migrate-from-local$/, perm: 'ownerOnly' },
   { method: 'POST', path: /^\/api\/cockpit\/tenants$/, perm: 'ownerOnly' },
   { method: 'POST', path: /^\/api\/agents\/enrol-token$/, perm: 'ownerOnly' },
@@ -77,10 +103,12 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
     const rule = POLICY.find((r) => r.method === req.method && r.path.test(req.path));
     if (!rule) return next();
 
+    // 'authenticated' = any signed-in role; `role` is already non-null above.
+    if (rule.perm === 'authenticated') return next();
     const allowed = rule.perm === 'ownerOnly' ? role === 'owner' : !!perms[rule.perm];
     if (!allowed) return res.status(403).json({ error: 'Insufficient permissions' });
     next();
   };
 }
 
-module.exports = { createRbacMiddleware };
+module.exports = { createRbacMiddleware, POLICY };

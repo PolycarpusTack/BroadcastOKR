@@ -335,6 +335,8 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
       return res.status(400).json({ error: 'queries array is required' });
     }
 
+    auditSql(req, `Executed ${queries.length} live-KR quer${queries.length === 1 ? 'y' : 'ies'}`);
+
     const config = loadConfig();
     const CONCURRENCY = 10;
     const results = [];
