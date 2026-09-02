@@ -20,6 +20,12 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   const router = createRouter();
   const { loadConfig, saveConfig, loadHistory, saveHistory } = store;
 
+  /** Refuse to persist a secret we cannot protect (D-2). */
+  const CREDENTIALS_UNPROTECTED = {
+    error: 'Credential encryption is not configured on this instance. '
+      + 'Set BRIDGE_ENCRYPTION_KEY before storing database credentials.',
+  };
+
   // Get/save config
   router.get('/config', (req, res) => {
     const config = loadConfig();
@@ -35,11 +41,19 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const incoming = req.body;
 
     if (incoming.connections) {
+      // Same rules as POST /connections: a masked password keeps the stored
+      // one; a new one is refused without a key and encrypted with one. This
+      // used to store whatever arrived, in the clear — a second write path
+      // that undid the D-2 guarantee (review 2026-09-02, F7).
+      const arrivingSecret = incoming.connections.some((c) => c.password && c.password !== '***');
+      if (cipher.unprotected && arrivingSecret) {
+        return res.status(503).json(CREDENTIALS_UNPROTECTED);
+      }
       incoming.connections = incoming.connections.map((c) => ({
         ...c,
         password: c.password === '***'
           ? (config.connections.find(x => x.id === c.id)?.password || '')
-          : c.password,
+          : (c.password ? encrypt(c.password) : ''),
       }));
     }
 
@@ -92,12 +106,6 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
       res.json({ ok: false, message: 'Connection test failed' });
     }
   });
-
-  /** Refuse to persist a secret we cannot protect (D-2). */
-  const CREDENTIALS_UNPROTECTED = {
-    error: 'Credential encryption is not configured on this instance. '
-      + 'Set BRIDGE_ENCRYPTION_KEY before storing database credentials.',
-  };
 
   // Save connection
   router.post('/connections', (req, res) => {

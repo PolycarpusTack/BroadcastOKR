@@ -245,6 +245,17 @@ describe('server-enforced RBAC (client mode)', () => {
       service: 'whatson', user: 'psi', password: '***',
     }, owner));
     assert.equal(masked.status, 200);
+
+    // POST /api/config is the other write path to the same store (F7): the
+    // same refusal applies, and masked passwords still pass.
+    const viaConfig = await fetch(`${BASE}/api/config`, json('POST', {
+      connections: [{ id: 'c-secret2', name: 'Bulk', type: 'postgres', host: 'db', port: 5432, service: 'w', user: 'u', password: 'hunter2' }],
+    }, owner));
+    assert.equal(viaConfig.status, 503);
+    const viaConfigMasked = await fetch(`${BASE}/api/config`, json('POST', {
+      connections: [{ id: 'c-secret', name: 'Bulk', type: 'postgres', host: 'db', port: 5432, service: 'w', user: 'u', password: '***' }],
+    }, owner));
+    assert.equal(viaConfigMasked.status, 200);
   });
 
   it('owners can do all of it', async () => {
