@@ -91,13 +91,27 @@ export const GoalCard = React.memo(function GoalCard({
                   color={clients.find((c) => goal.clientIds?.includes(c.id))?.color ?? PRIMARY_COLOR}
                 />
               ) : (
-                resolvedGoalScopedChannels.map((channel) => (
-                  <PillBadge
-                    key={channel.key}
-                    label={channel.label}
-                    color={channel.color}
-                  />
-                ))
+                <>
+                  {resolvedGoalScopedChannels.map((channel) => (
+                    <PillBadge
+                      key={channel.key}
+                      label={channel.label}
+                      color={channel.color}
+                    />
+                  ))}
+                  {/* Channel scope is presentation only — it never reaches the
+                      live query. Saying so beats a card that claims a scope its
+                      own number ignores. */}
+                  {hasLiveKRs && (
+                    <span
+                      title={'Channel scope labels this goal but does not filter its live Key Results — '
+                        + 'the query measures every channel unless its SQL says otherwise.'}
+                      style={{ fontSize: 10, color: theme.textFaint, cursor: 'help' }}
+                    >
+                      label only
+                    </span>
+                  )}
+                </>
               )
             ) : (
               <ChannelBadge channel={safeChannel(channels, goal.channel)} />

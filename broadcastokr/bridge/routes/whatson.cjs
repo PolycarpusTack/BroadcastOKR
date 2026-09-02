@@ -57,6 +57,10 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   router.post('/test-connection', async (req, res) => {
     const { type, host, port, service, user, password, clientDir } = req.body;
     const dbType = type || 'oracle';
+    // The form sends a plaintext password; a stored connection re-tested from
+    // the client sends back what it holds. `decrypt` passes plaintext through
+    // and unwraps marked ciphertext, so both callers are handled without the
+    // route having to guess which one it is talking to.
     const decryptedPassword = decrypt(password);
 
     try {
@@ -191,14 +195,26 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const connConfig = config.connections.find(c => c.id === connectionId);
     if (!connConfig) return res.status(400).json({ error: 'Connection not found' });
 
-    const channelQueries = connConfig.type === 'postgres'
+    // The schema is per-install (PSI is only the common default), so honour the
+    // connection's configured schema rather than hardcoding the owner prefix.
+    const isPg = connConfig.type === 'postgres';
+    const schema = connConfig.schema || 'PSI';
+    // A schema name cannot be bound as a parameter, so it is interpolated —
+    // constrain it to a plain identifier even though it comes from owner-only
+    // stored config rather than from the request.
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
+      return res.status(400).json({ error: 'Connection schema is not a valid identifier' });
+    }
+    const s = isPg ? schema.toLowerCase() : schema.toUpperCase();
+
+    const channelQueries = isPg
       ? [
-          'SELECT DISTINCT ch_id AS id, ch_description AS name, ch_internalvalue AS "internalValue", ch_kind AS "channelKind" FROM psi.psichannel ORDER BY ch_description',
-          'SELECT DISTINCT tx_id_channel AS id, tx_id_channel AS name FROM psi.psitransmission ORDER BY tx_id_channel',
+          `SELECT DISTINCT ch_id AS id, ch_description AS name, ch_internalvalue AS "internalValue", ch_kind AS "channelKind" FROM ${s}.psichannel ORDER BY ch_description`,
+          `SELECT DISTINCT tx_id_channel AS id, tx_id_channel AS name FROM ${s}.psitransmission ORDER BY tx_id_channel`,
         ]
       : [
-          'SELECT DISTINCT CH_ID AS id, CH_DESCRIPTION AS name, CH_INTERNALVALUE AS "internalValue", CH_KIND AS "channelKind" FROM PSI.PSICHANNEL ORDER BY CH_DESCRIPTION',
-          'SELECT DISTINCT TX_ID_CHANNEL AS id, TX_ID_CHANNEL AS name FROM PSI.PSITRANSMISSION ORDER BY TX_ID_CHANNEL',
+          `SELECT DISTINCT CH_ID AS id, CH_DESCRIPTION AS name, CH_INTERNALVALUE AS "internalValue", CH_KIND AS "channelKind" FROM ${s}.PSICHANNEL ORDER BY CH_DESCRIPTION`,
+          `SELECT DISTINCT TX_ID_CHANNEL AS id, TX_ID_CHANNEL AS name FROM ${s}.PSITRANSMISSION ORDER BY TX_ID_CHANNEL`,
         ];
 
     for (const sql of channelQueries) {
