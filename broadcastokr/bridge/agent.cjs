@@ -62,19 +62,23 @@ async function main() {
           : password),
     });
 
-    const executeQuery = async (q) => {
-      const connConfig = (config.connections || []).find((c) => c.id === q.connectionId);
-      if (!connConfig) return { status: 'error', error: 'Connection not found in agent config' };
-      try {
-        const rows = await core.runQueryWithTimeout(connConfig, q.sql, buildBinds(q));
-        if (!rows || rows.length === 0) return { status: 'no_data', error: 'No rows' };
-        const value = Number(Object.values(rows[0])[0]);
-        if (Number.isNaN(value)) return { status: 'error', error: 'Non-numeric result' };
-        return { status: 'ok', current: value };
-      } catch (err) {
-        return { status: 'error', error: err.message };
-      }
-    };
+    // Shares the bridge's scalar contract; only the wording differs, because
+    // these land in a local operator log rather than an API response.
+    const executeQuery = (q) => core.executeScalarQuery(
+      {
+        connConfig: (config.connections || []).find((c) => c.id === q.connectionId),
+        sql: q.sql,
+        binds: buildBinds(q),
+      },
+      {
+        messages: {
+          noConnection: 'Connection not found in agent config',
+          noRows: 'No rows',
+          notNumeric: 'Non-numeric result',
+          failed: (err) => err.message,
+        },
+      },
+    );
 
     const pass = () => runAgentPass(config, identity, { executeQuery })
       .then((r) => console.log(`[agent] pushed ${r.pushed} values`))

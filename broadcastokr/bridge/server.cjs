@@ -155,43 +155,26 @@ if (unprotected > 0) {
 
 const core = createWhatsonCore({ decryptPassword: cipher.decrypt });
 
-app.use('/api', createWhatsonRouter({ db, mode: MODE, core, store, cipher }));
-
 // ── Bridge-side live-KR sync loop ──
 
 const { buildBinds } = require('./whatson/core.cjs');
 const { runKRSyncOnce, startKRSyncLoop } = require('./liveSync.cjs');
 
-/** Same value-extraction contract as /api/kpi/execute-batch. */
-async function executeKrQuery(q) {
-  const config = store.loadConfig();
-  const connConfig = config.connections.find(c => c.id === q.connectionId);
-  if (!connConfig) return { status: 'error', error: 'Connection not found' };
-  try {
-    const rows = await core.runQueryWithTimeout(connConfig, q.sql, buildBinds(q));
-    if (!rows || rows.length === 0) return { status: 'no_data', error: 'Query returned no rows' };
-    const value = Number(Object.values(rows[0])[0]);
-    if (isNaN(value)) return { status: 'error', error: 'Query did not return a numeric value' };
-    return { status: 'ok', current: value };
-  } catch (err) {
-    const status = err.message === 'Query timed out' ? 'timeout' : 'error';
-    return { status, error: status === 'timeout' ? 'Query timed out' : 'Query execution failed' };
-  }
+/** Same value-extraction contract as /api/kpi/execute-batch — one seam. */
+function executeKrQuery(q) {
+  const connConfig = store.loadConfig().connections.find(c => c.id === q.connectionId);
+  return core.executeScalarQuery({ connConfig, sql: q.sql, binds: buildBinds(q) });
 }
+
+// The manual trigger lives on the WHATS'ON router, not on `app` directly, so
+// FF-9's policy-coverage scan sees it like every other data-plane route.
+app.use('/api', createWhatsonRouter({
+  db, mode: MODE, core, store, cipher,
+  syncNow: () => runKRSyncOnce(db, { executeQuery: executeKrQuery }),
+}));
 
 const KR_SYNC_INTERVAL_MS = Number(process.env.BRIDGE_KR_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
 startKRSyncLoop(db, { executeQuery: executeKrQuery, intervalMs: KR_SYNC_INTERVAL_MS });
-
-// Manual trigger for the loop (the app's "Sync now" affordances)
-app.post('/api/kpi/sync-now', async (req, res) => {
-  try {
-    const result = await runKRSyncOnce(db, { executeQuery: executeKrQuery });
-    res.json({ ok: true, ...result });
-  } catch (err) {
-    console.error('Manual KR sync failed:', err);
-    res.status(500).json({ error: 'Sync failed' });
-  }
-});
 
 // ── Health ──
 

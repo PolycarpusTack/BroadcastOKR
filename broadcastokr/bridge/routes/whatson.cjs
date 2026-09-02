@@ -12,7 +12,7 @@ const { getKpiTemplates } = require('../whatson/templates.cjs');
  * createCredentialCipher — when the cipher reports itself unavailable, routes
  * that would persist a new secret refuse rather than storing it in the clear.
  */
-function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher }) {
+function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNow }) {
   const { encrypt, decrypt } = cipher;
   const { audit } = require('../audit.cjs');
   const cloud = mode !== 'desktop';
@@ -365,27 +365,14 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher }) {
           }
 
           const connConfig = config.connections.find(c => c.id === connectionId);
-          if (!connConfig) {
-            return { goalId, krIndex, status: 'error', error: 'Connection not found' };
-          }
-
-          try {
-            const rows = await core.runQueryWithTimeout(connConfig, sql, buildBinds(q));
-            if (!rows || rows.length === 0) {
-              return { goalId, krIndex, status: 'no_data', error: 'Query returned no rows' };
-            }
-
-            const value = Number(Object.values(rows[0])[0]);
-            if (isNaN(value)) {
-              return { goalId, krIndex, status: 'error', error: 'Query did not return a numeric value' };
-            }
-
-            return { goalId, krIndex, status: 'ok', current: value };
-          } catch (err) {
-            console.error(`Batch query failed for goal ${goalId}, KR ${krIndex}:`, err);
-            const status = err.message === 'Query timed out' ? 'timeout' : 'error';
-            return { goalId, krIndex, status, error: status === 'timeout' ? 'Query timed out' : 'Query execution failed' };
-          }
+          const result = await core.executeScalarQuery(
+            { connConfig, sql, binds: buildBinds(q) },
+            { messages: { failed: (err) => {
+              console.error(`Batch query failed for goal ${goalId}, KR ${krIndex}:`, err);
+              return 'Query execution failed';
+            } } },
+          );
+          return { goalId, krIndex, ...result };
         })
       );
 
@@ -400,6 +387,19 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher }) {
     }
 
     res.json({ results });
+  });
+
+  // Manual trigger for the bridge-side sync loop (the app's "Sync now")
+  router.post('/kpi/sync-now', async (req, res) => {
+    if (!syncNow) return res.status(501).json({ error: 'Sync loop not configured' });
+    try {
+      const result = await syncNow();
+      auditSql(req, `Triggered a live-KR sync pass (${result.synced}/${result.total})`);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error('Manual KR sync failed:', err);
+      res.status(500).json({ error: 'Sync failed' });
+    }
   });
 
   // Get KPI history
