@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { KPIConfigModal } from './components/kpi/KPIConfigModal';
+const SetupWizard = lazy(() => import('./components/wizard/SetupWizard').then((m) => ({ default: m.SetupWizard })));
 
 // Route pages are code-split so each becomes its own chunk, keeping the
 // initial bundle small. Named exports are adapted to default for React.lazy.
@@ -29,6 +30,7 @@ import { useActivityLog } from './context/ActivityLogContext';
 import { DeploymentProvider } from './context/DeploymentContext';
 import { BUILD_EDITION, FLEET_IN_BUILD, setRuntimeMode, hasFeature, type TenancyMode } from './editions/entitlements';
 import { logger } from './utils/logger';
+import { useSetupWizard } from './components/wizard/useSetupWizard';
 
 export default function App() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -61,7 +63,7 @@ export default function App() {
   const { theme } = useTheme();
   const { toast } = useToast();
   const { hydrateLog } = useActivityLog();
-  const { authStatus, signIn } = useAuth();
+  const { authStatus, signIn, currentUser } = useAuth();
 
   // Tenancy: the bridge's health.mode wins over the build-time edition
   const mode: TenancyMode = useMemo(() => {
@@ -70,6 +72,25 @@ export default function App() {
   }, [health?.mode]);
   useEffect(() => { setRuntimeMode(mode); }, [mode]);
   const fleet = hasFeature('fleet', mode);
+
+  // First-run detection for the setup wizard. `null` means "not known yet" —
+  // the wizard must never auto-open on a guess, only on a positive zero.
+  const [connectionCount, setConnectionCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    getConnections()
+      .then((list) => { if (!cancelled) setConnectionCount(list.length); })
+      .catch(() => { if (!cancelled) setConnectionCount(null); });
+    return () => { cancelled = true; };
+  }, [connected, getConnections]);
+
+  const {
+    open: wizardOpen, openWizard, dismiss: dismissWizard, complete: completeWizard,
+  } = useSetupWizard({
+    connectionCount: connectionCount ?? 0,
+    connectionCountKnown: connectionCount !== null,
+  });
 
   // Fetch full state from bridge on connect, then poll for changes
   useEffect(() => {
@@ -187,7 +208,12 @@ export default function App() {
 
   return (
     <DeploymentProvider mode={mode}>
-    <AppShell onCreateTask={() => setCreateTaskOpen(true)} connected={connected} bridgeRunning={bridgeRunning}>
+    <AppShell
+      onCreateTask={() => setCreateTaskOpen(true)}
+      connected={connected}
+      bridgeRunning={bridgeRunning}
+      onRunSetupWizard={openWizard}
+    >
       <ErrorBoundary>
         <Suspense fallback={
           <div role="status" aria-label="Loading" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 64, color: theme.textMuted, fontSize: 13 }}>
@@ -246,6 +272,31 @@ export default function App() {
         </Routes>
         </Suspense>
       </ErrorBoundary>
+      {wizardOpen && (
+        <Suspense fallback={null}>
+          <SetupWizard
+            open={wizardOpen}
+            onDismiss={dismissWizard}
+            onComplete={completeWizard}
+            theme={theme}
+            context={{ fleet, isOwner: currentUser.role === 'owner' }}
+            bridge={{
+              connected,
+              bridgeRunning,
+              startBridge,
+              testConnection,
+              saveConnection,
+              getConnections,
+              getChannels,
+              getTables,
+              getColumns,
+              previewQuery,
+              saveKPI,
+              executeBatch,
+            }}
+          />
+        </Suspense>
+      )}
       <KPIConfigModal
         open={kpiConfigOpen}
         onClose={() => setKpiConfigOpen(false)}

@@ -12,6 +12,8 @@ interface HelpModalProps {
   theme: Theme;
   /** Opens the O'Reilly-style developer guide (rendered by AppShell) */
   onOpenDevGuide?: () => void;
+  /** Re-run the guided first-run setup. */
+  onRunSetupWizard?: () => void;
 }
 
 interface Section {
@@ -21,7 +23,7 @@ interface Section {
   body: () => React.ReactNode;
 }
 
-export function HelpModal({ open, onClose, theme, onOpenDevGuide }: HelpModalProps) {
+export function HelpModal({ open, onClose, theme, onOpenDevGuide, onRunSetupWizard }: HelpModalProps) {
   const [active, setActive] = useState('start');
 
   // ---- small inline helpers (theme-aware, For-Dummies styling) ----
@@ -334,11 +336,23 @@ export function HelpModal({ open, onClose, theme, onOpenDevGuide }: HelpModalPro
               </button>
             );
           })}
+          {onRunSetupWizard && (
+            <button
+              onClick={onRunSetupWizard}
+              style={{
+                marginTop: 'auto', textAlign: 'left', padding: '9px 11px', borderRadius: 8,
+                cursor: 'pointer', border: `1px solid ${PRIMARY_COLOR}55`, background: `${PRIMARY_COLOR}10`,
+                color: PRIMARY_COLOR, fontSize: 12, fontWeight: 700,
+              }}
+            >
+              {'\u{1F9ED}'} Run the setup wizard {'\u2192'}
+            </button>
+          )}
           {onOpenDevGuide && (
             <button
               onClick={onOpenDevGuide}
               style={{
-                marginTop: 'auto', textAlign: 'left', padding: '9px 11px', borderRadius: 8,
+                marginTop: onRunSetupWizard ? 8 : 'auto', textAlign: 'left', padding: '9px 11px', borderRadius: 8,
                 cursor: 'pointer', border: `1px dashed ${theme.borderLight}`, background: 'transparent',
                 color: theme.textMuted, fontSize: 12, fontWeight: 600,
               }}
