@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
-const { appendFileSync, mkdirSync } = require('fs');
+const { appendFileSync, writeFileSync, mkdirSync } = require('fs');
 const { loadOrCreateCredentialKey } = require('./credentialKey.cjs');
 
 // Keep a global reference so the window isn't garbage collected
@@ -110,11 +110,27 @@ function startBridge() {
     // better-sqlite3 kills it before it can write anything of its own). Tee it
     // to a file next to the other bridge data, and keep the tail in memory so
     // the exit handler can tell the renderer *why* it stopped.
+    //
+    // The file is truncated on every start and capped per run. Its job is
+    // "why did the last start die" — and a desktop bridge with no API key
+    // echoes every HTTP request to stdout, which left alone was ~2 MB per day
+    // the app was open, forever (review 2026-09-02, F8). Request logs have
+    // their own rotated file (logs/bridge.log).
+    const LOG_CAP_BYTES = 2 * 1024 * 1024;
+    let logged = 0;
+    try {
+      writeFileSync(bridgeLogPath(), `[${new Date().toISOString()}] bridge starting\n`);
+    } catch { /* logging must never take the app down */ }
     let lastOutput = '';
     const record = (text) => {
       lastOutput = `${lastOutput}${text}`.slice(-4000);
+      if (logged >= LOG_CAP_BYTES) return;
       try {
         appendFileSync(bridgeLogPath(), text);
+        logged += Buffer.byteLength(text);
+        if (logged >= LOG_CAP_BYTES) {
+          appendFileSync(bridgeLogPath(), '\n[bridge-process.log capped for this run — request logs continue in logs/bridge.log]\n');
+        }
       } catch { /* logging must never take the app down */ }
     };
 
