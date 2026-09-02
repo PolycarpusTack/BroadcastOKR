@@ -49,33 +49,50 @@ them — take both.
 > **The backup directory holds credentials.** The config copy carries stored
 > connection passwords, encrypted exactly as `config.json` holds them (i.e. only
 > if `BRIDGE_ENCRYPTION_KEY` is set — see Credentials below). Give the backup
-> directory the same protection as the bridge's data directory, and note that
-> restoring to an instance with a *different* encryption key will not decrypt
-> them: keep the key with the backup policy, not in it.
+> directory the same protection as the bridge's data directory.
 
-For off-machine copies, still ship the backup directory elsewhere with a cron
-job:
+> **A backup is only complete with its key.** The passwords in the config copy
+> decrypt only under the key that wrote them. On a server that is
+> `BRIDGE_ENCRYPTION_KEY` — keep it with the backup policy, not in the backup
+> directory. On the **desktop app** the key is generated on first run and sealed
+> to the Windows/macOS user account (`<userData>/bridge/credential-key`); it
+> cannot be copied to another machine or account. A desktop backup restored
+> elsewhere comes back with its goals, tasks and connections, and **every
+> database password must be re-entered** on the Clients page. The bridge says so
+> at startup and the Dashboard's System Health panel shows the count of
+> passwords it cannot read — nothing is silently lost, but nothing is silently
+> recovered either.
+
+For off-machine copies, ship the whole backup directory (both files of each
+pair) elsewhere with a cron job:
 
 ```bash
-# Daily backup at 2 AM
-0 2 * * * cp /path/to/broadcastokr.db /path/to/backups/broadcastokr-$(date +\%Y\%m\%d).db
+# Daily copy at 2 AM of the scheduler's paired snapshots
+0 2 * * * rsync -a /path/to/backups/ /offsite/broadcastokr-backups/
 ```
 
 ### Manual Backup
 
 ```bash
-# Via API
+# Via API — database only; pair it with a copy of config.json yourself
 curl -H "Authorization: Bearer <KEY>" http://bridge:3001/api/sync/backup -o backup.db
+cp bridge/config.json backup.config.json
 
-# Or copy the file directly
+# Or copy the files directly (stop the bridge first, or use the API for a consistent .db)
 cp bridge/broadcastokr.db backups/broadcastokr-$(date +%Y%m%d).db
+cp bridge/config.json      backups/broadcastokr-$(date +%Y%m%d).config.json
 ```
 
 ### Restore
 
 1. Stop the bridge
-2. Replace `broadcastokr.db` with the backup file
-3. Start the bridge
+2. Replace `broadcastokr.db` with the snapshot's `.db` **and** `config.json`
+   with its `.config.json` — the same timestamp, never a mix
+3. Make sure the encryption key the snapshot was written under is configured
+   (server: `BRIDGE_ENCRYPTION_KEY`; desktop: the same machine and account, or
+   plan to re-enter passwords)
+4. Start the bridge and read its startup lines: it reports how many stored
+   passwords it re-encrypted, left unprotected, or cannot read with the key it has
 
 ## Credentials
 
@@ -99,9 +116,19 @@ Stored ciphertext carries an `enc:v1:` marker, which is what lets the bridge tel
 "never encrypted" apart from "encrypted with a key we no longer have". On startup
 any unmarked password is re-encrypted in place and the count is logged.
 
-**Rotation** is not automatic: there is no re-wrap path in v1. To change the key,
-re-enter each connection password after setting the new one. A wrong or missing
-key fails loudly rather than handing ciphertext to the database as a password.
+**Upgrading an install that used `BRIDGE_API_KEY` for encryption:** values
+written before the marker were encrypted under `BRIDGE_API_KEY`. Keep that
+variable set for the first start after adding a dedicated
+`BRIDGE_ENCRYPTION_KEY` — the bridge re-wraps the old values under the new key
+and logs how many. Without it, the old values are left untouched and reported
+as unreadable (they are never re-sealed on a guess), and those passwords must
+be re-entered.
+
+**Rotation** is otherwise not automatic. To change the key, re-enter each
+connection password after setting the new one. A wrong or missing key fails
+loudly rather than handing ciphertext to the database as a password; the count
+of unreadable passwords is logged at startup and shown on `/api/health`
+(`credentials.unreadable`) and in the Dashboard's System Health panel.
 
 ## Log Files
 
