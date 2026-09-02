@@ -54,8 +54,11 @@ const POLICY = [
   { method: 'DELETE', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
 
   // ── Data plane (FF-9 requires an entry for every route in routes/whatson.cjs) ──
-  // Raw-SQL surfaces: SQL arrives in the request body, so these are credential-grade.
-  { method: 'POST', path: /^\/api\/kpi\/execute-batch$/, perm: 'ownerOnly' },
+  // execute-batch is how the app syncs *stored* live KRs (create/edit/sync on
+  // the Goals page, Compare, the wizard) — manager work. SQL does arrive in the
+  // body, so the handler verifies that every query a non-owner sends matches
+  // the KR's stored liveConfig byte-for-byte; owners alone may run ad hoc SQL.
+  { method: 'POST', path: /^\/api\/kpi\/execute-batch$/, perm: 'canEdit' },
   // Executes a stored definition, but on an ad-hoc caller-chosen trigger, and
   // /api/channels feeds updateClient — itself ownerOnly — so nothing regresses.
   { method: 'POST', path: /^\/api\/kpi\/execute$/, perm: 'ownerOnly' },

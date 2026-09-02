@@ -77,11 +77,16 @@ describe('FF-9: data-plane routes are policy-covered', () => {
   it('the raw-SQL surfaces are owner-gated, not merely covered', () => {
     // Coverage alone would be satisfied by `authenticated`; these specific
     // routes take SQL from the request body and must be owner-only.
-    for (const path of ['/api/kpi/execute-batch', '/api/preview-query']) {
+    for (const path of ['/api/preview-query']) {
       const rule = POLICY.find((r) => r.method === 'POST' && r.path.test(path));
       assert.ok(rule, `${path} must have a POLICY entry`);
       assert.equal(rule.perm, 'ownerOnly', `${path} accepts caller-supplied SQL and must be ownerOnly`);
     }
+    // execute-batch is manager-grade because the app syncs stored KRs through
+    // it; the handler refuses any non-owner query that is not byte-for-byte
+    // the KR's stored liveConfig (rbac.test.cjs proves that against a server).
+    const batch = POLICY.find((r) => r.method === 'POST' && r.path.test('/api/kpi/execute-batch'));
+    assert.equal(batch?.perm, 'canEdit');
   });
 
   it('coverage survives the shapes Express would also dispatch (case, trailing slash)', () => {

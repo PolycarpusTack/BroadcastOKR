@@ -212,7 +212,9 @@ export function GoalsPage({
           : { type: 'selected' as const, channels: newSelectedChannels },
       }),
     };
-    addGoal(goal);
+    // Hold the write: a non-owner's sync is verified against the stored KR,
+    // so it must not race the create it depends on.
+    const written = addGoal(goal);
     toast(`Goal created: ${goal.title}`, PRIMARY_COLOR, '\u{1F3AF}');
     logAction(`Created goal: ${goal.title}`, currentUser.name, PRIMARY_COLOR);
     setCreateOpen(false);
@@ -227,7 +229,7 @@ export function GoalsPage({
       .map((kr, idx) => ({ kr, idx }))
       .filter(({ kr }) => kr.liveConfig);
     if (liveKRs.length > 0 && executeBatch) {
-      syncGoal(goal.id, goal.keyResults);
+      void written.then(() => syncGoal(goal.id, goal.keyResults));
     }
   };
 
@@ -294,7 +296,7 @@ export function GoalsPage({
       };
     });
 
-    updateGoal(editGoalId, {
+    const written = updateGoal(editGoalId, {
       title: editTitle.trim(),
       channel: editChannel,
       owner: editOwner,
@@ -318,10 +320,11 @@ export function GoalsPage({
     setEditChannelScopeType('all');
     setEditSelectedChannels([]);
 
-    // Auto-sync live KRs after edit (in case SQL or connection changed)
+    // Auto-sync live KRs after edit (in case SQL or connection changed) —
+    // after the write lands, so the sync sees the new SQL as the stored one.
     const liveKRs = updatedKRs.filter((kr) => kr.liveConfig);
     if (liveKRs.length > 0 && executeBatch) {
-      syncGoal(editGoalId, updatedKRs);
+      void written.then(() => syncGoal(editGoalId, updatedKRs));
     }
   };
 

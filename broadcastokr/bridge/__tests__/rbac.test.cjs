@@ -152,6 +152,38 @@ describe('server-enforced RBAC (client mode)', () => {
     assert.equal((await fetch(`${BASE}/api/goals/g1`, { headers: { Cookie: owner } })).status, 200);
   });
 
+  it('managers sync stored live KRs through execute-batch but cannot supply SQL of their own', async () => {
+    // Review 2026-09-02 F5: every Goals-page sync path uses execute-batch with
+    // the KR's stored SQL. ownerOnly broke managers; the fix verifies the query
+    // against the stored liveConfig instead.
+    const manager = await signIn({ sub: 'mg-1', name: 'Manager One', email: 'mg@x' });
+    const users = await (await fetch(`${BASE}/api/users`, { headers: { Cookie: owner } })).json();
+    const mgr = users.find((u) => u.name === 'Manager One');
+    assert.equal((await fetch(`${BASE}/api/users/${mgr.id}`, json('PUT', { ...mgr, role: 'manager' }, owner))).status, 200);
+
+    const liveConfig = { connectionId: 'no-such-connection', sql: 'SELECT 42 AS v', unit: 'count', direction: 'hi' };
+    assert.equal((await fetch(`${BASE}/api/goals`, json('POST', {
+      id: 'g-live', title: 'Live', status: 'behind', progress: 0, owner: mgr.id, channel: 0, period: 'Q3',
+      keyResults: [{ id: 'kr-live', title: 'KR', start: 0, target: 100, current: 0, progress: 0, status: 'behind', liveConfig }],
+    }, owner))).status, 201);
+
+    const stored = { goalId: 'g-live', krIndex: 0, krId: 'kr-live', connectionId: liveConfig.connectionId, sql: liveConfig.sql };
+    const adHoc = { ...stored, sql: 'SELECT * FROM psi.psitransmission' };
+
+    const res = await fetch(`${BASE}/api/kpi/execute-batch`, json('POST', { queries: [stored, adHoc] }, manager));
+    assert.equal(res.status, 200);
+    const { results } = await res.json();
+    // The stored query ran (it fails at the connection, not at the gate)…
+    assert.equal(results[0].error, 'Connection not found');
+    // …and the ad hoc one was refused before it could reach a database.
+    assert.match(results[1].error, /Not a stored query/);
+
+    // Owners keep ad hoc execution; members are still refused at the door.
+    const ownerRes = await (await fetch(`${BASE}/api/kpi/execute-batch`, json('POST', { queries: [adHoc] }, owner))).json();
+    assert.equal(ownerRes.results[0].error, 'Connection not found');
+    assert.equal((await fetch(`${BASE}/api/kpi/execute-batch`, json('POST', { queries: [stored] }, member))).status, 403);
+  });
+
   it('role escalation is owner-only, even for self', async () => {
     const users = await (await fetch(`${BASE}/api/users`, { headers: { Cookie: owner } })).json();
     const me = users.find((u) => u.id === memberUserId);
@@ -179,10 +211,13 @@ describe('server-enforced RBAC (client mode)', () => {
     assert.equal((await fetch(`${BASE}/api/users`, json('POST', { name: 'Sneaky Owner', role: 'owner', av: 'S', color: '#000', dept: '', title: '' }, member))).status, 403);
     assert.equal((await fetch(`${BASE}/api/users`, json('POST', { name: 'New Member', role: 'member', av: 'N', color: '#000', dept: '', title: '' }, member))).status, 201);
 
-    // Managers may trigger a sync pass (stored SQL only) but never supply SQL themselves
+    // Managers may trigger a sync pass (stored SQL only) but never supply SQL
+    // themselves: the route is manager-grade, the ad hoc query is refused per result
     assert.notEqual((await fetch(`${BASE}/api/kpi/sync-now`, json('POST', {}, member))).status, 403);
-    assert.equal((await fetch(`${BASE}/api/kpi/execute-batch`,
-      json('POST', { queries: [{ goalId: 'g1', krIndex: 0, connectionId: 'x', sql: 'SELECT 1' }] }, member))).status, 403);
+    const adHoc = await fetch(`${BASE}/api/kpi/execute-batch`,
+      json('POST', { queries: [{ goalId: 'g1', krIndex: 0, krId: 'kr1', connectionId: 'x', sql: 'SELECT 1' }] }, member));
+    assert.equal(adHoc.status, 200);
+    assert.match((await adHoc.json()).results[0].error, /Not a stored query/);
   });
 
   it('server-side audit recorded the sensitive actions with session actors', async () => {

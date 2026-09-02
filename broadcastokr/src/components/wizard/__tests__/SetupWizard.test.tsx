@@ -23,7 +23,10 @@ function makeBridge(over: Partial<WizardBridge> = {}): WizardBridge {
   } as WizardBridge;
 }
 
-function renderWizard(over: Partial<WizardBridge> = {}, ctx = { fleet: true, isOwner: true }) {
+const OWNER = { fleet: true, isOwner: true, canCreate: true, canEdit: true };
+const MEMBER = { fleet: true, isOwner: false, canCreate: false, canEdit: false };
+
+function renderWizard(over: Partial<WizardBridge> = {}, ctx = OWNER) {
   const onComplete = vi.fn();
   const onDismiss = vi.fn();
   const bridge = makeBridge(over);
@@ -96,7 +99,7 @@ describe('SetupWizard', () => {
   });
 
   it('skips owner-only steps for a member', () => {
-    renderWizard({}, { fleet: true, isOwner: false });
+    renderWizard({}, MEMBER);
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));   // bridge
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));   // -> path, not database
 
@@ -118,8 +121,43 @@ describe('SetupWizard', () => {
     expect(screen.queryByText('First goal')).toBeNull();
   });
 
+  it('records the goal before syncing it, so a failed sync cannot create it twice', async () => {
+    // Review 2026-09-02 F6: the goal was added to the store first and the
+    // wizard only remembered it after a successful sync. A sync that threw
+    // left the form up; a retry made a second goal.
+    // The store's own bridge write (POST /api/goals) goes through global
+    // fetch with retry backoff; answer it instantly so the test measures the
+    // wizard, not the retry schedule.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } })));
+    const { bridge } = renderWizard({
+      getConnections: vi.fn().mockResolvedValue([{ id: 'conn_1', name: 'PSI', type: 'postgres', host: 'h', port: 1, service: 's', user: 'u', password: '***' }]),
+      executeBatch: vi.fn().mockRejectedValue(new Error('Insufficient permissions')),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));          // welcome
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));          // bridge
+    fireEvent.click(screen.getByRole('button', { name: /Skip for now/ })); // database
+    fireEvent.click(screen.getByRole('button', { name: /Skip for now/ })); // client
+    fireEvent.click(screen.getByRole('button', { name: /A goal with a live Key Result/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    fireEvent.change(screen.getByLabelText('Goal title'), { target: { value: 'Subtitle readiness' } });
+    fireEvent.change(screen.getByLabelText('Key Result'), { target: { value: 'Approved subtitles' } });
+    await waitFor(() => expect(screen.getByLabelText('KR connection').querySelectorAll('option').length).toBeGreaterThan(1));
+    fireEvent.change(screen.getByLabelText('KR connection'), { target: { value: 'conn_1' } });
+    fireEvent.change(screen.getByLabelText('KR SQL query'), { target: { value: 'SELECT 1 AS value' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create goal and fetch the number/ }));
+
+    await waitFor(() => expect(screen.getByText(/created, but syncing it failed/i)).toBeTruthy());
+    expect(bridge.executeBatch).toHaveBeenCalledTimes(1);
+    // The step now shows the created state — no second "Create" button to press.
+    expect(screen.queryByRole('button', { name: /Create goal and fetch the number/ })).toBeNull();
+    expect(screen.getByText(/“Subtitle readiness” created/)).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
   it('completes from the final step', () => {
-    const { onComplete } = renderWizard({}, { fleet: false, isOwner: false });
+    // A client-edition manager: no credential steps, but goal and KPI apply.
+    const { onComplete } = renderWizard({}, { fleet: false, isOwner: false, canCreate: true, canEdit: true });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));  // welcome
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));  // bridge
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));  // path

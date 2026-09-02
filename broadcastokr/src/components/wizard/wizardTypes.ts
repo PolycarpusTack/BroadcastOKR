@@ -41,10 +41,15 @@ export interface WizardBridge {
   executeBatch: (queries: LiveKRQuery[]) => Promise<{ results: LiveKRBatchResult[] }>;
 }
 
-/** Deployment + role facts that decide which steps apply. */
+/** Deployment + role facts that decide which steps apply. The permission
+ *  flags mirror what the bridge enforces (POST /api/goals needs canCreate,
+ *  POST /api/kpis needs canEdit) so a step is never shown to someone whose
+ *  save would 403 at the end of it. */
 export interface WizardContext {
   fleet: boolean;
   isOwner: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
 }
 
 /** Common props every step receives from the wizard shell. */

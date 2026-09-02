@@ -63,7 +63,7 @@ export default function App() {
   const { theme } = useTheme();
   const { toast } = useToast();
   const { hydrateLog } = useActivityLog();
-  const { authStatus, signIn, currentUser } = useAuth();
+  const { authStatus, signIn, currentUser, permissions } = useAuth();
 
   // Tenancy: the bridge's health.mode wins over the build-time edition
   const mode: TenancyMode = useMemo(() => {
@@ -294,7 +294,12 @@ export default function App() {
             onDismiss={dismissWizard}
             onComplete={completeWizard}
             theme={theme}
-            context={{ fleet, isOwner: currentUser.role === 'owner' }}
+            context={{
+              fleet,
+              isOwner: currentUser.role === 'owner',
+              canCreate: permissions.canCreate,
+              canEdit: permissions.canEdit,
+            }}
             bridge={{
               connected,
               bridgeRunning,
