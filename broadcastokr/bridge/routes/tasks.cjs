@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 
 function toTaskDTO(row, subtasks) {
   return {
@@ -28,7 +28,7 @@ function upsertSubtasks(db, taskId, subtasks) {
 }
 
 function createTasksRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   router.get('/', (req, res) => {
     const tasks = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all();

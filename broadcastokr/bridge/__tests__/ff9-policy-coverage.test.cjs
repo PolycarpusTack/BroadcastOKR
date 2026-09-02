@@ -77,10 +77,31 @@ describe('FF-9: data-plane routes are policy-covered', () => {
   it('the raw-SQL surfaces are owner-gated, not merely covered', () => {
     // Coverage alone would be satisfied by `authenticated`; these specific
     // routes take SQL from the request body and must be owner-only.
-    for (const path of ['/api/kpi/execute-batch', '/api/preview-query']) {
+    for (const path of ['/api/preview-query']) {
       const rule = POLICY.find((r) => r.method === 'POST' && r.path.test(path));
       assert.ok(rule, `${path} must have a POLICY entry`);
       assert.equal(rule.perm, 'ownerOnly', `${path} accepts caller-supplied SQL and must be ownerOnly`);
+    }
+    // execute-batch is manager-grade because the app syncs stored KRs through
+    // it; the handler refuses any non-owner query that is not byte-for-byte
+    // the KR's stored liveConfig (rbac.test.cjs proves that against a server).
+    const batch = POLICY.find((r) => r.method === 'POST' && r.path.test('/api/kpi/execute-batch'));
+    assert.equal(batch?.perm, 'canEdit');
+  });
+
+  it('coverage survives the shapes Express would also dispatch (case, trailing slash)', () => {
+    // The 2026-09-02 review found `/API/KPI/EXECUTE-BATCH` and
+    // `/api/kpi/execute-batch/` reaching the handler past every $-anchored
+    // rule. rbac now canonicalises before matching; this pins that the
+    // canonical form of every accepted shape lands on the same rule.
+    const { canonicalPath } = require('../middleware/auth.cjs');
+    const routes = mountedRoutes(buildDataPlaneRouter());
+    for (const { method, path } of routes) {
+      const expected = POLICY.find((r) => r.method === method && r.path.test(path));
+      for (const variant of [`${path}/`, path.toUpperCase(), `${path.toUpperCase()}/`]) {
+        const rule = POLICY.find((r) => r.method === method && r.path.test(canonicalPath(variant)));
+        assert.equal(rule, expected, `${method} ${variant} must resolve to the same rule as ${path}`);
+      }
     }
   });
 

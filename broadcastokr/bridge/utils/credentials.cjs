@@ -19,8 +19,12 @@ const { encrypt, decrypt, isEncrypted, rewrapSecret } = require('./crypto.cjs');
  * a fatal boot check would also leave an operator unable to start the app to
  * remove the offending credential.
  */
-function createCredentialCipher({ key, mode = 'desktop' }) {
+function createCredentialCipher({ key, mode = 'desktop', legacyKey } = {}) {
   const available = !!key;
+  // The pre-marker scheme only ever wrote under BRIDGE_API_KEY. Knowing that
+  // is what lets an upgrade that also introduces a dedicated key re-wrap the
+  // old values correctly instead of sealing them as garbage.
+  const keyOpts = { legacyKey: legacyKey && legacyKey !== key ? legacyKey : undefined };
   // Desktop is the documented single-user trust model: one person, one machine,
   // no key required. Cloud modes are multi-user and must protect secrets, so
   // there the absence of a key closes the credential-storing routes.
@@ -47,25 +51,40 @@ function createCredentialCipher({ key, mode = 'desktop' }) {
         }
         return value;
       }
-      return decrypt(value, key);
+      return decrypt(value, key, keyOpts);
     },
 
-    /** Upgrade every stored connection password to marked ciphertext. */
+    /**
+     * Upgrade every stored connection password to marked ciphertext, and say
+     * which ones the current key cannot read.
+     *
+     * `unreadable` counts marked values that fail under the current key (a
+     * restored backup from another machine, a rotated key) and unmarked values
+     * shaped like ciphertext that unpack under neither key. Both are left
+     * exactly as found — nothing here ever rewrites a value it cannot read.
+     */
     rewrapStoredConnections(store) {
-      if (!available) return { rewrapped: 0, unprotected: countUnprotected(store) };
+      if (!available) return { rewrapped: 0, unprotected: countUnprotected(store), unreadable: 0 };
 
       const config = store.loadConfig();
       const connections = config.connections || [];
       let rewrapped = 0;
+      let unreadable = 0;
 
       const upgraded = connections.map((connection) => {
-        if (!connection.password || isEncrypted(connection.password)) return connection;
+        if (!connection.password) return connection;
+        if (isEncrypted(connection.password)) {
+          try { decrypt(connection.password, key); } catch { unreadable++; }
+          return connection;
+        }
+        const sealed = rewrapSecret(connection.password, key, keyOpts);
+        if (sealed === null) { unreadable++; return connection; }
         rewrapped++;
-        return { ...connection, password: rewrapSecret(connection.password, key) };
+        return { ...connection, password: sealed };
       });
 
       if (rewrapped > 0) store.saveConfig({ ...config, connections: upgraded });
-      return { rewrapped, unprotected: 0 };
+      return { rewrapped, unprotected: 0, unreadable };
     },
   };
 }

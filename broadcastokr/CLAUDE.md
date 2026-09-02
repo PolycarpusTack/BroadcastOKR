@@ -64,6 +64,9 @@ KPI { name, unit, direction, target, current, trend[] }
 - KR edit matching by `kr.id` (not index) to preserve history during reorder/delete
 - localStorage quota-exceeded handler: catches QuotaExceededError, dispatches custom event, App.tsx shows toast
 - All bridge API calls go through `apiFetch()` in `useBridge.ts`
+- **Path shape is a security boundary.** Every path-keyed middleware compares against `canonicalPath(req.path)` (`bridge/middleware/auth.cjs`: lowercase, trailing slashes stripped) and every router comes from `bridge/utils/router.cjs` (strict, case-sensitive). Never compare `req.path` to a literal or a `$`-anchored regex directly — `/API/…` and `…/` used to bypass sign-in and RBAC entirely
+- `POST /api/kpi/execute-batch` is `canEdit`, but a non-owner's queries must match the KR's stored `liveConfig` byte-for-byte (`isStoredQuery` in `routes/whatson.cjs`) — only owners run ad hoc SQL. `addGoal`/`updateGoal` return the bridge-write promise so callers sync *after* the write lands
+- Credentials: `enc:v1:` marks ciphertext; pre-marker values were written under `BRIDGE_API_KEY`, which `createCredentialCipher` takes as `legacyKey` for the startup rewrap. A value that cannot be read is never rewritten — it is counted as `unreadable`, logged, and exposed on `/api/health` (`credentials.unreadable`) → SystemHealthPanel warning. Desktop key lives in `electron/credentialKey.cjs` (`sealed:`/`plain:` marker; never overwrites an unreadable file)
 - Oracle `:named` binds auto-converted to PostgreSQL `$1` positional via `convertBinds()`
 
 ## Components Structure
@@ -134,8 +137,8 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 210 tests across 40 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 108 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
+- `npm test` — 252 tests across 45 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 140 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 139/140 on Windows: `agent.test.cjs` asserts a `0600` identity file
 - `npm run lint` — 0 errors, gated in CI
 - `better-sqlite3` is native and can only be built for ONE runtime at a time. `npm run rebuild:node` targets system Node (`npm run bridge`, `npm test`); `npm run rebuild:electron` targets Electron (`npm run electron:dev`, packaging). `electron:build*` now force-rebuilds for Electron itself, so packaging is safe from either state — but run `npm run rebuild:node` afterwards to get the dev bridge back. **Do not trust electron-builder's own rebuild step**: on 2026-09-02 it treated a system-Node build as up to date and shipped an installer whose bridge died on `require` (NODE_MODULE_VERSION 127 vs 145)
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)

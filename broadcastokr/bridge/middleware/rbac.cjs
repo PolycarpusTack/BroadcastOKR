@@ -1,5 +1,5 @@
 const { ROLE_PERMS } = require('../permissions.cjs');
-const { isSessionExempt } = require('./auth.cjs');
+const { isSessionExempt, canonicalPath } = require('./auth.cjs');
 
 /**
  * Server-enforced RBAC for cloud modes. One declarative policy table maps
@@ -54,8 +54,11 @@ const POLICY = [
   { method: 'DELETE', path: /^\/api\/kpis(\/|$)/, perm: 'canEdit' },
 
   // ── Data plane (FF-9 requires an entry for every route in routes/whatson.cjs) ──
-  // Raw-SQL surfaces: SQL arrives in the request body, so these are credential-grade.
-  { method: 'POST', path: /^\/api\/kpi\/execute-batch$/, perm: 'ownerOnly' },
+  // execute-batch is how the app syncs *stored* live KRs (create/edit/sync on
+  // the Goals page, Compare, the wizard) — manager work. SQL does arrive in the
+  // body, so the handler verifies that every query a non-owner sends matches
+  // the KR's stored liveConfig byte-for-byte; owners alone may run ad hoc SQL.
+  { method: 'POST', path: /^\/api\/kpi\/execute-batch$/, perm: 'canEdit' },
   // Executes a stored definition, but on an ad-hoc caller-chosen trigger, and
   // /api/channels feeds updateClient — itself ownerOnly — so nothing regresses.
   { method: 'POST', path: /^\/api\/kpi\/execute$/, perm: 'ownerOnly' },
@@ -88,19 +91,23 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
     const perms = ROLE_PERMS[role];
     if (!perms) return res.status(403).json({ error: 'Unknown role' });
 
+    // Every rule below is written against the canonical shape — never req.path
+    // directly, or `/API/GOALS/g1` and `/api/goals/g1/` walk straight past it.
+    const path = canonicalPath(req.path);
+
     // Role escalation is owner-only regardless of the general users policy
-    if (req.method === 'POST' && req.path === '/api/users' && req.body?.role === 'owner' && role !== 'owner') {
+    if (req.method === 'POST' && path === '/api/users' && req.body?.role === 'owner' && role !== 'owner') {
       return res.status(403).json({ error: 'Only owners can create owners' });
     }
-    if (req.method === 'PUT' && /^\/api\/users\/[^/]+$/.test(req.path) && req.body?.role) {
-      const targetId = Number(req.path.split('/').pop());
+    if (req.method === 'PUT' && /^\/api\/users\/[^/]+$/.test(path) && req.body?.role) {
+      const targetId = Number(path.split('/').pop());
       const existing = db.prepare('SELECT role FROM users WHERE id = ?').get(targetId);
       if (existing && existing.role !== req.body.role && role !== 'owner') {
         return res.status(403).json({ error: 'Only owners can change roles' });
       }
     }
 
-    const rule = POLICY.find((r) => r.method === req.method && r.path.test(req.path));
+    const rule = POLICY.find((r) => r.method === req.method && r.path.test(path));
     if (!rule) return next();
 
     // 'authenticated' = any signed-in role; `role` is already non-null above.

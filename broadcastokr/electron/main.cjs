@@ -1,8 +1,8 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
-const { appendFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } = require('fs');
-const { randomBytes } = require('crypto');
+const { appendFileSync, writeFileSync, mkdirSync } = require('fs');
+const { loadOrCreateCredentialKey } = require('./credentialKey.cjs');
 
 // Keep a global reference so the window isn't garbage collected
 let mainWindow = null;
@@ -29,31 +29,20 @@ const BRIDGE_SCRIPT = path.join(__dirname, '..', 'bridge', 'server.cjs');
  * still better than the alternative — it raises "read the config" from
  * "open a JSON file" to "read two files as this user" — and we say so rather
  * than implying protection we do not have.
+ *
+ * The file handling itself lives in credentialKey.cjs (testable without
+ * Electron). Anything it could not do silently is kept here and sent to the
+ * renderer with the bridge status, because a main-process console.error is
+ * invisible in a packaged app.
  */
+let credentialKeyWarning;
 function credentialKey() {
-  const dataDir = path.join(app.getPath('userData'), 'bridge');
-  const keyFile = path.join(dataDir, 'credential-key');
-  mkdirSync(dataDir, { recursive: true });
-
-  const sealed = safeStorage.isEncryptionAvailable?.();
-  try {
-    if (existsSync(keyFile)) {
-      const raw = readFileSync(keyFile);
-      return sealed ? safeStorage.decryptString(raw) : raw.toString('utf8').trim();
-    }
-  } catch (err) {
-    // An unreadable key is not recoverable — a new one cannot decrypt what the
-    // old one wrote. Say so plainly instead of silently minting a replacement.
-    console.error(`[bridge] Stored credential key could not be read (${err.message}). `
-      + 'Existing database passwords will need re-entering.');
-  }
-
-  const key = randomBytes(32).toString('hex');
-  try {
-    writeFileSync(keyFile, sealed ? safeStorage.encryptString(key) : key, { mode: 0o600 });
-  } catch (err) {
-    console.error(`[bridge] Could not persist the credential key: ${err.message}`);
-  }
+  const { key, warning } = loadOrCreateCredentialKey({
+    dataDir: path.join(app.getPath('userData'), 'bridge'),
+    safeStorage,
+  });
+  credentialKeyWarning = warning;
+  if (warning) console.error(`[bridge] ${warning}`);
   return key;
 }
 
@@ -121,11 +110,27 @@ function startBridge() {
     // better-sqlite3 kills it before it can write anything of its own). Tee it
     // to a file next to the other bridge data, and keep the tail in memory so
     // the exit handler can tell the renderer *why* it stopped.
+    //
+    // The file is truncated on every start and capped per run. Its job is
+    // "why did the last start die" — and a desktop bridge with no API key
+    // echoes every HTTP request to stdout, which left alone was ~2 MB per day
+    // the app was open, forever (review 2026-09-02, F8). Request logs have
+    // their own rotated file (logs/bridge.log).
+    const LOG_CAP_BYTES = 2 * 1024 * 1024;
+    let logged = 0;
+    try {
+      writeFileSync(bridgeLogPath(), `[${new Date().toISOString()}] bridge starting\n`);
+    } catch { /* logging must never take the app down */ }
     let lastOutput = '';
     const record = (text) => {
       lastOutput = `${lastOutput}${text}`.slice(-4000);
+      if (logged >= LOG_CAP_BYTES) return;
       try {
         appendFileSync(bridgeLogPath(), text);
+        logged += Buffer.byteLength(text);
+        if (logged >= LOG_CAP_BYTES) {
+          appendFileSync(bridgeLogPath(), '\n[bridge-process.log capped for this run — request logs continue in logs/bridge.log]\n');
+        }
       } catch { /* logging must never take the app down */ }
     };
 
@@ -158,7 +163,7 @@ function startBridge() {
     // Give it a moment to start, then notify renderer
     setTimeout(() => {
       if (bridgeProcess) {
-        mainWindow?.webContents.send('bridge:status', { running: true });
+        mainWindow?.webContents.send('bridge:status', { running: true, warning: credentialKeyWarning });
       }
     }, 1000);
 

@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const { isFleetAllowed } = require('../editions.cjs');
 
 function toClientDTO(row) {
@@ -13,7 +13,7 @@ function toClientDTO(row) {
 }
 
 function createClientsRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   router.get('/', (req, res) => {
     const rows = db.prepare('SELECT * FROM clients ORDER BY name').all();

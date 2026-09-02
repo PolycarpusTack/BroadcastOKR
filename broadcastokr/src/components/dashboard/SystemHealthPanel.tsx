@@ -62,6 +62,19 @@ export function SystemHealthPanel({ theme, connected, health }: SystemHealthPane
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {(health.credentials?.unreadable ?? 0) > 0 && (
+            <div
+              role="alert"
+              style={{
+                padding: '10px 12px', borderRadius: 10, fontSize: 12, lineHeight: 1.5,
+                background: `${COLOR_WARNING}14`, border: `1px solid ${COLOR_WARNING}55`, color: theme.text,
+              }}
+            >
+              <b>{health.credentials!.unreadable} database password{health.credentials!.unreadable === 1 ? '' : 's'} cannot be read</b>
+              {' '}with this installation's encryption key — usually a backup restored on another machine
+              or user account, or a rotated key. Re-enter those passwords on the Clients page.
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             <Stat theme={theme} label="Uptime" value={formatUptime(health.uptime)} color={COLOR_SUCCESS} />
             <Stat theme={theme} label="DB Size" value={health.database?.size ?? '--'} />

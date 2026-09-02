@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const fs = require('fs');
 
 /**
@@ -17,7 +17,7 @@ function normalizeSince(since) {
 }
 
 function createSyncRouter(db, dbPath) {
-  const router = express.Router();
+  const router = createRouter();
 
   // GET /api/sync/state — full state snapshot
   router.get('/state', (req, res) => {

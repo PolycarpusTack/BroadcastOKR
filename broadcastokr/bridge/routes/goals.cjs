@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
 
 /**
@@ -95,7 +95,7 @@ function getGoalDTO(db, id) {
 }
 
 function createGoalsRouter(db) {
-  const router = express.Router();
+  const router = createRouter();
 
   // GET /api/goals — list all goals with nested keyResults
   router.get('/', (req, res) => {

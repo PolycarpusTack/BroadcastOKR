@@ -41,11 +41,13 @@ interface AppStore {
   kpis: KPI[];
 
   // Goals
-  addGoal: (goal: Goal) => void;
+  /** Resolves once the bridge write has settled (success or reported failure),
+   *  so a caller that syncs the goal next is not racing its own create. */
+  addGoal: (goal: Goal) => Promise<void>;
   setGoals: (goals: Goal[]) => void;
   checkInKR: (goalId: string, krId: string, entry: { value: number; confidence?: Confidence; note?: string; actor: string }) => void;
   setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
-  updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => void;
+  updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => Promise<void>;
   deleteGoal: (id: string) => void;
 
   // Live KR sync
@@ -101,8 +103,8 @@ export const useStore = create<AppStore>()(
           ? get().goals.find((g) => g.id === id)
           : get().tasks.find((t) => t.id === id));
         const full = find();
-        if (!full) return;
-        bridgePutEntity(kind, full as unknown as Record<string, unknown> & { id: string }, {
+        if (!full) return Promise.resolve();
+        return bridgePutEntity(kind, full as unknown as Record<string, unknown> & { id: string }, {
           getVersion: () => find()?.version,
           onVersion: (version) => set((s) => (kind === 'goals'
             ? { goals: s.goals.map((g) => (g.id === id ? { ...g, version } : g)) }
@@ -129,7 +131,7 @@ export const useStore = create<AppStore>()(
 
       addGoal: (goal) => {
         set((s) => ({ goals: [goal, ...s.goals] }));
-        bridgePost('/api/goals', goal).catch(bridgeWriteFailed);
+        return bridgePost('/api/goals', goal).then(() => undefined, bridgeWriteFailed);
       },
       setGoals: (goals) => set({ goals }),
 
@@ -298,7 +300,7 @@ export const useStore = create<AppStore>()(
           goals[idx] = recalcGoal({ ...goals[idx], ...updates });
           return { goals };
         });
-        putVersioned('goals', id);
+        return putVersioned('goals', id);
       },
 
       deleteGoal: (id) => {

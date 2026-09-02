@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const { parseCookies, serializeCookie, clearCookie } = require('../utils/cookies.cjs');
 const { SESSION_COOKIE, createSession, getSession, deleteSession, upsertSsoUser } = require('../sessions.cjs');
 const { ROLE_PERMS } = require('../permissions.cjs');
@@ -13,7 +13,7 @@ const FLOW_COOKIE = 'brokr_auth_flow';
  * runs once on first use and is retried on failure.
  */
 function createAuthRouter(db, oidcEnv) {
-  const router = express.Router();
+  const router = createRouter();
   let oidcConfigPromise = null;
 
   async function getOidc() {

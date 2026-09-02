@@ -10,6 +10,10 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
+// Exact paths only. The sub-routers are strict and case-sensitive too
+// (utils/router.cjs); these two settings cover the mounts and /api/health.
+app.set('case sensitive routing', true);
+app.set('strict routing', true);
 const { MODE } = require('./editions.cjs');
 const { version: APP_VERSION } = require('./package.json');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
@@ -143,19 +147,27 @@ const store = createConfigStore({ configPath: CONFIG_PATH, historyPath: HISTORY_
 // call the API" from "what unlocks stored credentials" — with BRIDGE_API_KEY
 // kept as the fallback so existing desktop installs keep working.
 const CREDENTIAL_KEY = process.env.BRIDGE_ENCRYPTION_KEY || BRIDGE_API_KEY;
-const cipher = createCredentialCipher({ key: CREDENTIAL_KEY, mode: MODE });
+const cipher = createCredentialCipher({ key: CREDENTIAL_KEY, mode: MODE, legacyKey: BRIDGE_API_KEY });
 
 // Upgrade anything written before credentials were marked, then say plainly
-// what is unprotected. Startup is the only moment an operator reliably reads.
-const { rewrapped, unprotected } = cipher.rewrapStoredConnections(store);
-if (rewrapped > 0) {
-  console.log(`  Encrypted ${rewrapped} stored connection password(s) at rest.`);
+// what is unprotected or unreadable. Startup is the only moment an operator
+// reliably reads; the unreadable count is also on /api/health so the app can
+// show it — a restored backup or a rotated key otherwise presents as every
+// live KR failing with a generic query error.
+const credentialReport = cipher.rewrapStoredConnections(store);
+if (credentialReport.rewrapped > 0) {
+  console.log(`  Encrypted ${credentialReport.rewrapped} stored connection password(s) at rest.`);
 }
-if (unprotected > 0) {
+if (credentialReport.unprotected > 0) {
   const consequence = cipher.enforced
     ? 'New credentials will be REFUSED until BRIDGE_ENCRYPTION_KEY is set.'
     : 'They stay in cleartext until BRIDGE_ENCRYPTION_KEY is set, then are encrypted on the next start.';
-  console.warn(`  WARNING: ${unprotected} connection password(s) are not encrypted. ${consequence}`);
+  console.warn(`  WARNING: ${credentialReport.unprotected} connection password(s) are not encrypted. ${consequence}`);
+}
+if (credentialReport.unreadable > 0) {
+  console.warn(`  WARNING: ${credentialReport.unreadable} stored connection password(s) cannot be read with the `
+    + 'configured key — restored from another machine, or the key was rotated? '
+    + 'Re-enter those passwords on the Clients page; nothing has been changed on disk.');
 }
 
 const core = createWhatsonCore({ decryptPassword: cipher.decrypt });
@@ -214,6 +226,7 @@ app.get('/api/health', (req, res) => {
       postgres: !!pg,
     },
     database: dbStats,
+    credentials: { unreadable: credentialReport.unreadable },
   });
 });
 
@@ -223,7 +236,9 @@ if (MODE !== 'desktop') {
   const APP_DIR = process.env.BRIDGE_APP_DIR || path.join(__dirname, '..', 'dist');
   app.use(express.static(APP_DIR));
   // SPA fallback for everything that isn't the API
-  app.get(/^\/(?!api\/).*/, (req, res) => {
+  // Case-insensitive on purpose: `/API/…` must 404 as an unknown API path,
+  // not come back as index.html with a 200 (which read as "reachable").
+  app.get(/^\/(?!api(\/|$)).*/i, (req, res) => {
     res.sendFile(path.join(APP_DIR, 'index.html'));
   });
 }

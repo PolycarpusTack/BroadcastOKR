@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { activeSteps } from '../wizardSteps';
-import { emptyWizardData, type WizardData } from '../wizardTypes';
+import { emptyWizardData, type WizardContext, type WizardData } from '../wizardTypes';
 
-const ids = (ctx: { fleet: boolean; isOwner: boolean }, data: WizardData) =>
+const ids = (ctx: WizardContext, data: WizardData) =>
   activeSteps(ctx, data).map((s) => s.id);
 
 describe('wizard step registry', () => {
-  const owner = { fleet: true, isOwner: true };
+  const owner: WizardContext = { fleet: true, isOwner: true, canCreate: true, canEdit: true };
+  const manager: WizardContext = { fleet: true, isOwner: false, canCreate: true, canEdit: true };
+  const member: WizardContext = { fleet: true, isOwner: false, canCreate: false, canEdit: false };
 
   it('gives a fleet owner the full run', () => {
     expect(ids(owner, emptyWizardData())).toEqual([
@@ -17,15 +19,26 @@ describe('wizard step registry', () => {
   it('drops credential steps for non-owners rather than letting them 403', () => {
     // The bridge gates connections and clients as ownerOnly, so showing these
     // to a member would mean filling in a form that cannot possibly save.
-    const steps = ids({ fleet: true, isOwner: false }, emptyWizardData());
+    const steps = ids(manager, emptyWizardData());
     expect(steps).not.toContain('connection');
     expect(steps).not.toContain('client');
     expect(steps).toContain('path');
+    expect(steps).toContain('goal');
+    expect(steps).toContain('kpi');
     expect(steps).toContain('finish');
   });
 
+  it('drops the writing steps a member cannot complete (goal needs canCreate, KPI needs canEdit)', () => {
+    // Review 2026-09-02 F6: these used to apply to every role and then fail
+    // at the bridge with a 403 and a "kept locally" toast.
+    const steps = ids(member, emptyWizardData());
+    expect(steps).not.toContain('goal');
+    expect(steps).not.toContain('kpi');
+    expect(steps).toEqual(['welcome', 'bridge', 'path', 'finish']);
+  });
+
   it('drops the client step in a single-tenant (client-edition) install', () => {
-    const steps = ids({ fleet: false, isOwner: true }, emptyWizardData());
+    const steps = ids({ ...owner, fleet: false }, emptyWizardData());
     expect(steps).not.toContain('client');
     expect(steps).toContain('connection');
   });

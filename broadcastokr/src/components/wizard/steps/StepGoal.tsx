@@ -61,7 +61,14 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
         keyResults: [kr],
         ...(data.clientId ? { clientIds: [data.clientId], channelScope: { type: 'all' as const } } : {}),
       };
-      addGoal(goal);
+      // The goal exists from this line on. Record that before anything that
+      // can fail, or a failed sync leaves the form up and a retry creates a
+      // second goal (review 2026-09-02, F6). Wait for the bridge write, too:
+      // a non-owner's sync is verified against the *stored* KR, so syncing
+      // before the store has it would be refused.
+      const written = addGoal(goal);
+      patch({ goalId: goal.id, goalTitle: goal.title });
+      await written;
 
       // Run it immediately — the point of the whole wizard is seeing a real
       // number, and a goal that sits at "pending" proves nothing.
@@ -71,13 +78,12 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
 
       const first = results[0];
       if (first?.status === 'ok') {
-        patch({ goalId: goal.id, goalTitle: goal.title, krValue: first.current });
+        patch({ krValue: first.current });
       } else {
-        patch({ goalId: goal.id, goalTitle: goal.title });
         setError(first?.error || 'The goal was created, but its query did not return a value.');
       }
     } catch (e) {
-      setError((e as Error).message || 'Could not create the goal');
+      setError(`The goal was created, but syncing it failed: ${(e as Error).message || 'unknown error'}`);
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,4 @@
-const express = require('express');
+const { createRouter } = require('../utils/router.cjs');
 const {
   oracledb, pg, QUERY_TIMEOUT_MS, assertSelectOnly, buildBinds,
   getTablesQuery, getColumnsQuery, wrapPreviewQuery, getTestQuery,
@@ -17,8 +17,14 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   const { audit } = require('../audit.cjs');
   const cloud = mode !== 'desktop';
   const auditSql = (req, what) => { if (cloud && db) audit(db, req, what); };
-  const router = express.Router();
+  const router = createRouter();
   const { loadConfig, saveConfig, loadHistory, saveHistory } = store;
+
+  /** Refuse to persist a secret we cannot protect (D-2). */
+  const CREDENTIALS_UNPROTECTED = {
+    error: 'Credential encryption is not configured on this instance. '
+      + 'Set BRIDGE_ENCRYPTION_KEY before storing database credentials.',
+  };
 
   // Get/save config
   router.get('/config', (req, res) => {
@@ -35,11 +41,19 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const incoming = req.body;
 
     if (incoming.connections) {
+      // Same rules as POST /connections: a masked password keeps the stored
+      // one; a new one is refused without a key and encrypted with one. This
+      // used to store whatever arrived, in the clear — a second write path
+      // that undid the D-2 guarantee (review 2026-09-02, F7).
+      const arrivingSecret = incoming.connections.some((c) => c.password && c.password !== '***');
+      if (cipher.unprotected && arrivingSecret) {
+        return res.status(503).json(CREDENTIALS_UNPROTECTED);
+      }
       incoming.connections = incoming.connections.map((c) => ({
         ...c,
         password: c.password === '***'
           ? (config.connections.find(x => x.id === c.id)?.password || '')
-          : c.password,
+          : (c.password ? encrypt(c.password) : ''),
       }));
     }
 
@@ -92,12 +106,6 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
       res.json({ ok: false, message: 'Connection test failed' });
     }
   });
-
-  /** Refuse to persist a secret we cannot protect (D-2). */
-  const CREDENTIALS_UNPROTECTED = {
-    error: 'Credential encryption is not configured on this instance. '
-      + 'Set BRIDGE_ENCRYPTION_KEY before storing database credentials.',
-  };
 
   // Save connection
   router.post('/connections', (req, res) => {
@@ -356,15 +364,35 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     res.json(results);
   });
 
+  /**
+   * Is this query exactly the one stored on the KR it names? Non-owners may
+   * trigger stored live KRs but never supply SQL of their own (review
+   * 2026-09-02, F5: gating the route ownerOnly broke every manager sync path
+   * in the app, because the app syncs stored SQL through this route).
+   */
+  const isStoredQuery = (q) => {
+    if (!db || !q.krId) return false;
+    const row = db.prepare('SELECT live_config FROM key_results WHERE id = ? AND goal_id = ?').get(q.krId, q.goalId);
+    if (!row?.live_config) return false;
+    let stored;
+    try { stored = JSON.parse(row.live_config); } catch { return false; }
+    return stored.sql === q.sql && stored.connectionId === q.connectionId
+      && (stored.timeframeDays ?? null) === (q.timeframeDays ?? null);
+  };
+
   // Execute batch of KR queries for live goal syncing
-  // Body: { queries: [{ goalId, krIndex, connectionId, sql, binds?, timeframeDays? }] }
+  // Body: { queries: [{ goalId, krIndex, krId, connectionId, sql, binds?, timeframeDays? }] }
   router.post('/kpi/execute-batch', async (req, res) => {
     const { queries } = req.body;
     if (!Array.isArray(queries) || queries.length === 0) {
       return res.status(400).json({ error: 'queries array is required' });
     }
 
-    auditSql(req, `Executed ${queries.length} live-KR quer${queries.length === 1 ? 'y' : 'ies'}`);
+    // Desktop is single-user (no req.user); in cloud modes only owners run ad hoc SQL.
+    const adHocAllowed = !cloud || req.user?.role === 'owner';
+    const refused = adHocAllowed ? 0 : queries.filter((q) => !isStoredQuery(q)).length;
+    auditSql(req, `Executed ${queries.length - refused} live-KR quer${queries.length - refused === 1 ? 'y' : 'ies'}`
+      + (refused ? ` (refused ${refused} not matching a stored KR)` : ''));
 
     const config = loadConfig();
     const CONCURRENCY = 10;
@@ -378,6 +406,9 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
           const { goalId, krIndex, connectionId, sql } = q;
           if (!connectionId || !sql) {
             return { goalId, krIndex, status: 'error', error: 'Missing connectionId or sql' };
+          }
+          if (!adHocAllowed && !isStoredQuery(q)) {
+            return { goalId, krIndex, status: 'error', error: 'Not a stored query — only owners may run ad hoc SQL' };
           }
 
           const connConfig = config.connections.find(c => c.id === connectionId);

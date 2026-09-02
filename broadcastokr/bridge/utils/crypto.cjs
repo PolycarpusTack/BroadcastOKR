@@ -53,9 +53,29 @@ function decryptPacked(base64, apiKey) {
 }
 
 /**
- * Decrypt a base64-encoded encrypted string back to plaintext.
+ * Does an unmarked value have the shape of a pre-marker ciphertext? Strict
+ * base64 that unpacks to at least IV + tag (32 bytes). A heuristic — a long
+ * alphanumeric plaintext password can match — so it is used only to decide
+ * what NOT to do (rewrap, or trust a fallback), never to reject a read.
  */
-function decrypt(value, apiKey) {
+function looksLikeCiphertext(value) {
+  if (typeof value !== 'string' || value.length % 4 !== 0) return false;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return false;
+  return Buffer.from(value, 'base64').length >= IV_LENGTH + 16;
+}
+
+/** Keys to try on an unmarked value, most likely first, without repeats. */
+function candidateKeys(apiKey, legacyKey) {
+  return [...new Set([legacyKey, apiKey].filter(Boolean))];
+}
+
+/**
+ * Decrypt a stored value back to plaintext.
+ *
+ * `legacyKey` is the key the pre-marker scheme wrote under (in practice
+ * BRIDGE_API_KEY); a value written before the marker is tried under it first.
+ */
+function decrypt(value, apiKey, { legacyKey } = {}) {
   // Marked ciphertext: a failure here is a real failure (wrong or rotated key)
   // and must surface, never fall back to handing the ciphertext out as a password.
   if (isEncrypted(value)) {
@@ -67,17 +87,34 @@ function decrypt(value, apiKey) {
   // unpack, the value was plaintext all along. This ambiguity is bounded — it
   // exists only for values written before the marker, and `rewrapSecret`
   // upgrades them on sight.
-  try {
-    return decryptPacked(value, apiKey);
-  } catch {
-    return value;
+  for (const key of candidateKeys(apiKey, legacyKey)) {
+    try {
+      return decryptPacked(value, key);
+    } catch { /* not ciphertext under this key */ }
   }
+  return value;
 }
 
-/** Encrypt a stored secret unless it already carries the marker. */
-function rewrapSecret(value, apiKey) {
+/**
+ * Encrypt a stored secret unless it already carries the marker.
+ *
+ * Returns `null` when the value cannot be rewrapped safely: it is shaped like
+ * ciphertext but unpacks under neither key. Sealing it anyway would wrap the
+ * old ciphertext as if it were the password and mark the result as good —
+ * exactly the silent corruption the marker exists to prevent (review
+ * 2026-09-02, F2: an install with BRIDGE_API_KEY that then sets a dedicated
+ * BRIDGE_ENCRYPTION_KEY, as the docs recommend). Callers leave a `null` alone
+ * and say so.
+ */
+function rewrapSecret(value, apiKey, { legacyKey } = {}) {
   if (!value || isEncrypted(value)) return value;
-  return encrypt(decrypt(value, apiKey), apiKey);
+  for (const key of candidateKeys(apiKey, legacyKey)) {
+    try {
+      return encrypt(decryptPacked(value, key), apiKey);
+    } catch { /* not ciphertext under this key */ }
+  }
+  if (looksLikeCiphertext(value)) return null;
+  return encrypt(value, apiKey);
 }
 
-module.exports = { encrypt, decrypt, isEncrypted, rewrapSecret };
+module.exports = { encrypt, decrypt, isEncrypted, rewrapSecret, looksLikeCiphertext };
