@@ -5,12 +5,13 @@ import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
 import {
   PRIMARY_COLOR,
   COLOR_SUCCESS,
-  COLOR_DANGER,
   FONT_BODY,
   FONT_HEADING,
   FONT_MONO,
 } from '../../constants/config';
 import type { Client, GoalTemplate, Theme } from '../../types';
+import { ConnectionFields } from './ConnectionFields';
+import { emptyConnectionDraft, draftToConnection, type ConnectionDraft } from './connectionDraft';
 import type { DBConnection } from '../../hooks/useBridge';
 
 const PRESET_COLORS = [
@@ -54,25 +55,15 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
   const [color, setColor] = useState(PRESET_COLORS[0]);
   const [connectionId, setConnectionId] = useState('');
   const [connMode, setConnMode] = useState<'existing' | 'new'>('existing');
-  const [dbType, setDbType] = useState<'oracle' | 'postgres'>('oracle');
-  const [dbHost, setDbHost] = useState('');
-  const [dbPort, setDbPort] = useState('1521');
-  const [dbService, setDbService] = useState('');
-  const [dbSchema, setDbSchema] = useState('PSI');
-  const [dbUser, setDbUser] = useState('');
-  const [dbPassword, setDbPassword] = useState('');
-  const [dbClientDir, setDbClientDir] = useState('');
+  const [connDraft, setConnDraft] = useState<ConnectionDraft>(emptyConnectionDraft);
   const [tagsRaw, setTagsRaw] = useState('');
   const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>({});
   const [overrideEnabled, setOverrideEnabled] = useState<Record<string, Record<string, boolean>>>({});
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [connTestResult, setConnTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
      modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
   useEffect(() => {
-    setConnTestResult(null);
     if (!open) return;
     if (client) {
       setName(client.name);
@@ -82,14 +73,17 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
       const conn = connections.find(c => c.id === client.connectionId);
       if (conn) {
         setConnMode('existing');
-        setDbType(conn.type as 'oracle' | 'postgres');
-        setDbHost(conn.host);
-        setDbPort(String(conn.port));
-        setDbService(conn.service || '');
-        setDbSchema(conn.schema || 'PSI');
-        setDbUser(conn.user);
-        setDbPassword('');
-        setDbClientDir(conn.clientDir || '');
+        setConnDraft({
+          type: conn.type as ConnectionDraft['type'],
+          host: conn.host,
+          port: String(conn.port),
+          service: conn.service || '',
+          schema: conn.schema || 'PSI',
+          user: conn.user,
+          // Never echo a stored password back into the form.
+          password: '',
+          clientDir: conn.clientDir || '',
+        });
       } else {
         setConnMode('new');
       }
@@ -112,14 +106,7 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
       setColor(PRESET_COLORS[0]);
       setConnectionId('');
       setConnMode(connections.length > 0 ? 'existing' : 'new');
-      setDbType('oracle');
-      setDbHost('');
-      setDbPort('1521');
-      setDbService('');
-      setDbSchema('PSI');
-      setDbUser('');
-      setDbPassword('');
-      setDbClientDir('');
+      setConnDraft(emptyConnectionDraft());
       setTagsRaw('');
       const initialOverrides: Record<string, Record<string, string>> = emptyOverrides(templates);
       const initialEnabled: Record<string, Record<string, boolean>> = {};
@@ -159,21 +146,9 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
       let finalConnectionId = connectionId;
 
       // If creating a new connection, save it to the bridge first
-      if (connMode === 'new' && dbHost.trim() && saveConnection) {
+      if (connMode === 'new' && connDraft.host.trim() && saveConnection) {
         const connId = `conn_${Date.now()}`;
-        const newConn: DBConnection = {
-          id: connId,
-          name: `${trimmed} DB`,
-          type: dbType as 'oracle' | 'postgres',
-          host: dbHost.trim(),
-          port: Number(dbPort) || (dbType === 'oracle' ? 1521 : 5432),
-          service: dbService.trim(),
-          schema: dbSchema.trim() || 'PSI',
-          user: dbUser.trim(),
-          password: dbPassword,
-          clientDir: dbType === 'oracle' && dbClientDir.trim() ? dbClientDir.trim() : undefined,
-        };
-        await saveConnection(newConn);
+        await saveConnection(draftToConnection(connDraft, `${trimmed} DB`, connId));
         finalConnectionId = connId;
         onConnectionCreated?.();
       }
@@ -311,120 +286,13 @@ export function ClientModal({ open, onClose, theme, client, connections, templat
               ))}
             </select>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 8, border: `1px solid ${theme.borderLight}`, background: theme.bgMuted }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Type</label>
-                  <select
-                    style={{ ...inputStyle(theme), cursor: 'pointer', fontSize: 12 }}
-                    value={dbType}
-                    onChange={(e) => { setDbType(e.target.value as 'oracle' | 'postgres'); setDbPort(e.target.value === 'oracle' ? '1521' : '5432'); }}
-                  >
-                    <option value="oracle">Oracle</option>
-                    <option value="postgres">PostgreSQL</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Schema</label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12 }} value={dbSchema} onChange={(e) => setDbSchema(e.target.value)} placeholder="PSI" />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Host</label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12 }} value={dbHost} onChange={(e) => setDbHost(e.target.value)} placeholder="db-server.example.com" />
-                </div>
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Port</label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12 }} value={dbPort} onChange={(e) => setDbPort(e.target.value)} placeholder={dbType === 'oracle' ? '1521' : '5432'} />
-                </div>
-              </div>
-              {dbType === 'oracle' && (
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Service Name</label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12 }} value={dbService} onChange={(e) => setDbService(e.target.value)} placeholder="ORCL" />
-                </div>
-              )}
-              {dbType === 'postgres' && (
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Database</label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12 }} value={dbService} onChange={(e) => setDbService(e.target.value)} placeholder="whatson" />
-                </div>
-              )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Username</label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12 }} value={dbUser} onChange={(e) => setDbUser(e.target.value)} placeholder="psi" />
-                </div>
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Password</label>
-                  <input type="password" style={{ ...inputStyle(theme), fontSize: 12 }} value={dbPassword} onChange={(e) => setDbPassword(e.target.value)} placeholder="********" />
-                </div>
-              </div>
-              {dbType === 'oracle' && (
-                <div>
-                  <label style={{ ...labelStyle(theme), fontSize: 11 }}>Oracle Client Directory <span style={{ fontWeight: 400, color: theme.textFaint }}>(optional)</span></label>
-                  <input style={{ ...inputStyle(theme), fontSize: 12, fontFamily: FONT_MONO }} value={dbClientDir} onChange={(e) => setDbClientDir(e.target.value)} placeholder="C:\Oracle\19c\db_home\bin" />
-                </div>
-              )}
-            </div>
-            {testConnection && dbHost.trim() && (
-              <div>
-                <button
-                  type="button"
-                  disabled={testing}
-                  onClick={async () => {
-                    setTesting(true);
-                    setConnTestResult(null);
-                    try {
-                      const result = await testConnection({
-                        name: `${name.trim() || 'New'} DB`,
-                        type: dbType,
-                        host: dbHost.trim(),
-                        port: Number(dbPort) || (dbType === 'oracle' ? 1521 : 5432),
-                        service: dbService.trim(),
-                        schema: dbSchema.trim() || 'PSI',
-                        user: dbUser.trim(),
-                        password: dbPassword,
-                        clientDir: dbType === 'oracle' && dbClientDir.trim() ? dbClientDir.trim() : undefined,
-                      });
-                      setConnTestResult(result);
-                    } catch (e) {
-                      setConnTestResult({ ok: false, message: (e as Error).message || 'Unknown error' });
-                    } finally {
-                      setTesting(false);
-                    }
-                  }}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 6,
-                    border: `1px solid ${theme.border}`,
-                    background: 'transparent',
-                    color: theme.textSecondary,
-                    fontSize: 12,
-                    fontFamily: FONT_BODY,
-                    fontWeight: 600,
-                    cursor: testing ? 'not-allowed' : 'pointer',
-                    opacity: testing ? 0.7 : 1,
-                  }}
-                >
-                  {testing ? 'Testing…' : 'Test Connection'}
-                </button>
-                {connTestResult && (
-                  <span style={{
-                    marginLeft: 10,
-                    fontSize: 12,
-                    fontFamily: FONT_BODY,
-                    fontWeight: 600,
-                    color: connTestResult.ok ? COLOR_SUCCESS : COLOR_DANGER,
-                  }}>
-                    {connTestResult.ok ? '✓ Connected' : `✗ ${connTestResult.message}`}
-                  </span>
-                )}
-              </div>
-            )}
-            </div>
+            <ConnectionFields
+              draft={connDraft}
+              onChange={setConnDraft}
+              theme={theme}
+              connectionName={name.trim() || 'New'}
+              testConnection={testConnection}
+            />
           )}
         </div>
 
