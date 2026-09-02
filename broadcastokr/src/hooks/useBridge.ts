@@ -210,6 +210,11 @@ export function useBridge() {
           setConnected(false);
           setLiveKPIs([]);
           stopPolling();
+          // A crash used to be indistinguishable from a deliberate stop: the
+          // dot simply went dark. Pass the reason on so the user sees it.
+          if (data.error) {
+            window.dispatchEvent(new CustomEvent('bridge-start-failed', { detail: data.error }));
+          }
         }
       });
       // Check initial status

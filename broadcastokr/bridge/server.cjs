@@ -152,9 +152,10 @@ if (rewrapped > 0) {
   console.log(`  Encrypted ${rewrapped} stored connection password(s) at rest.`);
 }
 if (unprotected > 0) {
-  const how = cipher.enforced ? 'REFUSED until' : 'stored in cleartext because';
-  console.warn(`  WARNING: ${unprotected} connection password(s) are not encrypted. `
-    + `New credentials will be ${how} BRIDGE_ENCRYPTION_KEY is set.`);
+  const consequence = cipher.enforced
+    ? 'New credentials will be REFUSED until BRIDGE_ENCRYPTION_KEY is set.'
+    : 'They stay in cleartext until BRIDGE_ENCRYPTION_KEY is set, then are encrypted on the next start.';
+  console.warn(`  WARNING: ${unprotected} connection password(s) are not encrypted. ${consequence}`);
 }
 
 const core = createWhatsonCore({ decryptPassword: cipher.decrypt });

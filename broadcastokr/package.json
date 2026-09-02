@@ -21,10 +21,12 @@
     "test:e2e": "npx playwright test",
     "bridge": "node bridge/server.cjs",
     "electron:dev": "vite & wait-on http://localhost:5173 && electron .",
-    "electron:build": "npm run build && electron-builder --win",
-    "electron:build:linux": "npm run build && electron-builder --linux",
-    "electron:build:mac": "npm run build && electron-builder --mac",
-    "electron:build:all": "npm run build && electron-builder --win --linux"
+    "electron:build": "npm run build && npm run rebuild:electron && electron-builder --win",
+    "electron:build:linux": "npm run build && npm run rebuild:electron && electron-builder --linux",
+    "electron:build:mac": "npm run build && npm run rebuild:electron && electron-builder --mac",
+    "electron:build:all": "npm run build && npm run rebuild:electron && electron-builder --win --linux",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
+    "rebuild:node": "npm rebuild better-sqlite3"
   },
   "build": {
     "appId": "com.broadcastokr.app",

@@ -161,6 +161,13 @@ export default function App() {
       toast('Change not saved to server — kept locally', COLOR_WARNING, '⚠️');
     };
 
+    // Startup crashes get a long, specific toast: the cause is not something a
+    // user can guess, and the fix is usually a single documented action.
+    const handleBridgeStartFailed = (e: Event) => {
+      const reason = (e as CustomEvent<string>).detail;
+      toast(reason || 'The bridge stopped unexpectedly.', COLOR_DANGER, '⚠️');
+    };
+
     const handleWriteConflict = () => {
       toast('Updated elsewhere — refreshed with the latest version', COLOR_WARNING, '🔄');
     };
@@ -170,6 +177,7 @@ export default function App() {
     window.addEventListener('storage-quota-exceeded', handleStorageQuota);
     window.addEventListener('bridge-write-failed', handleBridgeWriteFailed);
     window.addEventListener('bridge-write-conflict', handleWriteConflict);
+    window.addEventListener('bridge-start-failed', handleBridgeStartFailed);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
@@ -177,6 +185,7 @@ export default function App() {
       window.removeEventListener('storage-quota-exceeded', handleStorageQuota);
       window.removeEventListener('bridge-write-failed', handleBridgeWriteFailed);
       window.removeEventListener('bridge-write-conflict', handleWriteConflict);
+      window.removeEventListener('bridge-start-failed', handleBridgeStartFailed);
     };
   }, [toast]);
 

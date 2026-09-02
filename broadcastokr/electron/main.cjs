@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
+const { appendFileSync, mkdirSync } = require('fs');
 
 // Keep a global reference so the window isn't garbage collected
 let mainWindow = null;
@@ -28,6 +29,33 @@ function bridgeEnv() {
   };
 }
 
+/** Split captured output into lines regardless of the child's line endings. */
+const LINE_SPLIT = /[\r\n]+/;
+
+/** Where the bridge's own output is teed, so a startup crash is recoverable. */
+function bridgeLogPath() {
+  const dir = path.join(app.getPath('userData'), 'bridge', 'logs');
+  mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'bridge-process.log');
+}
+
+/**
+ * Turn the child's dying words into something a user can act on. The native
+ * module mismatch is worth naming explicitly: its stack is long, its cause is
+ * a build-order mistake, and its fix is a documented command.
+ */
+function summarizeBridgeFailure(output, code) {
+  if (/NODE_MODULE_VERSION|ERR_DLOPEN_FAILED/.test(output)) {
+    return 'The bridge could not load its database module — it was built for a different '
+      + 'runtime. Reinstall the app, or run "npm run rebuild:electron" if running from source.';
+  }
+  if (/EADDRINUSE/.test(output)) {
+    return 'Port 3001 is already in use — another bridge is probably still running.';
+  }
+  const lastLine = output.trim().split(LINE_SPLIT).filter(Boolean).pop();
+  return lastLine ? `Bridge exited (${code}): ${lastLine.slice(0, 200)}` : `Bridge exited with code ${code}`;
+}
+
 // ── Bridge Process Management ──
 
 function startBridge() {
@@ -42,18 +70,37 @@ function startBridge() {
       silent: true,
     });
 
+    // A packaged app has no console, so piping the child's output to one loses
+    // exactly the message needed when it dies on startup (an ABI mismatch on
+    // better-sqlite3 kills it before it can write anything of its own). Tee it
+    // to a file next to the other bridge data, and keep the tail in memory so
+    // the exit handler can tell the renderer *why* it stopped.
+    let lastOutput = '';
+    const record = (text) => {
+      lastOutput = `${lastOutput}${text}`.slice(-4000);
+      try {
+        appendFileSync(bridgeLogPath(), text);
+      } catch { /* logging must never take the app down */ }
+    };
+
     bridgeProcess.stdout?.on('data', (data) => {
-      console.log(`[bridge] ${data.toString().trim()}`);
+      const text = data.toString();
+      console.log(`[bridge] ${text.trim()}`);
+      record(text);
     });
 
     bridgeProcess.stderr?.on('data', (data) => {
-      console.error(`[bridge] ${data.toString().trim()}`);
+      const text = data.toString();
+      console.error(`[bridge] ${text.trim()}`);
+      record(text);
     });
 
     bridgeProcess.on('exit', (code) => {
       console.log(`[bridge] Process exited with code ${code}`);
       bridgeProcess = null;
-      mainWindow?.webContents.send('bridge:status', { running: false });
+      // A non-zero exit within moments of starting is a crash, not a stop.
+      const error = code === 0 ? undefined : summarizeBridgeFailure(lastOutput, code);
+      mainWindow?.webContents.send('bridge:status', { running: false, error });
     });
 
     bridgeProcess.on('error', (err) => {

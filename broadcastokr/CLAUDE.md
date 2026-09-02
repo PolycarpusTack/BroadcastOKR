@@ -137,7 +137,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 - `npm test` — 210 tests across 40 test files (vitest; not on PATH, use the npm script)
 - `npm run test:bridge` — 108 bridge tests (node --test), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI
 - `npm run lint` — 0 errors, gated in CI
-- After `npm run electron:build*`, run `npm rebuild better-sqlite3` — electron-builder rebuilds it for Electron's ABI, which breaks the dev bridge under system Node
+- `better-sqlite3` is native and can only be built for ONE runtime at a time. `npm run rebuild:node` targets system Node (`npm run bridge`, `npm test`); `npm run rebuild:electron` targets Electron (`npm run electron:dev`, packaging). `electron:build*` now force-rebuilds for Electron itself, so packaging is safe from either state — but run `npm run rebuild:node` afterwards to get the dev bridge back. **Do not trust electron-builder's own rebuild step**: on 2026-09-02 it treated a system-Node build as up to date and shipped an installer whose bridge died on `require` (NODE_MODULE_VERSION 127 vs 145)
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
 - Key test files: `store.test.ts` (core actions), `history.test.ts` (checkInKR, setMonitor, monitoring sync), `clients.test.ts` (client CRUD, templates, materialization), `progress.test.ts` (krProgress direction/hold-the-line)
 
