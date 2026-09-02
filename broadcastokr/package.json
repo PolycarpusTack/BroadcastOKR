@@ -37,7 +37,7 @@
       "electron/**/*",
       "bridge/**/*",
       "!bridge/__tests__/**",
-      "!bridge/*.db",
+      "!bridge/*.db*",
       "!bridge/.env",
       "!bridge/config.json",
       "!bridge/kpi-history.json",
