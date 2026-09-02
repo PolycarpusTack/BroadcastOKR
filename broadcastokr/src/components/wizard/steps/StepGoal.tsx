@@ -10,6 +10,7 @@ import { nextGoalId } from '../../../utils/ids';
 import { inputStyle, labelStyle } from '../../../styles/formStyles';
 import { selectStyle as makeSelectStyle } from '../../../utils/styles';
 import { FONT_BODY, COLOR_SUCCESS, COLOR_DANGER, PRIMARY_COLOR } from '../../../constants/config';
+import { currentPeriod } from '../../../utils/periods';
 
 export function StepGoal({ data, patch, theme, bridge }: StepProps) {
   const addGoal = useStore((s) => s.addGoal);
@@ -56,7 +57,7 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
         progress: 0,
         owner: currentUser.id,
         channel: 0,
-        period: 'Q4 2026',
+        period: currentPeriod(),
         keyResults: [kr],
         ...(data.clientId ? { clientIds: [data.clientId], channelScope: { type: 'all' as const } } : {}),
       };

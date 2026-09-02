@@ -82,6 +82,8 @@ export interface DriverStatus {
 export interface BridgeHealth {
   status: string;
   mode?: string;
+  /** Bridge's own version; may differ from the app's after a partial upgrade. */
+  version?: string;
   timestamp: string;
   uptime: number;
   drivers: DriverStatus;

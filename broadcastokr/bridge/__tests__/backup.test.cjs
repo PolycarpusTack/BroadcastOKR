@@ -22,7 +22,7 @@ describe('backup', () => {
   });
 
   it('writes a consistent snapshot that can be reopened', async () => {
-    const dest = await runBackupOnce(db, dir, { keep: 14 });
+    const { dbPath: dest } = await runBackupOnce(db, dir, { keep: 14 });
     assert.ok(fs.existsSync(dest));
     const copy = new Database(dest, { readonly: true });
     assert.equal(copy.prepare('SELECT COUNT(*) AS c FROM t').get().c, 1);
@@ -41,5 +41,39 @@ describe('backup', () => {
     const copy = new Database(path.join(dir, newest), { readonly: true });
     assert.equal(copy.prepare('SELECT COUNT(*) AS c FROM t').get().c, 1);
     copy.close();
+  });
+
+  it('captures the connection store alongside the database', async () => {
+    // A database-only snapshot restored cleanly and came back with no database
+    // connections — the OKRs returned and the thing that feeds them did not.
+    const configPath = path.join(dir, 'source-config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ connections: [{ id: 'c1', name: 'PSI' }] }));
+
+    const { dbPath, configPath: copied } = await runBackupOnce(db, dir, { keep: 14, configPath });
+
+    assert.ok(fs.existsSync(dbPath));
+    assert.ok(copied && fs.existsSync(copied), 'config.json must be captured with the snapshot');
+    assert.equal(JSON.parse(fs.readFileSync(copied, 'utf8')).connections[0].id, 'c1');
+    // Matched pair: same timestamp, so a restore never mixes generations.
+    assert.equal(path.basename(copied), path.basename(dbPath).replace(/\.db$/, '.config.json'));
+  });
+
+  it('still snapshots when no connection store exists yet', async () => {
+    const { dbPath, configPath } = await runBackupOnce(db, dir, { keep: 14, configPath: path.join(dir, 'absent.json') });
+    assert.ok(fs.existsSync(dbPath));
+    assert.equal(configPath, null);
+  });
+
+  it('prunes a snapshot as a unit, never orphaning a config copy', async () => {
+    const configPath = path.join(dir, 'source-config.json');
+    fs.writeFileSync(configPath, '{"connections":[]}');
+    for (let i = 0; i < 4; i++) {
+      await runBackupOnce(db, dir, { keep: 2, configPath });
+      await new Promise((r) => setTimeout(r, 5)); // distinct timestamps
+    }
+    const dbs = fs.readdirSync(dir).filter((f) => f.endsWith('.db'));
+    const configs = fs.readdirSync(dir).filter((f) => f.endsWith('.config.json'));
+    assert.equal(dbs.length, 2);
+    assert.equal(configs.length, 2, 'config copies must be pruned with their database');
   });
 });

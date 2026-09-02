@@ -11,6 +11,7 @@ const path = require('path');
 
 const app = express();
 const { MODE } = require('./editions.cjs');
+const { version: APP_VERSION } = require('./package.json');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
 const { createCredentialCipher } = require('./utils/credentials.cjs');
 
@@ -85,7 +86,10 @@ const { startBackupScheduler } = require('./utils/backup.cjs');
 const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR
   || (DB_PATH !== ':memory:' ? path.join(path.dirname(DB_PATH), 'backups') : null);
 if (DB_PATH !== ':memory:' && BACKUP_DIR) {
-  startBackupScheduler(db, BACKUP_DIR);
+  // CONFIG_PATH is resolved further down with the rest of the WHATS'ON wiring;
+  // recompute it here so the scheduler captures connections with the database.
+  const backupConfigPath = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'config.json');
+  startBackupScheduler(db, BACKUP_DIR, { configPath: backupConfigPath });
 }
 
 const { createGoalsRouter } = require('./routes/goals.cjs');
@@ -184,7 +188,7 @@ const { getSession } = require('./sessions.cjs');
 app.get('/api/health', (req, res) => {
   // Cloud instances reveal operational stats only to signed-in callers
   if (MODE !== 'desktop' && !INSECURE_NO_AUTH && !getSession(db, parseCookies(req)[SESSION_COOKIE_NAME])) {
-    return res.json({ status: 'ok', mode: MODE, protocolVersion: PROTOCOL_VERSION, minSupported: MIN_SUPPORTED });
+    return res.json({ status: 'ok', mode: MODE, version: APP_VERSION, protocolVersion: PROTOCOL_VERSION, minSupported: MIN_SUPPORTED });
   }
   let dbStats = null;
   try {
@@ -199,6 +203,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     mode: MODE,
+    version: APP_VERSION,
     protocolVersion: PROTOCOL_VERSION,
     minSupported: MIN_SUPPORTED,
     timestamp: new Date().toISOString(),

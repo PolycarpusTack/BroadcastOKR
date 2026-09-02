@@ -2,7 +2,7 @@ import type { Theme } from '../../types';
 import type { BridgeHealth } from '../../hooks/useBridge';
 import { formatUptime } from '../../utils/dates';
 import {
-  FONT_HEADING, FONT_MONO, COLOR_SUCCESS, COLOR_DANGER,
+  FONT_HEADING, FONT_MONO, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING,
   COLOR_DB_ORACLE, COLOR_DB_POSTGRES,
 } from '../../constants/config';
 
@@ -68,6 +68,17 @@ export function SystemHealthPanel({ theme, connected, health }: SystemHealthPane
             <Stat theme={theme} label="Tables" value={health.database ? String(health.database.tables) : '--'} />
           </div>
           <div>
+            {/* App and bridge versions are shown separately on purpose: they are
+                deployed independently, and a mismatch is worth seeing. */}
+            <div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Version</div>
+            <div style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 12 }}>
+              app <b style={{ color: theme.text }}>{__APP_VERSION__}</b>
+              {health.version && (
+                <>
+                  {' · '}bridge <b style={{ color: health.version === __APP_VERSION__ ? theme.text : COLOR_WARNING }}>{health.version}</b>
+                </>
+              )}
+            </div>
             <div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Database Drivers</div>
             <div style={{ display: 'flex', gap: 16 }}>
               <DriverDot theme={theme} label="Oracle" up={health.drivers.oracle} color={COLOR_DB_ORACLE} />
