@@ -8,10 +8,12 @@ const { getKpiTemplates } = require('../whatson/templates.cjs');
 /**
  * The WHATS'ON-facing route family: connection management, schema browsing,
  * query preview, and KPI/live-KR execution. Mounted at /api. `core` comes
- * from createWhatsonCore, `store` from createConfigStore; `encrypt`/`decrypt`
- * handle credential storage (no-ops when no key is configured).
+ * from createWhatsonCore, `store` from createConfigStore, and `cipher` from
+ * createCredentialCipher — when the cipher reports itself unavailable, routes
+ * that would persist a new secret refuse rather than storing it in the clear.
  */
-function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decrypt }) {
+function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNow }) {
+  const { encrypt, decrypt } = cipher;
   const { audit } = require('../audit.cjs');
   const cloud = mode !== 'desktop';
   const auditSql = (req, what) => { if (cloud && db) audit(db, req, what); };
@@ -55,6 +57,10 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
   router.post('/test-connection', async (req, res) => {
     const { type, host, port, service, user, password, clientDir } = req.body;
     const dbType = type || 'oracle';
+    // The form sends a plaintext password; a stored connection re-tested from
+    // the client sends back what it holds. `decrypt` passes plaintext through
+    // and unwraps marked ciphertext, so both callers are handled without the
+    // route having to guess which one it is talking to.
     const decryptedPassword = decrypt(password);
 
     try {
@@ -87,10 +93,21 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
     }
   });
 
+  /** Refuse to persist a secret we cannot protect (D-2). */
+  const CREDENTIALS_UNPROTECTED = {
+    error: 'Credential encryption is not configured on this instance. '
+      + 'Set BRIDGE_ENCRYPTION_KEY before storing database credentials.',
+  };
+
   // Save connection
   router.post('/connections', (req, res) => {
-    const config = loadConfig();
     const conn = req.body;
+    // A masked password means "keep the existing one" — no new secret arrives,
+    // so renaming or re-tagging a connection stays possible without a key.
+    if (cipher.unprotected && conn.password && conn.password !== '***') {
+      return res.status(503).json(CREDENTIALS_UNPROTECTED);
+    }
+    const config = loadConfig();
     if (!conn.id) conn.id = `conn_${Date.now()}`;
     const idx = (config.connections || []).findIndex(c => c.id === conn.id);
     if (idx >= 0) {
@@ -178,14 +195,26 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
     const connConfig = config.connections.find(c => c.id === connectionId);
     if (!connConfig) return res.status(400).json({ error: 'Connection not found' });
 
-    const channelQueries = connConfig.type === 'postgres'
+    // The schema is per-install (PSI is only the common default), so honour the
+    // connection's configured schema rather than hardcoding the owner prefix.
+    const isPg = connConfig.type === 'postgres';
+    const schema = connConfig.schema || 'PSI';
+    // A schema name cannot be bound as a parameter, so it is interpolated —
+    // constrain it to a plain identifier even though it comes from owner-only
+    // stored config rather than from the request.
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(schema)) {
+      return res.status(400).json({ error: 'Connection schema is not a valid identifier' });
+    }
+    const s = isPg ? schema.toLowerCase() : schema.toUpperCase();
+
+    const channelQueries = isPg
       ? [
-          'SELECT DISTINCT ch_id AS id, ch_description AS name, ch_internalvalue AS "internalValue", ch_kind AS "channelKind" FROM psi.psichannel ORDER BY ch_description',
-          'SELECT DISTINCT tx_id_channel AS id, tx_id_channel AS name FROM psi.psitransmission ORDER BY tx_id_channel',
+          `SELECT DISTINCT ch_id AS id, ch_description AS name, ch_internalvalue AS "internalValue", ch_kind AS "channelKind" FROM ${s}.psichannel ORDER BY ch_description`,
+          `SELECT DISTINCT tx_id_channel AS id, tx_id_channel AS name FROM ${s}.psitransmission ORDER BY tx_id_channel`,
         ]
       : [
-          'SELECT DISTINCT CH_ID AS id, CH_DESCRIPTION AS name, CH_INTERNALVALUE AS "internalValue", CH_KIND AS "channelKind" FROM PSI.PSICHANNEL ORDER BY CH_DESCRIPTION',
-          'SELECT DISTINCT TX_ID_CHANNEL AS id, TX_ID_CHANNEL AS name FROM PSI.PSITRANSMISSION ORDER BY TX_ID_CHANNEL',
+          `SELECT DISTINCT CH_ID AS id, CH_DESCRIPTION AS name, CH_INTERNALVALUE AS "internalValue", CH_KIND AS "channelKind" FROM ${s}.PSICHANNEL ORDER BY CH_DESCRIPTION`,
+          `SELECT DISTINCT TX_ID_CHANNEL AS id, TX_ID_CHANNEL AS name FROM ${s}.PSITRANSMISSION ORDER BY TX_ID_CHANNEL`,
         ];
 
     for (const sql of channelQueries) {
@@ -335,6 +364,8 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
       return res.status(400).json({ error: 'queries array is required' });
     }
 
+    auditSql(req, `Executed ${queries.length} live-KR quer${queries.length === 1 ? 'y' : 'ies'}`);
+
     const config = loadConfig();
     const CONCURRENCY = 10;
     const results = [];
@@ -350,27 +381,14 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
           }
 
           const connConfig = config.connections.find(c => c.id === connectionId);
-          if (!connConfig) {
-            return { goalId, krIndex, status: 'error', error: 'Connection not found' };
-          }
-
-          try {
-            const rows = await core.runQueryWithTimeout(connConfig, sql, buildBinds(q));
-            if (!rows || rows.length === 0) {
-              return { goalId, krIndex, status: 'no_data', error: 'Query returned no rows' };
-            }
-
-            const value = Number(Object.values(rows[0])[0]);
-            if (isNaN(value)) {
-              return { goalId, krIndex, status: 'error', error: 'Query did not return a numeric value' };
-            }
-
-            return { goalId, krIndex, status: 'ok', current: value };
-          } catch (err) {
-            console.error(`Batch query failed for goal ${goalId}, KR ${krIndex}:`, err);
-            const status = err.message === 'Query timed out' ? 'timeout' : 'error';
-            return { goalId, krIndex, status, error: status === 'timeout' ? 'Query timed out' : 'Query execution failed' };
-          }
+          const result = await core.executeScalarQuery(
+            { connConfig, sql, binds: buildBinds(q) },
+            { messages: { failed: (err) => {
+              console.error(`Batch query failed for goal ${goalId}, KR ${krIndex}:`, err);
+              return 'Query execution failed';
+            } } },
+          );
+          return { goalId, krIndex, ...result };
         })
       );
 
@@ -385,6 +403,19 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, encrypt, decry
     }
 
     res.json({ results });
+  });
+
+  // Manual trigger for the bridge-side sync loop (the app's "Sync now")
+  router.post('/kpi/sync-now', async (req, res) => {
+    if (!syncNow) return res.status(501).json({ error: 'Sync loop not configured' });
+    try {
+      const result = await syncNow();
+      auditSql(req, `Triggered a live-KR sync pass (${result.synced}/${result.total})`);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      console.error('Manual KR sync failed:', err);
+      res.status(500).json({ error: 'Sync failed' });
+    }
   });
 
   // Get KPI history

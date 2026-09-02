@@ -215,8 +215,51 @@ function createWhatsonCore({ decryptPassword }) {
     ]);
   }
 
-  return { getOraclePool, getPgPool, runOracleQuery, runPgQuery, runQuery, runQueryWithTimeout };
+  /**
+   * The one way a KR/KPI definition becomes a number.
+   *
+   * This contract was copied at three call sites (the bridge sync loop, the
+   * execute-batch route, and the connector agent) where the empty-rows, NaN and
+   * timeout semantics could drift apart independently. They matter: an empty
+   * result must read as `no_data`, never as a fabricated 0, or a KR silently
+   * reports "we hit zero" when it means "we measured nothing".
+   *
+   * `messages` exists because the agent words its failures for a local operator
+   * log while the bridge words them for an API response; the structure is the
+   * part that must not diverge.
+   */
+  async function executeScalarQuery({ connConfig, sql, binds }, { messages = {} } = {}) {
+    const m = { ...SCALAR_MESSAGES, ...messages };
+    if (!connConfig) return { status: 'error', error: m.noConnection };
+
+    try {
+      const rows = await runQueryWithTimeout(connConfig, sql, binds);
+      if (!rows || rows.length === 0) return { status: 'no_data', error: m.noRows };
+
+      const value = Number(Object.values(rows[0])[0]);
+      if (Number.isNaN(value)) return { status: 'error', error: m.notNumeric };
+
+      return { status: 'ok', current: value };
+    } catch (err) {
+      if (err.message === 'Query timed out') return { status: 'timeout', error: m.timeout };
+      return { status: 'error', error: m.failed(err) };
+    }
+  }
+
+  return {
+    getOraclePool, getPgPool, runOracleQuery, runPgQuery,
+    runQuery, runQueryWithTimeout, executeScalarQuery,
+  };
 }
+
+/** Bridge-facing wording; failures stay generic (operators read bridge logs). */
+const SCALAR_MESSAGES = {
+  noConnection: 'Connection not found',
+  noRows: 'Query returned no rows',
+  notNumeric: 'Query did not return a numeric value',
+  timeout: 'Query timed out',
+  failed: () => 'Query execution failed',
+};
 
 module.exports = {
   oracledb,

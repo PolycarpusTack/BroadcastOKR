@@ -12,7 +12,7 @@ const path = require('path');
 const app = express();
 const { MODE } = require('./editions.cjs');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
-const { encrypt, decrypt } = require('./utils/crypto.cjs');
+const { createCredentialCipher } = require('./utils/credentials.cjs');
 
 const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000')
   .split(',')
@@ -134,54 +134,47 @@ const CONFIG_PATH = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'conf
 const HISTORY_PATH = process.env.BRIDGE_HISTORY_PATH || path.join(__dirname, 'kpi-history.json');
 
 const store = createConfigStore({ configPath: CONFIG_PATH, historyPath: HISTORY_PATH });
-const core = createWhatsonCore({
-  decryptPassword: (password) => (BRIDGE_API_KEY ? decrypt(password, BRIDGE_API_KEY) : password),
-});
 
-app.use('/api', createWhatsonRouter({
-  db,
-  mode: MODE,
-  core,
-  store,
-  encrypt: (password) => (BRIDGE_API_KEY ? encrypt(password, BRIDGE_API_KEY) : password),
-  decrypt: (password) => (BRIDGE_API_KEY ? decrypt(password, BRIDGE_API_KEY) : password),
-}));
+// Credentials-at-rest. A dedicated key is preferred — it decouples "who may
+// call the API" from "what unlocks stored credentials" — with BRIDGE_API_KEY
+// kept as the fallback so existing desktop installs keep working.
+const CREDENTIAL_KEY = process.env.BRIDGE_ENCRYPTION_KEY || BRIDGE_API_KEY;
+const cipher = createCredentialCipher({ key: CREDENTIAL_KEY, mode: MODE });
+
+// Upgrade anything written before credentials were marked, then say plainly
+// what is unprotected. Startup is the only moment an operator reliably reads.
+const { rewrapped, unprotected } = cipher.rewrapStoredConnections(store);
+if (rewrapped > 0) {
+  console.log(`  Encrypted ${rewrapped} stored connection password(s) at rest.`);
+}
+if (unprotected > 0) {
+  const how = cipher.enforced ? 'REFUSED until' : 'stored in cleartext because';
+  console.warn(`  WARNING: ${unprotected} connection password(s) are not encrypted. `
+    + `New credentials will be ${how} BRIDGE_ENCRYPTION_KEY is set.`);
+}
+
+const core = createWhatsonCore({ decryptPassword: cipher.decrypt });
 
 // ── Bridge-side live-KR sync loop ──
 
 const { buildBinds } = require('./whatson/core.cjs');
 const { runKRSyncOnce, startKRSyncLoop } = require('./liveSync.cjs');
 
-/** Same value-extraction contract as /api/kpi/execute-batch. */
-async function executeKrQuery(q) {
-  const config = store.loadConfig();
-  const connConfig = config.connections.find(c => c.id === q.connectionId);
-  if (!connConfig) return { status: 'error', error: 'Connection not found' };
-  try {
-    const rows = await core.runQueryWithTimeout(connConfig, q.sql, buildBinds(q));
-    if (!rows || rows.length === 0) return { status: 'no_data', error: 'Query returned no rows' };
-    const value = Number(Object.values(rows[0])[0]);
-    if (isNaN(value)) return { status: 'error', error: 'Query did not return a numeric value' };
-    return { status: 'ok', current: value };
-  } catch (err) {
-    const status = err.message === 'Query timed out' ? 'timeout' : 'error';
-    return { status, error: status === 'timeout' ? 'Query timed out' : 'Query execution failed' };
-  }
+/** Same value-extraction contract as /api/kpi/execute-batch — one seam. */
+function executeKrQuery(q) {
+  const connConfig = store.loadConfig().connections.find(c => c.id === q.connectionId);
+  return core.executeScalarQuery({ connConfig, sql: q.sql, binds: buildBinds(q) });
 }
+
+// The manual trigger lives on the WHATS'ON router, not on `app` directly, so
+// FF-9's policy-coverage scan sees it like every other data-plane route.
+app.use('/api', createWhatsonRouter({
+  db, mode: MODE, core, store, cipher,
+  syncNow: () => runKRSyncOnce(db, { executeQuery: executeKrQuery }),
+}));
 
 const KR_SYNC_INTERVAL_MS = Number(process.env.BRIDGE_KR_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
 startKRSyncLoop(db, { executeQuery: executeKrQuery, intervalMs: KR_SYNC_INTERVAL_MS });
-
-// Manual trigger for the loop (the app's "Sync now" affordances)
-app.post('/api/kpi/sync-now', async (req, res) => {
-  try {
-    const result = await runKRSyncOnce(db, { executeQuery: executeKrQuery });
-    res.json({ ok: true, ...result });
-  } catch (err) {
-    console.error('Manual KR sync failed:', err);
-    res.status(500).json({ error: 'Sync failed' });
-  }
-});
 
 // ── Health ──
 
