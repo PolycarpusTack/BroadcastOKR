@@ -24,7 +24,7 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON environ
            Express.js + SQLite
            API key auth, request logging
                    |
-         [broadcastokr.db]  [config.json]
+         [broadcastokr.db]  (goals, tasks, connections, history)
                    |
          [Oracle/PostgreSQL WHATS'ON databases]
 ```

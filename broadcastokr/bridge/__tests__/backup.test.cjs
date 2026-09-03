@@ -43,37 +43,35 @@ describe('backup', () => {
     copy.close();
   });
 
-  it('captures the connection store alongside the database', async () => {
-    // A database-only snapshot restored cleanly and came back with no database
-    // connections — the OKRs returned and the thing that feeds them did not.
-    const configPath = path.join(dir, 'source-config.json');
-    fs.writeFileSync(configPath, JSON.stringify({ connections: [{ id: 'c1', name: 'PSI' }] }));
+  it('a restored snapshot brings the connections back with it (D-3)', async () => {
+    // Before D-3 the connection store was a file copied next to the snapshot;
+    // a database-only restore came back with OKRs and no connections. The
+    // connections are rows now, so the snapshot alone is the whole tenant.
+    const { createDB } = require('../db/connection.cjs');
+    const { runMigrations } = require('../db/migrate.cjs');
+    const tenant = createDB(':memory:');
+    runMigrations(tenant, path.join(__dirname, '..', 'migrations'));
+    tenant.prepare("INSERT INTO connections (id, name, type, host, password) VALUES ('c1', 'PSI', 'oracle', 'db', 'enc:v1:x')").run();
 
-    const { dbPath, configPath: copied } = await runBackupOnce(db, dir, { keep: 14, configPath });
+    const { dbPath } = await runBackupOnce(tenant, dir, { keep: 14 });
+    tenant.close();
 
-    assert.ok(fs.existsSync(dbPath));
-    assert.ok(copied && fs.existsSync(copied), 'config.json must be captured with the snapshot');
-    assert.equal(JSON.parse(fs.readFileSync(copied, 'utf8')).connections[0].id, 'c1');
-    // Matched pair: same timestamp, so a restore never mixes generations.
-    assert.equal(path.basename(copied), path.basename(dbPath).replace(/\.db$/, '.config.json'));
+    const restored = new Database(dbPath, { readonly: true });
+    assert.deepEqual(restored.prepare('SELECT id, name, password FROM connections').all(), [{ id: 'c1', name: 'PSI', password: 'enc:v1:x' }]);
+    restored.close();
+    assert.ok(!fs.readdirSync(dir).some((f) => f.endsWith('.config.json')), 'no config copy is written any more');
   });
 
-  it('still snapshots when no connection store exists yet', async () => {
-    const { dbPath, configPath } = await runBackupOnce(db, dir, { keep: 14, configPath: path.join(dir, 'absent.json') });
-    assert.ok(fs.existsSync(dbPath));
-    assert.equal(configPath, null);
-  });
-
-  it('prunes a snapshot as a unit, never orphaning a config copy', async () => {
-    const configPath = path.join(dir, 'source-config.json');
-    fs.writeFileSync(configPath, '{"connections":[]}');
+  it('prunes a pre-D-3 snapshot pair as a unit, never orphaning its config copy', async () => {
     for (let i = 0; i < 4; i++) {
-      await runBackupOnce(db, dir, { keep: 2, configPath });
-      await new Promise((r) => setTimeout(r, 5)); // distinct timestamps
+      const stamp = `2026-01-0${i + 1}T00-00-00-000Z`;
+      fs.writeFileSync(path.join(dir, `broadcastokr-${stamp}.db`), 'old');
+      fs.writeFileSync(path.join(dir, `broadcastokr-${stamp}.config.json`), '{}');
     }
+    await runBackupOnce(db, dir, { keep: 2 });
     const dbs = fs.readdirSync(dir).filter((f) => f.endsWith('.db'));
     const configs = fs.readdirSync(dir).filter((f) => f.endsWith('.config.json'));
     assert.equal(dbs.length, 2);
-    assert.equal(configs.length, 2, 'config copies must be pruned with their database');
+    assert.equal(configs.length, 1, 'the surviving old pair keeps its config copy; the pruned ones lose theirs');
   });
 });

@@ -97,10 +97,13 @@ export async function bridgeFetch<T>(
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        if (res.status === 409) {
-          throw new ConflictError((body as { current?: unknown }).current);
+        const err = body as { error?: string; detail?: string; current?: unknown };
+        // Only the version CAS is a conflict to retry from the server row; a
+        // refused delete (connection_in_use) is a 409 with a message to show.
+        if (res.status === 409 && err.error === 'version_conflict') {
+          throw new ConflictError(err.current);
         }
-        const message = (body as { error?: string }).error || `HTTP ${res.status}`;
+        const message = err.detail || err.error || `HTTP ${res.status}`;
         throw res.status < 500 ? new NoRetryError(message) : new Error(message);
       }
       return res.json();

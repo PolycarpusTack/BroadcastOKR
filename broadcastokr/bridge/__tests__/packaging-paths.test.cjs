@@ -7,7 +7,9 @@ const path = require('node:path');
 
 // Packaged builds run the bridge from a read-only install directory, so every
 // writable path must be overridable via env (electron/main.cjs bridgeEnv()).
-// This exercises the BRIDGE_CONFIG_PATH / BRIDGE_HISTORY_PATH overrides.
+// This exercises the BRIDGE_DB_PATH / BRIDGE_HISTORY_PATH overrides. Since D-3
+// BRIDGE_CONFIG_PATH is only where an upgraded install's config.json is
+// imported from; nothing is written there any more.
 
 const SERVER = path.join(__dirname, '..', 'server.cjs');
 const PORT = 3500 + Math.floor(Math.random() * 400);
@@ -48,7 +50,7 @@ describe('bridge writable paths are env-overridable', () => {
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it('writes config to BRIDGE_CONFIG_PATH, db to BRIDGE_DB_PATH', async () => {
+  it('writes the db to BRIDGE_DB_PATH and never creates a config.json', async () => {
     const res = await fetch(`${BASE}/api/config`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,7 +58,7 @@ describe('bridge writable paths are env-overridable', () => {
     });
     assert.ok(res.ok, `POST /api/config failed: ${res.status}`);
 
-    assert.ok(fs.existsSync(path.join(dataDir, 'config.json')), 'config.json not written to override path');
     assert.ok(fs.existsSync(path.join(dataDir, 'test.db')), 'sqlite db not created at override path');
+    assert.ok(!fs.existsSync(path.join(dataDir, 'config.json')), 'config.json must not be written: connections live in the database');
   });
 });

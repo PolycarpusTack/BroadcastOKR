@@ -12,7 +12,7 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON (PSI) e
 
 ## Architecture
 - `src/` — React app (pages, components, hooks, store, utils, types, constants, styles)
-- `bridge/` — Express bridge server (`server.cjs`, `config.json`, `kpi-history.json`)
+- `bridge/` — Express bridge server (`server.cjs`, `broadcastokr.db` incl. the `connections`/`kpi_definitions` tables, `kpi-history.json`)
 - `electron/` — Electron main process (`main.cjs`) + preload (`preload.cjs`)
 - Single `useBridge()` hook in `App.tsx` owns all bridge state; props drilled to pages
 - Zustand single store with `persist` middleware (localStorage) for goals, tasks, kpis, clients, goalTemplates
@@ -69,6 +69,7 @@ KPI { name, unit, direction, target, current, trend[] }
 - `POST /api/kpi/execute-batch` is `canEdit`, but a non-owner's queries must match the KR's stored `liveConfig` byte-for-byte (`isStoredQuery` in `routes/whatson.cjs`) — only owners run ad hoc SQL. `addGoal`/`updateGoal` return the bridge-write promise so callers sync *after* the write lands
 - Credentials: `enc:v1:` marks ciphertext; pre-marker values were written under `BRIDGE_API_KEY`, which `createCredentialCipher` takes as `legacyKey` for the startup rewrap. A value that cannot be read is never rewritten — it is counted as `unreadable`, logged, and exposed on `/api/health` (`credentials.unreadable`) → SystemHealthPanel warning. Desktop key lives in `electron/credentialKey.cjs` (`sealed:`/`plain:` marker; never overwrites an unreadable file)
 - Oracle `:named` binds auto-converted to PostgreSQL `$1` positional via `convertBinds()`
+- **Connection store is the database** (D-3, `docs/gpm/state/ADR-2026-09-03-connection-store.md`): `connections` + `kpi_definitions` + `bridge_settings` tables (migration 007), behind the unchanged `createConfigStore` interface in `bridge/whatson/store.cjs`. `BRIDGE_CONFIG_PATH` is only the one-time import source (`config.json` → rows → renamed `.migrated`; `BRIDGE_CONFIG_IMPORT=dry-run` to preview). Deleting a referenced connection is refused with `409 connection_in_use` (clients, live KRs and Dashboard KPIs named); `bridgeFetch` treats only `error: 'version_conflict'` 409s as CAS conflicts. Backups are the `.db` alone
 
 ## Components Structure
 ```
@@ -140,7 +141,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 
 ## Testing
 - `npm test` — 252 tests across 45 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 140 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 139/140 on Windows: `agent.test.cjs` asserts a `0600` identity file
+- `npm run test:bridge` — 178 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 177/178 on Windows: `agent.test.cjs` asserts a `0600` identity file
 - `npm run lint` — 0 errors, gated in CI
 - `better-sqlite3` is native and can only be built for ONE runtime at a time. `npm run rebuild:node` targets system Node (`npm run bridge`, `npm test`); `npm run rebuild:electron` targets Electron (`npm run electron:dev`, packaging). `electron:build*` now force-rebuilds for Electron itself, so packaging is safe from either state — but run `npm run rebuild:node` afterwards to get the dev bridge back. Stop any running bridge/agent first (`scripts/local-rig/start-rig.ps1 -Stop`) — a loaded `better_sqlite3.node` makes the Electron rebuild fail with EPERM. **Do not trust electron-builder's own rebuild step**: on 2026-09-02 it treated a system-Node build as up to date and shipped an installer whose bridge died on `require` (NODE_MODULE_VERSION 127 vs 145)
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
@@ -167,6 +168,8 @@ Frontend-only persona switching (no backend auth). Three roles:
 - localStorage quota-exceeded handler
 
 - 2026-08-31 hardening pass (GPM, `docs/gpm/state/`): goal-template route contract fixed + contract-tested in CI, first-connect migration replaces the data-wipe path, bridge ships in packaged Electron builds (fork from inside app.asar, writable paths → userData), check-in propagation fixed (updated_at bump + ISO-vs-sqlite `since` normalization), bridge-write failures toast, audit 24→0, lint 0 + CI gate, shared live-KR batch builder (`src/utils/liveSync.ts`)
+
+- 2026-09-03 (evening) — D-3 shipped: connections and Dashboard KPI definitions moved from `config.json` into the tenant database (migration 007, additive), one-shot import with `.migrated` rename, refuse-while-referenced delete, backups are the `.db` alone. ADR `docs/gpm/state/ADR-2026-09-03-connection-store.md` also closes R6 item 4 (KPI vs live KR: keep both, share the store, name them apart)
 
 - 2026-09-03 — R1 local validation rig is up (`docs/saas/readiness/r1-findings.md`): real Keycloak OIDC on both instances, real Oracle 19c (WHATS'ON PSI schema, thick driver) + Postgres 17 through the agent on read-only accounts, cockpit channel live. Fixes from the rig: cloud editions call the bridge same-origin (`BRIDGE_URL` defaults to `''` unless desktop), `POST /api/kpi/execute-batch` persists a KR's own result on the bridge (`storedKR` — a user's sync no longer vanishes at the next change poll), session-keyed rate limiter uses `ipKeyGenerator`. Instances start with `node --env-file=<inst>/.env bridge/server.cjs` — the bridge only auto-loads `bridge/.env`
 

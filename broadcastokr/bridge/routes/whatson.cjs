@@ -61,6 +61,27 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   const router = createRouter();
   const { loadConfig, saveConfig, loadHistory, saveHistory } = store;
 
+  /**
+   * Refuse-while-referenced (D-3 ADR): a connection a client, a live KR or a
+   * Dashboard KPI still names is not deleted — the response names them and
+   * the operator rebinds first. Returns the 409 body, or null when unreferenced.
+   */
+  const connectionInUse = (conn) => {
+    if (!store.referencesTo) return null;
+    const refs = store.referencesTo(conn.id);
+    const parts = [
+      ...refs.clients.map((c) => `client ${c.name}`),
+      ...refs.keyResults.map((kr) => `live KR "${kr.title}" (goal ${kr.goalTitle})`),
+      ...refs.kpiDefinitions.map((k) => `Dashboard KPI "${k.name}"`),
+    ];
+    if (parts.length === 0) return null;
+    return {
+      error: 'connection_in_use',
+      detail: `Connection '${conn.name || conn.id}' is still used by ${parts.join(', ')}. Rebind them before deleting it.`,
+      ...refs,
+    };
+  };
+
   /** Refuse to persist a secret we cannot protect (D-2). */
   const CREDENTIALS_UNPROTECTED = {
     error: 'Credential encryption is not configured on this instance. '
@@ -96,6 +117,15 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
           ? (config.connections.find(x => x.id === c.id)?.password || '')
           : (c.password ? encrypt(c.password) : ''),
       }));
+    }
+
+    if (incoming.connections) {
+      const keeping = new Set(incoming.connections.map((c) => c.id));
+      for (const existing of config.connections) {
+        if (keeping.has(existing.id)) continue;
+        const inUse = connectionInUse(existing);
+        if (inUse) return res.status(409).json(inUse);
+      }
     }
 
     const ALLOWED_KEYS = ['connections', 'kpiDefinitions', 'pollIntervalMs'];
@@ -175,6 +205,9 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   // Delete connection
   router.delete('/connections/:id', (req, res) => {
     const config = loadConfig();
+    const existing = (config.connections || []).find(c => c.id === req.params.id);
+    const inUse = existing && connectionInUse(existing);
+    if (inUse) return res.status(409).json(inUse);
     config.connections = (config.connections || []).filter(c => c.id !== req.params.id);
     saveConfig(config);
     auditSql(req, `Deleted database connection '${req.params.id}'`);

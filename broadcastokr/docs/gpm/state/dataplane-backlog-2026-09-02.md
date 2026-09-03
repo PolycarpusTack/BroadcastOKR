@@ -154,7 +154,7 @@ parallel-safe.
 
 ---
 
-#### D-3 — Give the credential store the same guarantees as the rest of the data
+#### D-3 — Give the credential store the same guarantees as the rest of the data · **DONE 2026-09-03** (branch `feature/d3-connections-in-db`; ADR `ADR-2026-09-03-connection-store.md`)
 - **Persona:** As the operator of a multi-tenant instance I want connections tenant-scoped,
   backed up and referentially sound, so that a restore is complete and one tenant cannot see
   another's database bindings.
@@ -342,10 +342,16 @@ mode bits. It passes on CI Linux. `static-serving.test.cjs` is flaky under paral
 
 ### Still open
 
-- **D-3** — not started. Now carries an extra constraint: SQLite is the demo/desktop store and
-  the production tenant store is intended to be Postgres (`docs/saas/2026-06-01-saas-migration-plan.md`
-  records "Port SQLite schema → Postgres schema-per-tenant"), so ST0 must decide portable
-  credential storage and tenancy shape rather than reaching for SQLite idioms.
+- **D-3** — **DONE 2026-09-03.** ST0 ADR (`ADR-2026-09-03-connection-store.md`): refuse-while-
+  referenced delete; `kpiDefinitions` move, `kpi-history.json` stays; one database per instance is
+  the tenant boundary (no `client_id` column — R6-1 adds one if it needs it); scalar contract
+  recorded as the deliberate v1 boundary (D-7). ST1: `connection-store.test.cjs` (store, import,
+  references), `connections-api.test.cjs` (shapes, isolation, import through the server, 409,
+  snapshot round-trip), `backup.test.cjs` rewritten. ST2: migration `007-connection-store.sql`
+  (plain columns, no SQLite-only idioms — `json_extract` in the reference query is the one JSON
+  function and exists in Postgres too), `createConfigStore({ db })`, `importLegacyConfig` with
+  dry-run. ST3: backup pairing removed (old pairs still pruned together), `BRIDGE_CONFIG_PATH`
+  kept as import source. FF-6: additive, `MIN_SUPPORTED` unchanged (Assumption 6 verified).
 - **D-5** — deferred to post-95%; the join-key question (`CH_ID` vs `CH_INTERNALVALUE` in
   `TX_ID_CHANNEL`) must be verified against a real PSI instance before it is built.
 - **D-7** — deferred; record the scalar contract as a deliberate v1 boundary in the D-3 ADR.

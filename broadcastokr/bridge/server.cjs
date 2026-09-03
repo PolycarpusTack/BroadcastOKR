@@ -86,16 +86,6 @@ const { createAuthRouter } = require('./routes/auth.cjs');
 const { SESSION_COOKIE: SESSION_COOKIE_NAME } = require('./sessions.cjs');
 app.use('/api/auth', createAuthRouter(db, OIDC_ENV));
 
-const { startBackupScheduler } = require('./utils/backup.cjs');
-const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR
-  || (DB_PATH !== ':memory:' ? path.join(path.dirname(DB_PATH), 'backups') : null);
-if (DB_PATH !== ':memory:' && BACKUP_DIR) {
-  // CONFIG_PATH is resolved further down with the rest of the WHATS'ON wiring;
-  // recompute it here so the scheduler captures connections with the database.
-  const backupConfigPath = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'config.json');
-  startBackupScheduler(db, BACKUP_DIR, { configPath: backupConfigPath });
-}
-
 const { createGoalsRouter } = require('./routes/goals.cjs');
 const { createTasksRouter } = require('./routes/tasks.cjs');
 const { createClientsRouter } = require('./routes/clients.cjs');
@@ -141,10 +131,23 @@ const { createWhatsonCore, oracledb, pg } = require('./whatson/core.cjs');
 const { createConfigStore } = require('./whatson/store.cjs');
 const { createWhatsonRouter } = require('./routes/whatson.cjs');
 
+// Connections and KPI definitions are rows in the tenant database (D-3);
+// BRIDGE_CONFIG_PATH only says where an upgraded install's config.json is
+// imported from, once. ADR: docs/gpm/state/ADR-2026-09-03-connection-store.md
 const CONFIG_PATH = process.env.BRIDGE_CONFIG_PATH || path.join(__dirname, 'config.json');
 const HISTORY_PATH = process.env.BRIDGE_HISTORY_PATH || path.join(__dirname, 'kpi-history.json');
 
-const store = createConfigStore({ configPath: CONFIG_PATH, historyPath: HISTORY_PATH });
+const store = createConfigStore({ db, historyPath: HISTORY_PATH });
+
+const importReport = store.importLegacyConfig(CONFIG_PATH, { dryRun: process.env.BRIDGE_CONFIG_IMPORT === 'dry-run' });
+if (importReport.status === 'imported') {
+  console.log(`  Imported ${importReport.connections} connection(s) and ${importReport.kpiDefinitions} KPI definition(s) from ${CONFIG_PATH}`
+    + (importReport.renamedTo ? ` (file renamed to ${path.basename(importReport.renamedTo)}).` : '.'));
+} else if (importReport.status === 'dry-run') {
+  console.log(`  DRY RUN: would import ${importReport.connections} connection(s) and ${importReport.kpiDefinitions} KPI definition(s) from ${CONFIG_PATH}; nothing written.`);
+} else if (importReport.status === 'unreadable') {
+  console.warn(`  WARNING: ${CONFIG_PATH} exists but could not be read (${importReport.error}); it was not imported. Fix or remove it, then restart.`);
+}
 
 // Credentials-at-rest. A dedicated key is preferred — it decouples "who may
 // call the API" from "what unlocks stored credentials" — with BRIDGE_API_KEY
@@ -175,12 +178,23 @@ if (credentialReport.unreadable > 0) {
 // Warnings go to stderr; the banner to stdout. Someone capturing only stdout
 // (the R1 rig did at first — finding 26) must at least learn there is something
 // to read on the other stream.
-const startupWarnings = (credentialReport.unprotected > 0 ? 1 : 0) + (credentialReport.unreadable > 0 ? 1 : 0);
+const startupWarnings = (credentialReport.unprotected > 0 ? 1 : 0) + (credentialReport.unreadable > 0 ? 1 : 0)
+  + (importReport.status === 'unreadable' ? 1 : 0);
 if (startupWarnings > 0) {
   console.log(`  ${startupWarnings} startup warning(s) — see stderr.`);
 }
 
 const core = createWhatsonCore({ decryptPassword: cipher.decrypt });
+
+const { startBackupScheduler } = require('./utils/backup.cjs');
+const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR
+  || (DB_PATH !== ':memory:' ? path.join(path.dirname(DB_PATH), 'backups') : null);
+if (DB_PATH !== ':memory:' && BACKUP_DIR) {
+  // After the legacy import and the credential rewrap, so the startup snapshot
+  // already holds the connections in the shape they will be read back in.
+  startBackupScheduler(db, BACKUP_DIR);
+}
+
 
 // ── Bridge-side live-KR sync loop ──
 
@@ -268,6 +282,6 @@ app.listen(PORT, HOST, () => {
   console.log(`  Running on http://${HOST}:${PORT}`);
   console.log(`  Mode: ${MODE}`);
   console.log(`  Drivers: Oracle=${oracledb ? 'yes' : 'no'}, PostgreSQL=${pg ? 'yes' : 'no'}`);
-  console.log(`  Config: ${CONFIG_PATH}`);
+  console.log(`  Database: ${DB_PATH} (connections included)`);
   console.log(`  History: ${HISTORY_PATH}\n`);
 });
