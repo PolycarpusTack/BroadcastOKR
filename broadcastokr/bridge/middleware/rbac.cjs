@@ -79,6 +79,7 @@ const POLICY = [
   { method: 'POST', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
   { method: 'PUT', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
   { method: 'DELETE', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
+  { method: 'PUT', path: /^\/api\/cockpit\/fleet-labels(\/|$)/, perm: 'ownerOnly' },
   { method: 'POST', path: /^\/api\/agents\/enrol-token$/, perm: 'ownerOnly' },
   { method: 'DELETE', path: /^\/api\/agents(\/|$)/, perm: 'ownerOnly' },
   { method: 'GET', path: /^\/api\/sync\/backup$/, perm: 'ownerOnly' },

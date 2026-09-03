@@ -24,14 +24,14 @@ describe('FF-4: share payload allowlist', () => {
       VALUES ('g1', ?, 'behind', 0, 1, 0, 'Q1')`).run(`${PRIVATE}-goal-title`);
 
     const insertKR = db.prepare(`INSERT INTO key_results
-      (id, goal_id, title, start_val, target_val, current_val, progress, status, live_config, shared_with_mediagenix, sort_order)
-      VALUES (?, 'g1', ?, ?, ?, ?, 0, 'behind', ?, ?, ?)`);
+      (id, goal_id, title, start_val, target_val, current_val, progress, status, live_config, shared_with_mediagenix, sort_order, kr_template_id)
+      VALUES (?, 'g1', ?, ?, ?, ?, 0, 'behind', ?, ?, ?, ?)`);
     // Shared KR — its title and SQL still must never leave
     insertKR.run('kr-shared', `${PRIVATE}-shared-title`, 100, 5, 12,
-      JSON.stringify({ connectionId: 'conn1', sql: `SELECT ${PRIVATE}-deal-cost`, unit: 'h', direction: 'lo' }), 1, 0);
+      JSON.stringify({ connectionId: 'conn1', sql: `SELECT ${PRIVATE}-deal-cost`, unit: 'h', direction: 'lo' }), 1, 0, 'krt-fill');
     // Private KR — nothing of it may appear
     insertKR.run('kr-private', `${PRIVATE}-private-title`, 0, 100, 40,
-      JSON.stringify({ connectionId: 'conn1', sql: `SELECT ${PRIVATE}-secret`, unit: '#', direction: 'hi' }), 0, 1);
+      JSON.stringify({ connectionId: 'conn1', sql: `SELECT ${PRIVATE}-secret`, unit: '#', direction: 'hi' }), 0, 1, null);
     db.prepare(`INSERT INTO kr_history (kr_id, timestamp, value, note, actor, source)
       VALUES ('kr-shared', '2026-08-31T00:00:00Z', 10, ?, ?, 'check-in')`)
       .run(`${PRIVATE}-note`, `${PRIVATE}-actor`);
@@ -60,6 +60,7 @@ describe('FF-4: share payload allowlist', () => {
     assert.equal(m.target, 5);
     assert.equal(m.direction, 'lo');
     assert.equal(typeof m.timestamp, 'string');
+    assert.equal(m.krTemplateId, 'krt-fill', 'the template id (not the title) lets the cockpit line columns up');
   });
 
   it('unsharing removes the KR from the next payload', () => {
