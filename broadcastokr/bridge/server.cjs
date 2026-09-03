@@ -234,7 +234,8 @@ app.get('/api/health', (req, res) => {
   }
   let dbStats = null;
   try {
-    const tableCount = db.prepare("SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'").get().c;
+    // `_` is a LIKE wildcard: NOT LIKE '_%' matched every table and reported 0 (rig, finding 36)
+    const tableCount = db.prepare("SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'").get().c;
     const pageCount = db.pragma('page_count', { simple: true });
     const pageSize = db.pragma('page_size', { simple: true });
     const dbSizeBytes = pageCount * pageSize;

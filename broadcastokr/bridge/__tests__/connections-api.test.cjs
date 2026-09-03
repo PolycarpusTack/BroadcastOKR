@@ -71,6 +71,11 @@ describe('connections API on the database store', () => {
     for (const d of [dirA, dirB]) fs.rmSync(d, { recursive: true, force: true });
   });
 
+  it('signed-in health counts the tenant tables (finding 36: `_` is a LIKE wildcard)', async () => {
+    const health = await (await fetch(`${a.base}/api/health`)).json();
+    assert.ok(health.database.tables >= 15, `expected the schema's tables, got ${health.database.tables}`);
+  });
+
   it('keeps the /api/connections shape: saved masked, listed masked, no password on the wire', async () => {
     const saved = await fetch(`${a.base}/api/connections`, json('POST', connection('c1')));
     assert.equal(saved.status, 200);

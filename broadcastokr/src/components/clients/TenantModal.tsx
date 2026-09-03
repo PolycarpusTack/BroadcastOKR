@@ -79,10 +79,13 @@ export function TenantModal({ open, onClose, client, theme, api = defaultApi }: 
 
   const run = async (work: () => Promise<string>) => {
     setBusy(true);
+    setMessage(null);
     try {
       const text = await work();
-      setMessage({ ok: true, text });
+      // Refresh first: the message is the signal that the modal is settled,
+      // so a selection made after it is never overwritten by a late reload.
       await refresh();
+      setMessage({ ok: true, text });
     } catch (e) {
       fail(e);
     } finally {
