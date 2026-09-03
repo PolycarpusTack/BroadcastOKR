@@ -25,6 +25,28 @@ function resolveTestConnection(body, config) {
 }
 
 /**
+ * One readable line for a failed connection test. The route is owner-only and
+ * the operator is the one who has to fix the host, port, service, account or
+ * password, so hiding the driver's reason behind "Connection test failed" only
+ * sent them to the bridge log (R1 rig, Yannick, 2026-09-03). Drivers never echo
+ * the password; the first line of the message plus the code is what helps.
+ */
+function describeConnectionError(err) {
+  const firstLine = String(err?.message || err || 'unknown error').split(/\r?\n/)[0].trim();
+  const code = err?.code || (err?.errorNum ? `ORA-${String(err.errorNum).padStart(5, '0')}` : '');
+  const hint = {
+    ECONNREFUSED: 'nothing is listening on that host and port',
+    ENOTFOUND: 'host name does not resolve',
+    ETIMEDOUT: 'no answer from that host and port (firewall?)',
+    '28P01': 'password authentication failed',
+    '3D000': 'database does not exist',
+    '08001': 'could not reach the server',
+  }[code];
+  const codePart = code && !firstLine.includes(code) ? `${code}: ` : '';
+  return `Connection test failed — ${codePart}${firstLine}${hint ? ` (${hint})` : ''}`;
+}
+
+/**
  * The WHATS'ON-facing route family: connection management, schema browsing,
  * query preview, and KPI/live-KR execution. Mounted at /api. `core` comes
  * from createWhatsonCore, `store` from createConfigStore, and `cipher` from
@@ -122,7 +144,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
       res.json({ ok: true, message: `${dbType === 'postgres' ? 'PostgreSQL' : 'Oracle'} connection successful` });
     } catch (err) {
       console.error('Connection test failed:', err);
-      res.json({ ok: false, message: 'Connection test failed' });
+      res.json({ ok: false, message: describeConnectionError(err) });
     }
   });
 
@@ -519,4 +541,4 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   return router;
 }
 
-module.exports = { createWhatsonRouter, resolveTestConnection };
+module.exports = { createWhatsonRouter, resolveTestConnection, describeConnectionError };
