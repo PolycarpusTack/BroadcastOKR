@@ -52,8 +52,9 @@ databases (its `config.json` becomes the import source under 0.9.2). Watch findi
 mode) and 4/15 (channels on a real schema). Yannick logs the day-2 line and checks the
 backups directory for the first scheduled `.db` snapshot.
 
-**Gotchas learned last night:** the Bash tool collapses `\` to `\` — use the Edit tool
-for source lines that need backslashes (finding 36's `ESCAPE '\'`). Python scripted edits:
+**Gotchas learned last night:** the assistant's Bash tool collapses a doubled backslash to
+a single one — use the Edit tool for source lines that need backslashes (finding 36's
+`ESCAPE '\\'`, which this very paragraph got wrong twice). Python scripted edits:
 `encoding='utf-8'`, detect the file's line ending (`TeamPage.tsx` is LF; most files CRLF),
 and remember each `rep()` writes immediately — a later assertion failure leaves earlier
 edits applied. PowerShell calls that wait on the rig go to the background past 180 s; read
