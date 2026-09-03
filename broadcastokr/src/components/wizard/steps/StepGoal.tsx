@@ -164,6 +164,7 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
         getTables={bridge.getTables}
         getColumns={bridge.getColumns}
         previewQuery={bridge.previewQuery}
+        getTemplates={bridge.getTemplates}
         theme={theme}
         selectStyle={makeSelectStyle(theme)}
         inputStyle={inputStyle(theme)}

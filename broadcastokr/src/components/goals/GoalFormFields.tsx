@@ -2,7 +2,7 @@ import { type CSSProperties } from 'react';
 import { CHANNELS } from '../../constants';
 import { useStore } from '../../store/store';
 import type { Theme, Client, ScopedChannelRef } from '../../types';
-import type { DBConnection, TableInfo, ColumnInfo } from '../../hooks/useBridge';
+import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../../hooks/useBridge';
 import { GoalFormKRList } from './GoalFormKRList';
 import { GoalFormChannelScope } from './GoalFormChannelScope';
 import { periodOptionsIncluding } from '../../utils/periods';
@@ -31,6 +31,8 @@ interface GoalFormFieldsProps {
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   /** Preview SQL query */
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
+  /** Preset KPI queries per dialect */
+  getTemplates?: () => Promise<KPITemplate[]>;
   /** Available clients (empty = no client feature) */
   clients?: Client[];
   selectedClientIds?: string[];
@@ -45,7 +47,7 @@ interface GoalFormFieldsProps {
 export function GoalFormFields({
   title, setTitle, channel, setChannel, owner, setOwner,
   period, setPeriod, krs, setKRs, theme, selectStyle, showSharing,
-  connections = [], getTables, getColumns, previewQuery,
+  connections = [], getTables, getColumns, previewQuery, getTemplates,
   clients = [],
   selectedClientIds = [], setSelectedClientIds,
   channelScopeType = 'all', setChannelScopeType,
@@ -113,6 +115,7 @@ export function GoalFormFields({
         getTables={getTables}
         getColumns={getColumns}
         previewQuery={previewQuery}
+        getTemplates={getTemplates}
       />
     </>
   );

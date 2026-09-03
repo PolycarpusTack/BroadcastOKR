@@ -1,4 +1,4 @@
-import type { DBConnection, TableInfo, ColumnInfo, KPIDefinition } from '../../hooks/useBridge';
+import type { DBConnection, TableInfo, ColumnInfo, KPIDefinition, KPITemplate } from '../../hooks/useBridge';
 import type { LiveKRBatchResult, LiveKRQuery } from '../../utils/liveSync';
 
 /** Which of the two measurement subsystems the user wants to set up. */
@@ -37,6 +37,7 @@ export interface WizardBridge {
   getTables: (connectionId: string) => Promise<TableInfo[]>;
   getColumns: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   previewQuery: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
+  getTemplates: () => Promise<KPITemplate[]>;
   saveKPI: (kpi: KPIDefinition) => Promise<{ ok: boolean; kpi: KPIDefinition }>;
   executeBatch: (queries: LiveKRQuery[]) => Promise<{ results: LiveKRBatchResult[] }>;
 }

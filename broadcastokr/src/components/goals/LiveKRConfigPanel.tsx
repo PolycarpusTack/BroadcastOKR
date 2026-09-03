@@ -1,8 +1,9 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Theme, LiveKRConfig } from '../../types';
-import type { DBConnection, TableInfo, ColumnInfo } from '../../hooks/useBridge';
+import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../../hooks/useBridge';
 import { PRIMARY_COLOR, COLOR_INFO, FONT_MONO } from '../../constants/config';
 import type { GoalFormKR } from './GoalFormFields';
+import { QueryBuilder } from './QueryBuilder';
 
 export interface LiveKRConfigPanelProps {
   config: LiveKRConfig;
@@ -14,16 +15,24 @@ export interface LiveKRConfigPanelProps {
   getTables?: (connectionId: string) => Promise<TableInfo[]>;
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
+  /** Preset KPI queries per dialect (GET /api/kpi/templates). */
+  getTemplates?: () => Promise<KPITemplate[]>;
   theme: Theme;
   selectStyle: CSSProperties;
   inputStyle: CSSProperties;
   labelStyle: CSSProperties;
 }
 
-/** Inline panel for configuring a live KR's database query */
+type QueryMode = 'sql' | 'build';
+
+/**
+ * Inline panel for configuring a live KR's database query. Three ways in, in
+ * order of effort: pick a preset, build it from dropdowns, or write the SQL.
+ * All three end in the same textarea, so what runs is always visible.
+ */
 export function LiveKRConfigPanel({
   config, target, start, onUpdateConfig, onUpdateKR,
-  connections, getTables, getColumns, previewQuery,
+  connections, getTables, getColumns, previewQuery, getTemplates,
   theme, selectStyle, inputStyle, labelStyle,
 }: LiveKRConfigPanelProps) {
   const [tables, setTables] = useState<TableInfo[]>([]);
@@ -32,6 +41,34 @@ export function LiveKRConfigPanel({
   const [preview, setPreview] = useState<Record<string, unknown>[]>([]);
   const [status, setStatus] = useState('');
   const [showSchema, setShowSchema] = useState(false);
+  const [templates, setTemplates] = useState<KPITemplate[]>([]);
+  const [preset, setPreset] = useState('');
+  const [mode, setMode] = useState<QueryMode>('sql');
+
+  const connection = connections.find((c) => c.id === config.connectionId);
+  const dialect = connection?.type;
+  const presets = templates.filter((t) => !t.dbType || !dialect || t.dbType === dialect);
+
+  // Fetch once per mount, not per callback identity: callers may pass a fresh
+  // function each render, and re-fetching on every render never settles.
+  const getTemplatesRef = useRef(getTemplates);
+  useEffect(() => { getTemplatesRef.current = getTemplates; });
+  useEffect(() => {
+    const fetchTemplates = getTemplatesRef.current;
+    if (!fetchTemplates) return;
+    let live = true;
+    fetchTemplates().then((t) => { if (live) setTemplates(t); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  const applyPreset = (name: string) => {
+    setPreset(name);
+    const t = presets.find((p) => p.name === name);
+    if (!t) return;
+    onUpdateConfig({ sql: t.sql, unit: t.unit, direction: t.direction, timeframeDays: t.timeframeDays });
+    onUpdateKR({ target: t.target });
+    setMode('sql');
+  };
 
   const loadTables = async () => {
     if (!getTables || !config.connectionId) return;
@@ -39,7 +76,7 @@ export function LiveKRConfigPanel({
       setStatus('Loading tables...');
       const t = await getTables(config.connectionId);
       setTables(t);
-      setStatus(`${t.length} tables`);
+      setStatus(t.length ? `${t.length} tables` : 'No tables found in this schema — check the connection’s Schema field');
       setShowSchema(true);
     } catch (e) {
       setStatus(`Error: ${(e as Error).message}`);
@@ -70,7 +107,7 @@ export function LiveKRConfigPanel({
     }
   };
 
-  const smallBtn = (bg: string, disabled = false): CSSProperties => ({
+  const smallBtn = (bg: string, disabled = false, active = true): CSSProperties => ({
     background: disabled ? '#555' : bg,
     color: '#fff',
     border: 'none',
@@ -79,7 +116,7 @@ export function LiveKRConfigPanel({
     fontSize: 10,
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1,
+    opacity: disabled ? 0.6 : active ? 1 : 0.55,
   });
 
   return (
@@ -90,7 +127,7 @@ export function LiveKRConfigPanel({
           <label style={{ ...labelStyle, fontSize: 10 }}>Connection</label>
           <select
             value={config.connectionId}
-            onChange={(e) => { onUpdateConfig({ connectionId: e.target.value }); setTables([]); setColumns([]); }}
+            onChange={(e) => { onUpdateConfig({ connectionId: e.target.value }); setTables([]); setColumns([]); setPreset(''); }}
             style={{ ...selectStyle, width: '100%', padding: '6px 8px', fontSize: 11 }}
             aria-label="KR connection"
           >
@@ -158,10 +195,35 @@ export function LiveKRConfigPanel({
         </div>
       </div>
 
-      {/* SQL Query */}
+      {/* Presets: the no-SQL path for the standard broadcast KPIs */}
+      {getTemplates && presets.length > 0 && (
+        <div>
+          <label style={{ ...labelStyle, fontSize: 10 }}>Start from a preset</label>
+          <select
+            value={preset}
+            onChange={(e) => applyPreset(e.target.value)}
+            style={{ ...selectStyle, width: '100%', padding: '6px 8px', fontSize: 11 }}
+            aria-label="KR preset"
+            disabled={!config.connectionId}
+          >
+            <option value="">{config.connectionId ? 'Choose a preset…' : 'Pick a connection first'}</option>
+            {presets.map((t) => (
+              <option key={`${t.dbType}-${t.name}`} value={t.name}>{t.name} — {t.description}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* SQL Query: written, or built from dropdowns */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           <label style={{ ...labelStyle, fontSize: 10, marginBottom: 0 }}>SQL Query (must return a single numeric value)</label>
+          <button onClick={() => setMode('sql')} style={smallBtn(PRIMARY_COLOR, false, mode === 'sql')} type="button" aria-pressed={mode === 'sql'}>
+            Write SQL
+          </button>
+          <button onClick={() => setMode('build')} disabled={!config.connectionId} style={smallBtn(PRIMARY_COLOR, !config.connectionId, mode === 'build')} type="button" aria-pressed={mode === 'build'}>
+            Build it
+          </button>
           <button onClick={() => setShowSchema(!showSchema)} style={smallBtn(PRIMARY_COLOR)} type="button">
             {showSchema ? 'Hide Schema' : 'Schema'}
           </button>
@@ -169,6 +231,26 @@ export function LiveKRConfigPanel({
             Load Tables
           </button>
         </div>
+
+        {mode === 'build' && (
+          <div style={{ marginBottom: 6 }}>
+            <QueryBuilder
+              key={connection?.id}
+              connection={connection}
+              getTables={getTables}
+              getColumns={getColumns}
+              onSql={(sql, usesTimeframe) => onUpdateConfig({
+                sql,
+                ...(usesTimeframe && !config.timeframeDays ? { timeframeDays: 30 } : {}),
+              })}
+              theme={theme}
+              selectStyle={selectStyle}
+              inputStyle={inputStyle}
+              labelStyle={labelStyle}
+            />
+          </div>
+        )}
+
         <textarea
           value={config.sql}
           onChange={(e) => onUpdateConfig({ sql: e.target.value })}

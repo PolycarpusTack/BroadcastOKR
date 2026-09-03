@@ -258,6 +258,7 @@ export default function App() {
               getTables={getTables}
               getColumns={getColumns}
               previewQuery={previewQuery}
+              getTemplates={getTemplates}
               executeBatch={executeBatch}
             />
           } />
@@ -311,6 +312,7 @@ export default function App() {
               getTables,
               getColumns,
               previewQuery,
+              getTemplates,
               saveKPI,
               executeBatch,
             }}
