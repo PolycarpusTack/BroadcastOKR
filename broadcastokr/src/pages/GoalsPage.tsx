@@ -23,7 +23,7 @@ import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO, COLOR_WARNING, 
 import { formatTimeAgo } from '../utils/dates';
 import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
 import type { Goal, KeyResult, GoalTemplate, ScopedChannelRef } from '../types';
-import type { DBConnection, TableInfo, ColumnInfo } from '../hooks/useBridge';
+import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../hooks/useBridge';
 import { currentPeriod } from '../utils/periods';
 
 interface GoalsPageProps {
@@ -37,6 +37,7 @@ interface GoalsPageProps {
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   /** Preview SQL query */
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
+  getTemplates?: () => Promise<KPITemplate[]>;
   /** Execute batch of KR queries */
   executeBatch?: (queries: Array<{
     goalId: string;
@@ -58,7 +59,7 @@ interface GoalsPageProps {
 
 export function GoalsPage({
   bridgeConnected = false, getConnections,
-  getTables, getColumns, previewQuery, executeBatch,
+  getTables, getColumns, previewQuery, getTemplates, executeBatch,
 }: GoalsPageProps) {
   const { theme } = useTheme();
   const { currentUser, permissions } = useAuth();
@@ -636,6 +637,7 @@ export function GoalsPage({
             getTables={getTables}
             getColumns={getColumns}
             previewQuery={previewQuery}
+            getTemplates={getTemplates}
             clients={clients}
             selectedClientIds={newClientIds}
             setSelectedClientIds={setNewClientIds}
@@ -663,6 +665,7 @@ export function GoalsPage({
             getTables={getTables}
             getColumns={getColumns}
             previewQuery={previewQuery}
+            getTemplates={getTemplates}
             clients={clients}
             selectedClientIds={editClientIds}
             setSelectedClientIds={setEditClientIds}

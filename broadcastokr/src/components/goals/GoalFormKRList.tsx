@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Theme, LiveKRConfig } from '../../types';
-import type { DBConnection, TableInfo, ColumnInfo } from '../../hooks/useBridge';
+import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../../hooks/useBridge';
 import { COLOR_INFO } from '../../constants/config';
 import { LiveKRConfigPanel } from './LiveKRConfigPanel';
 
@@ -26,11 +26,12 @@ export interface GoalFormKRListProps {
   getTables?: (connectionId: string) => Promise<TableInfo[]>;
   getColumns?: (connectionId: string, tableName: string) => Promise<ColumnInfo[]>;
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
+  getTemplates?: () => Promise<KPITemplate[]>;
 }
 
 export function GoalFormKRList({
   theme, krs, setKRs, selectStyle, showSharing,
-  connections = [], getTables, getColumns, previewQuery,
+  connections = [], getTables, getColumns, previewQuery, getTemplates,
 }: GoalFormKRListProps) {
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
   const krInputStyle = { ...inputStyle, padding: '8px 10px', borderRadius: 6, fontSize: 12 };
@@ -170,6 +171,7 @@ export function GoalFormKRList({
               getTables={getTables}
               getColumns={getColumns}
               previewQuery={previewQuery}
+              getTemplates={getTemplates}
               theme={theme}
               selectStyle={selectStyle}
               inputStyle={krInputStyle}

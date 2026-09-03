@@ -17,6 +17,7 @@ function makeBridge(over: Partial<WizardBridge> = {}): WizardBridge {
     getTables: vi.fn().mockResolvedValue([]),
     getColumns: vi.fn().mockResolvedValue([]),
     previewQuery: vi.fn().mockResolvedValue([]),
+    getTemplates: vi.fn().mockResolvedValue([]),
     saveKPI: vi.fn().mockResolvedValue({ ok: true, kpi: { id: 'kpi_1' } }),
     executeBatch: vi.fn().mockResolvedValue({ results: [] }),
     ...over,
