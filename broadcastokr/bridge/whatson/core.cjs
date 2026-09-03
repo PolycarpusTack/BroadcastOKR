@@ -74,7 +74,7 @@ function buildBinds(kpi) {
 
 function getTablesQuery(connConfig) {
   if (connConfig.type === 'postgres') {
-    const schema = connConfig.schema || 'public';
+    const schema = (connConfig.schema || 'public').toLowerCase();
     return {
       sql: `SELECT table_name AS "TABLE_NAME",
             (SELECT reltuples::bigint FROM pg_class WHERE relname = t.table_name) AS "NUM_ROWS"
@@ -86,13 +86,13 @@ function getTablesQuery(connConfig) {
   }
   return {
     sql: `SELECT table_name, num_rows FROM all_tables WHERE owner = :owner ORDER BY table_name`,
-    params: { owner: connConfig.schema || connConfig.user.toUpperCase() },
+    params: { owner: (connConfig.schema || connConfig.user).toUpperCase() },
   };
 }
 
 function getColumnsQuery(connConfig, tableName) {
   if (connConfig.type === 'postgres') {
-    const schema = connConfig.schema || 'public';
+    const schema = (connConfig.schema || 'public').toLowerCase();
     return {
       sql: `SELECT column_name AS "COLUMN_NAME",
             data_type AS "DATA_TYPE",
@@ -105,7 +105,7 @@ function getColumnsQuery(connConfig, tableName) {
   }
   return {
     sql: `SELECT column_name, data_type, data_length FROM all_tab_columns WHERE owner = :owner AND table_name = :tbl ORDER BY column_id`,
-    params: { owner: connConfig.schema || connConfig.user.toUpperCase(), tbl: tableName },
+    params: { owner: (connConfig.schema || connConfig.user).toUpperCase(), tbl: tableName },
   };
 }
 
