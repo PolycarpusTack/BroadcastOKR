@@ -4,6 +4,7 @@ const {
   getTablesQuery, getColumnsQuery, wrapPreviewQuery, getTestQuery,
 } = require('../whatson/core.cjs');
 const { getKpiTemplates } = require('../whatson/templates.cjs');
+const { applySyncedValue } = require('../liveSync.cjs');
 
 /**
  * The WHATS'ON-facing route family: connection management, schema browsing,
@@ -370,14 +371,40 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
    * 2026-09-02, F5: gating the route ownerOnly broke every manager sync path
    * in the app, because the app syncs stored SQL through this route).
    */
-  const isStoredQuery = (q) => {
-    if (!db || !q.krId) return false;
-    const row = db.prepare('SELECT live_config FROM key_results WHERE id = ? AND goal_id = ?').get(q.krId, q.goalId);
-    if (!row?.live_config) return false;
+  /**
+   * The KR row whose stored liveConfig this query *is* (same sql, connection,
+   * timeframe), or null. Two callers: the non-owner gate (only stored queries
+   * may run) and result persistence (only a KR's own query may write its
+   * value — an owner's ad hoc SQL is answered, never stored).
+   */
+  const storedKR = (q) => {
+    if (!db || !q.krId) return null;
+    const row = db.prepare(`
+      SELECT kr.id, kr.goal_id, kr.live_config, g.monitor_until, g.client_ids
+      FROM key_results kr JOIN goals g ON g.id = kr.goal_id
+      WHERE kr.id = ? AND kr.goal_id = ?`).get(q.krId, q.goalId);
+    if (!row?.live_config) return null;
     let stored;
-    try { stored = JSON.parse(row.live_config); } catch { return false; }
-    return stored.sql === q.sql && stored.connectionId === q.connectionId
+    try { stored = JSON.parse(row.live_config); } catch { return null; }
+    const same = stored.sql === q.sql && stored.connectionId === q.connectionId
       && (stored.timeframeDays ?? null) === (q.timeframeDays ?? null);
+    return same ? row : null;
+  };
+  const isStoredQuery = (q) => !!storedKR(q);
+
+  /**
+   * A result for a KR's own query is a fact about that KR: persist it the way
+   * the bridge loop and agent ingest do, or the 5-s change poll hands the
+   * browser back the stale row and the value it just showed vanishes (R1 rig,
+   * finding 24). Progress stays client-owned.
+   */
+  const persistResult = (kr, result) => {
+    if (result.status === 'ok' && typeof result.current === 'number') {
+      applySyncedValue(db, kr, result.current, new Date().toISOString());
+    } else {
+      db.prepare('UPDATE key_results SET sync_status=?, sync_error=? WHERE id=?')
+        .run(result.status || 'error', result.error || 'Sync failed', kr.id);
+    }
   };
 
   // Execute batch of KR queries for live goal syncing
@@ -397,6 +424,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const config = loadConfig();
     const CONCURRENCY = 10;
     const results = [];
+    const touchedGoals = new Set();
 
     // Process in batches of CONCURRENCY
     for (let i = 0; i < queries.length; i += CONCURRENCY) {
@@ -419,6 +447,11 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
               return 'Query execution failed';
             } } },
           );
+          const kr = storedKR(q);
+          if (kr) {
+            persistResult(kr, result);
+            touchedGoals.add(kr.goal_id);
+          }
           return { goalId, krIndex, ...result };
         })
       );
@@ -431,6 +464,11 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
           error: 'Unexpected execution error',
         });
       });
+    }
+
+    // Bump touched goals so /api/sync/changes carries the persisted values
+    for (const goalId of touchedGoals) {
+      db.prepare("UPDATE goals SET updated_at=datetime('now') WHERE id=?").run(goalId);
     }
 
     res.json({ results });
