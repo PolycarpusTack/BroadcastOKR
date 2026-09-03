@@ -45,4 +45,4 @@ playwright-report/
 **/.~lock*
 
 # R1 local validation rig: provisioned instances (.env with secrets, SQLite, agent identity)
-local-rig/
+/local-rig/

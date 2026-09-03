@@ -1,6 +1,9 @@
 # Local OIDC provider for the R1 validation rig — no corporate tenant needed.
 #   docker compose -f scripts/local-rig/keycloak-compose.yml up -d
 # Issuer for the instances:  http://localhost:8080/realms/brokr
+# If 8080 is busy on the host, change the left side of the port mapping and the
+# issuer in both instance .env files (the R1 rig runs on 8081 — findings 1–2).
+# No Docker? Run the same realm natively: readiness-instructions.md §R1 step 1.
 # Dev-only credentials; never reuse anywhere real.
 services:
   keycloak:

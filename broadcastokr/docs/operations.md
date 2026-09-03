@@ -130,6 +130,54 @@ loudly rather than handing ciphertext to the database as a password; the count
 of unreadable passwords is logged at startup and shown on `/api/health`
 (`credentials.unreadable`) and in the Dashboard's System Health panel.
 
+## Identity (OIDC) — client and cockpit modes
+
+Cloud modes fail closed: the bridge refuses to start until `BRIDGE_OIDC_ISSUER`,
+`BRIDGE_OIDC_CLIENT_ID`, `BRIDGE_OIDC_CLIENT_SECRET` and `BRIDGE_BASE_URL` are set
+(`BRIDGE_INSECURE_NO_AUTH=1` is the screaming escape hatch for tests only).
+Authorization Code + PKCE, scope `openid profile email`; the redirect URI to
+register at the IdP is `<BRIDGE_BASE_URL>/api/auth/callback`. An `http://` issuer
+is accepted (local IdPs); anything real should be `https://`.
+
+**Claims used** (`bridge/sessions.cjs` `upsertSsoUser`): `iss` + `sub` identify the
+user; `name` (falling back to `email`) becomes the display name; `email` is stored.
+`preferred_username` is not used. Verified against Keycloak 26 on 2026-09-03 with no
+mapping changes; Entra is the R1b spot-check.
+
+**Roles:** the first SSO sign-in on an instance becomes `owner`; everyone after is
+`member` until an owner promotes them (`PUT /api/users/:id`, audited). Sessions are
+an httpOnly cookie, 8 h sliding / 7 d absolute; `POST /api/auth/logout` ends one
+session only.
+
+**Running an instance:** the bridge only auto-loads `bridge/.env`. Start each
+provisioned instance with its own file — `node --env-file=<instance>/.env
+bridge/server.cjs` — and read **both** stdout and stderr at startup: the banner is
+on stdout, credential warnings on stderr.
+
+## Connector agent
+
+Runs at the customer site, outbound-only, and pushes numeric scalars to the
+instance's `/api/agent/ingest`; SQL never crosses the network. Enrolment:
+
+```bash
+# on the instance, as owner (15-minute, single-use token)
+curl -X POST -b brokr_session=… https://<instance>/api/agents/enrol-token
+# at the site
+node bridge/agent.cjs enroll --instance https://<instance> --token <T> --name "site" --dir /etc/brokr-agent
+node bridge/agent.cjs run --dir /etc/brokr-agent
+```
+
+`agent-config.json` (operator-owned) holds `instanceUrl`, `intervalMs`,
+`connections` (same shape as the bridge's, `schema` optional) and `bindings` of
+`{ krId, connectionId, sql, timeframeDays? }`. The `krId` must exist on the instance
+first — unknown ids come back in the ingest response as `unknown`. Passwords may be
+plaintext or `enc:v1:` values produced by the bridge's `encrypt()`; set
+`AGENT_DATA_KEY` in the agent's environment to unlock them. Identity lives in
+`agent-identity.json` (0600 where the filesystem honours it; a no-op on NTFS).
+Oracle uses thick mode when an Oracle client is on PATH, thin mode otherwise;
+`ORACLE_CLIENT_DIR` pins a client directory. Revoke an agent with
+`DELETE /api/agents/:id`.
+
 ## Log Files
 
 | Location | Content | Rotation |

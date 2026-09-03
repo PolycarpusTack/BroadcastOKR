@@ -1,6 +1,13 @@
 -- Minimal WHATS'ON-shaped test schema (Postgres) for the local R1 rig.
 -- Matches the preset KPI templates in bridge/whatson/templates.cjs.
 --   psql -U <user> -d <db> -f psi-test-schema.postgres.sql
+-- Read-only account for the agent afterwards (run as a superuser, in the same DB):
+--   CREATE ROLE brokr_reader LOGIN PASSWORD '<pw>';
+--   GRANT CONNECT ON DATABASE <db> TO brokr_reader;
+--   GRANT USAGE ON SCHEMA psi TO brokr_reader;
+--   GRANT SELECT ON ALL TABLES IN SCHEMA psi TO brokr_reader;
+--   ALTER DEFAULT PRIVILEGES IN SCHEMA psi GRANT SELECT ON TABLES TO brokr_reader;
+-- Verified 2026-09-03: SELECTs work, INSERT -> "permission denied for table".
 CREATE SCHEMA IF NOT EXISTS psi;
 
 CREATE TABLE IF NOT EXISTS psi.psichannel (

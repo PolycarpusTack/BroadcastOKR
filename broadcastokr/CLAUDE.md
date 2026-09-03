@@ -149,7 +149,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 - `npm run electron:build` — Electron packaged app
 - `npm run bridge` — Start Express bridge on localhost:3001
 
-## Current State (2026-06-04)
+## Current State (2026-09-03)
 
 ### What's done
 - Full React app with Dashboard, Goals, Tasks, Team, Reports, Clients, Compare pages
@@ -166,8 +166,10 @@ Frontend-only persona switching (no backend auth). Three roles:
 
 - 2026-08-31 hardening pass (GPM, `docs/gpm/state/`): goal-template route contract fixed + contract-tested in CI, first-connect migration replaces the data-wipe path, bridge ships in packaged Electron builds (fork from inside app.asar, writable paths → userData), check-in propagation fixed (updated_at bump + ISO-vs-sqlite `since` normalization), bridge-write failures toast, audit 24→0, lint 0 + CI gate, shared live-KR batch builder (`src/utils/liveSync.ts`)
 
+- 2026-09-03 — R1 local validation rig is up (`docs/saas/readiness/r1-findings.md`): real Keycloak OIDC on both instances, real Oracle 19c (WHATS'ON PSI schema, thick driver) + Postgres 17 through the agent on read-only accounts, cockpit channel live. Fixes from the rig: cloud editions call the bridge same-origin (`BRIDGE_URL` defaults to `''` unless desktop), `POST /api/kpi/execute-batch` persists a KR's own result on the bridge (`storedKR` — a user's sync no longer vanishes at the next change poll), session-keyed rate limiter uses `ipKeyGenerator`. Instances start with `node --env-file=<inst>/.env bridge/server.cjs` — the bridge only auto-loads `bridge/.env`
+
 ### Next steps
 1. Export history to file (if localStorage gets tight)
-2. TD-1: bridge writes for setMonitor/toggleSubtask/addBulkTasks + persisting live-KR sync results (see docs/gpm/state/hardening-backlog-2026-08-31.md)
+2. TD-1: bridge writes for setMonitor/toggleSubtask/addBulkTasks (live-KR sync persistence landed 2026-09-03 via execute-batch; see docs/gpm/state/hardening-backlog-2026-08-31.md)
 3. Phase 3 offline mutation queue (deferred — server convergence; note: first-connect migration now protects local data)
 4. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights; kept at repo root as a design asset) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype
