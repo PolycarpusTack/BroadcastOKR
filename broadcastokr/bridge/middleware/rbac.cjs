@@ -75,14 +75,44 @@ const POLICY = [
   { method: 'GET', path: /^\/api\/config$/, perm: 'authenticated' },
   { method: 'GET', path: /^\/api\/connections(\/|$)/, perm: 'authenticated' },
   { method: 'POST', path: /^\/api\/sync\/migrate-from-local$/, perm: 'ownerOnly' },
-  { method: 'POST', path: /^\/api\/cockpit\/tenants$/, perm: 'ownerOnly' },
+  // Cockpit tenant registry and the operator channel — the cockpit's owners only
+  { method: 'POST', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
+  { method: 'PUT', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
+  { method: 'DELETE', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
   { method: 'POST', path: /^\/api\/agents\/enrol-token$/, perm: 'ownerOnly' },
   { method: 'DELETE', path: /^\/api\/agents(\/|$)/, perm: 'ownerOnly' },
   { method: 'GET', path: /^\/api\/sync\/backup$/, perm: 'ownerOnly' },
 ];
 
+/**
+ * What the cockpit's operator principal may do on a client instance (R6-1):
+ * the WHATS'ON connection, the pinned client's binding and channels, and the
+ * connector agents. A closed list — the operator token is not an owner
+ * session, and nothing outside this table is reachable with it.
+ */
+const OPERATOR_ALLOW = [
+  { method: 'GET', path: /^\/api\/connections$/ },
+  { method: 'POST', path: /^\/api\/connections$/ },
+  { method: 'DELETE', path: /^\/api\/connections\/[^/]+$/ },
+  { method: 'POST', path: /^\/api\/test-connection$/ },
+  { method: 'POST', path: /^\/api\/channels$/ },
+  { method: 'GET', path: /^\/api\/clients$/ },
+  { method: 'PUT', path: /^\/api\/clients\/[^/]+$/ },
+  { method: 'GET', path: /^\/api\/agents$/ },
+  { method: 'POST', path: /^\/api\/agents\/enrol-token$/ },
+  { method: 'DELETE', path: /^\/api\/agents\/[^/]+$/ },
+];
+
 function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } = {}) {
   return function rbacMiddleware(req, res, next) {
+    // The operator principal is held to its allowlist even under the dev
+    // escape — the escape relaxes sign-in, not what the channel may touch.
+    if (req.user?.operator) {
+      const path = canonicalPath(req.path);
+      const allowed = OPERATOR_ALLOW.some((r) => r.method === req.method && r.path.test(path));
+      if (!allowed) return res.status(403).json({ error: 'Outside the operator channel' });
+      return next();
+    }
     if (mode === 'desktop' || insecureNoAuth) return next();
     if (isSessionExempt(req.path)) return next();
 
@@ -118,4 +148,4 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
   };
 }
 
-module.exports = { createRbacMiddleware, POLICY };
+module.exports = { createRbacMiddleware, POLICY, OPERATOR_ALLOW };

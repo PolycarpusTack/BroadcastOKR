@@ -76,7 +76,7 @@ const { createRbacMiddleware } = require('./middleware/rbac.cjs');
 if (MODE !== 'desktop') app.set('trust proxy', 1);
 app.use(createRateLimitMiddleware({ sessionKeyed: MODE !== 'desktop' }));
 app.use(createProtocolMiddleware());
-app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureNoAuth: INSECURE_NO_AUTH }));
+app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureNoAuth: INSECURE_NO_AUTH, operatorToken: process.env.BRIDGE_OPERATOR_TOKEN }));
 app.use(createRbacMiddleware({ mode: MODE, insecureNoAuth: INSECURE_NO_AUTH, db }));
 app.use(createLoggingMiddleware());
 
@@ -103,9 +103,6 @@ app.use('/api/users', createUsersRouter(db));
 app.use('/api/teams', createTeamsRouter(db));
 app.use('/api/sync', createSyncRouter(db, DB_PATH));
 app.use('/api/activity', createActivityRouter(db));
-
-const { createCockpitRouter } = require('./routes/cockpit.cjs');
-app.use('/api/cockpit', createCockpitRouter(db));
 
 const { createAgentRouters } = require('./routes/agent.cjs');
 const agentRouters = createAgentRouters(db);
@@ -185,6 +182,14 @@ if (startupWarnings > 0) {
 }
 
 const core = createWhatsonCore({ decryptPassword: cipher.decrypt });
+
+// Mounted here rather than with the tenant routers because the operator
+// channel stores each tenant's operator token under the credential cipher.
+const { createCockpitRouter } = require('./routes/cockpit.cjs');
+app.use('/api/cockpit', createCockpitRouter(db, { cipher }));
+if (MODE === 'client' && process.env.BRIDGE_OPERATOR_TOKEN) {
+  console.log('  Operator channel: enabled — the cockpit may manage this instance\'s connections and agents.');
+}
 
 const { startBackupScheduler } = require('./utils/backup.cjs');
 const BACKUP_DIR = process.env.BRIDGE_BACKUP_DIR

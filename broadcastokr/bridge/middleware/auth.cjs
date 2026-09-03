@@ -50,7 +50,7 @@ function isSessionExempt(path) {
  * `insecureNoAuth` is the explicit, loudly-logged test/dev escape for cloud
  * modes — production cloud instances refuse to start without OIDC instead.
  */
-function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = false } = {}) {
+function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = false, operatorToken } = {}) {
   return function authMiddleware(req, res, next) {
     if (isSessionExempt(req.path)) return next();
 
@@ -66,6 +66,20 @@ function createAuthMiddleware({ mode = 'desktop', apiKey, db, insecureNoAuth = f
         return res.status(401).json({ error: 'Unauthorized' });
       }
       return next();
+    }
+
+    // Operator channel (R6-1): the cockpit manages this instance's connections
+    // and connector agents with the per-instance BRIDGE_OPERATOR_TOKEN. It is a
+    // principal of its own (RBAC holds it to an allowlist), never a session.
+    // Checked before the dev escape so tests exercise the real path; anything
+    // that presents the header and does not match is refused outright.
+    const presented = req.headers['x-operator-token'];
+    if (presented !== undefined) {
+      if (mode === 'client' && operatorToken && safeEqual(presented, operatorToken)) {
+        req.user = { id: null, role: 'operator', operator: true };
+        return next();
+      }
+      return res.status(401).json({ error: 'Invalid operator token' });
     }
 
     // Cloud modes: session-based

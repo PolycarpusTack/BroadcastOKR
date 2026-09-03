@@ -75,7 +75,12 @@ BRIDGE_API_KEY=${crypto.randomBytes(24).toString('hex')}
 # stored passwords" rotate independently (docs/operations.md, Credentials).
 BRIDGE_ENCRYPTION_KEY=${crypto.randomBytes(32).toString('hex')}
 BRIDGE_CORS_ORIGINS=${baseUrl}
-
+${mode === 'client' ? `
+# Operator channel — the cockpit registers this instance with this token and
+# manages its WHATS'ON connection and connector agents from its Clients page
+# (docs/operations.md, Operator channel).
+BRIDGE_OPERATOR_TOKEN=${crypto.randomBytes(32).toString('hex')}
+` : ''}
 # Identity — the instance refuses to start until these are real
 BRIDGE_OIDC_ISSUER=${arg('oidc-issuer', 'https://CHANGE-ME.example/oidc')}
 BRIDGE_OIDC_CLIENT_ID=${arg('oidc-client-id', 'CHANGE-ME')}
@@ -88,4 +93,6 @@ console.log(`Provisioned ${mode} instance for "${name}"
   database:   ${dbPath} (migrated, client '${clientId}' seeded)
   env:        ${join(instanceDir, '.env')} (0600)
   next steps: fill in the OIDC values, build with VITE_EDITION=${mode === 'client' ? 'client' : 'internal'},
-              start the bridge with this env — the first SSO sign-in becomes owner.`);
+              start the bridge with this env — the first SSO sign-in becomes owner.${mode === 'client' ? `
+              On the cockpit: Clients → this client → Tenant instance: enter ${baseUrl}
+              and the BRIDGE_OPERATOR_TOKEN from the .env, then bind its connection there.` : ''}`);

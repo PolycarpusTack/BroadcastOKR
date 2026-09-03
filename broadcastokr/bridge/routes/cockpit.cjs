@@ -3,17 +3,28 @@ const crypto = require('crypto');
 const { MODE } = require('../editions.cjs');
 const { audit } = require('../audit.cjs');
 const { SHARE_FIELDS } = require('../cockpit/sharePayload.cjs');
+const { callTenant, normalizeInstanceUrl } = require('../cockpit/tenantClient.cjs');
 
 const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const MAX_METRICS = 500;
+const MASKED = '***';
 
 /**
- * Cockpit side of the shared-metrics channel. Push-only: client instances
- * send their allowlist payload with a per-tenant write-only token; the cockpit
- * validates strictly (unknown fields rejected — defense in depth behind FF-4)
- * and lands numeric facts under the tenant's client row.
+ * Cockpit side of the two channels.
+ *
+ * Shared metrics (T2-3): push-only — client instances send their allowlist
+ * payload with a per-tenant write-only token; the cockpit validates strictly
+ * (unknown fields rejected — defense in depth behind FF-4) and lands numeric
+ * facts under the tenant's client row.
+ *
+ * Operator channel (R6-1): the cockpit is where Mediagenix onboards a client,
+ * so per tenant it keeps the instance URL and the instance's operator token
+ * (ciphertext under `cipher`) and forwards a small, fixed set of management
+ * calls — connections, the pinned client's binding, connector agents — with
+ * that token. Nothing generic is proxied: every forwarded path is written here.
+ * ADR: docs/gpm/state/r6-backlog-2026-09-03.md (ST0).
  */
-function createCockpitRouter(db) {
+function createCockpitRouter(db, { cipher } = {}) {
   const router = createRouter();
 
   const cockpitOnly = (req, res, next) => {
@@ -21,21 +32,177 @@ function createCockpitRouter(db) {
     next();
   };
 
-  // Owner mints a per-tenant write-only token (echoed exactly once)
+  // ── Tenant registry ──
+
+  const tenantRow = db.prepare(`
+    SELECT c.id AS client_id, c.name, t.instance_url, t.operator_token, t.share_token_hash, t.share_minted_at, t.created_at
+    FROM clients c LEFT JOIN cockpit_tenants t ON t.client_id = c.id WHERE c.id = ?`);
+
+  const toTenantDTO = (r) => ({
+    clientId: r.client_id,
+    name: r.name,
+    instanceUrl: r.instance_url || '',
+    operatorTokenSet: !!r.operator_token,
+    shareTokenMintedAt: r.share_minted_at || (r.share_token_hash ? r.created_at : null) || null,
+  });
+
+  router.get('/tenants', cockpitOnly, (req, res) => {
+    const rows = db.prepare(`
+      SELECT c.id AS client_id, c.name, t.instance_url, t.operator_token, t.share_token_hash, t.share_minted_at, t.created_at
+      FROM clients c LEFT JOIN cockpit_tenants t ON t.client_id = c.id ORDER BY c.name`).all();
+    res.json(rows.map(toTenantDTO));
+  });
+
+  // Register (or re-point / rotate) a tenant instance. A masked or absent
+  // token keeps the stored one, so the URL can change without re-entering it.
+  router.put('/tenants/:clientId', cockpitOnly, (req, res) => {
+    const row = tenantRow.get(req.params.clientId);
+    if (!row) return res.status(404).json({ error: 'Unknown client' });
+    const { instanceUrl: rawUrl, operatorToken } = req.body || {};
+    const instanceUrl = rawUrl === undefined ? (row.instance_url || '') : (rawUrl === '' ? '' : normalizeInstanceUrl(rawUrl));
+    if (instanceUrl === null) return res.status(400).json({ error: 'instanceUrl must be an http(s) URL' });
+
+    const arrivingSecret = operatorToken && operatorToken !== MASKED;
+    if (arrivingSecret && cipher?.unprotected) {
+      return res.status(503).json({ error: 'Credential encryption is not configured on this instance. Set BRIDGE_ENCRYPTION_KEY before storing an operator token.' });
+    }
+    const storedToken = arrivingSecret ? cipher.encrypt(String(operatorToken)) : (row.operator_token || '');
+
+    db.prepare(`INSERT INTO cockpit_tenants (client_id, share_token_hash, instance_url, operator_token) VALUES (?, '', ?, ?)
+      ON CONFLICT(client_id) DO UPDATE SET instance_url = excluded.instance_url, operator_token = excluded.operator_token`)
+      .run(row.client_id, instanceUrl, storedToken);
+    audit(db, req, `${arrivingSecret ? 'Registered' : 'Updated'} tenant instance for '${row.name}'${instanceUrl ? ` at ${instanceUrl}` : ''}`);
+    res.json({ ok: true, tenant: toTenantDTO(tenantRow.get(row.client_id)) });
+  });
+
+  // Owner mints a per-tenant write-only share token (echoed exactly once)
   router.post('/tenants', cockpitOnly, (req, res) => {
     const { clientId } = req.body || {};
     const client = db.prepare('SELECT id, name FROM clients WHERE id = ?').get(clientId);
     if (!client) return res.status(400).json({ error: 'Unknown client' });
 
     const token = crypto.randomBytes(32).toString('hex');
-    db.prepare(`INSERT INTO cockpit_tenants (client_id, share_token_hash) VALUES (?, ?)
-      ON CONFLICT(client_id) DO UPDATE SET share_token_hash = excluded.share_token_hash, created_at = datetime('now')`)
+    db.prepare(`INSERT INTO cockpit_tenants (client_id, share_token_hash, share_minted_at) VALUES (?, ?, datetime('now'))
+      ON CONFLICT(client_id) DO UPDATE SET share_token_hash = excluded.share_token_hash, share_minted_at = excluded.share_minted_at`)
       .run(clientId, sha256(token));
     audit(db, req, `Minted share token for tenant '${client.name}'`);
     res.status(201).json({ ok: true, clientId, token });
   });
 
-  // Machine endpoint — authenticated by the share token, not a session
+  // ── Operator channel: forwarded calls ──
+
+  /** The registered tenant, or the 409 that says why it cannot be reached. */
+  function registeredTenant(req, res) {
+    const row = tenantRow.get(req.params.clientId);
+    if (!row) { res.status(404).json({ error: 'Unknown client' }); return null; }
+    if (!row.instance_url || !row.operator_token) {
+      res.status(409).json({ error: 'tenant_not_registered', detail: `Register ${row.name}'s instance URL and operator token first.` });
+      return null;
+    }
+    let operatorToken;
+    try { operatorToken = cipher.decrypt(row.operator_token); }
+    catch (err) {
+      res.status(409).json({ error: 'operator_token_unreadable', detail: `The stored operator token cannot be read with this cockpit's key (${err.message}). Re-enter it.` });
+      return null;
+    }
+    return { clientId: row.client_id, name: row.name, instanceUrl: row.instance_url, operatorToken };
+  }
+
+  /** Forward one call; the tenant's status and body come back as they are. */
+  async function forward(req, res, method, path, body) {
+    const tenant = registeredTenant(req, res);
+    if (!tenant) return;
+    try {
+      const { status, body: out } = await callTenant(tenant, method, path, body);
+      res.status(status).json(out);
+    } catch (err) {
+      res.status(502).json({ error: 'tenant_unreachable', detail: `${tenant.name} at ${tenant.instanceUrl}: ${err.name === 'AbortError' ? 'no answer within 10 s' : err.message}` });
+    }
+  }
+
+  /** The tenant's pinned client row (client instances hold exactly one). */
+  async function pinnedClient(tenant) {
+    const { status, body } = await callTenant(tenant, 'GET', '/api/clients');
+    if (status !== 200 || !Array.isArray(body) || body.length === 0) {
+      return { error: { status: status === 200 ? 409 : status, body: status === 200 ? { error: 'tenant_has_no_client', detail: 'The instance has no client row — provisioning seeds it.' } : body } };
+    }
+    return { client: body[0] };
+  }
+
+  router.get('/tenants/:clientId/status', cockpitOnly, async (req, res) => {
+    const tenant = registeredTenant(req, res);
+    if (!tenant) return;
+    const out = { reachable: false, version: null, mode: null, operatorAccepted: false, client: null, detail: null };
+    try {
+      const health = await callTenant({ instanceUrl: tenant.instanceUrl }, 'GET', '/api/health', undefined, { timeoutMs: 5000 });
+      out.reachable = health.status === 200;
+      out.version = health.body?.version || null;
+      out.mode = health.body?.mode || null;
+      if (out.reachable) {
+        const probe = await callTenant(tenant, 'GET', '/api/clients');
+        out.operatorAccepted = probe.status === 200;
+        if (probe.status === 200 && Array.isArray(probe.body)) out.client = probe.body[0] || null;
+        else out.detail = probe.body?.error || `HTTP ${probe.status}`;
+      }
+    } catch (err) {
+      out.detail = err.name === 'AbortError' ? 'no answer within 5 s' : err.message;
+    }
+    res.json(out);
+  });
+
+  router.get('/tenants/:clientId/connections', cockpitOnly, (req, res) => forward(req, res, 'GET', '/api/connections'));
+  router.post('/tenants/:clientId/connections', cockpitOnly, (req, res) => forward(req, res, 'POST', '/api/connections', req.body));
+  router.delete('/tenants/:clientId/connections/:connectionId', cockpitOnly,
+    (req, res) => forward(req, res, 'DELETE', `/api/connections/${encodeURIComponent(req.params.connectionId)}`));
+  router.post('/tenants/:clientId/test-connection', cockpitOnly, (req, res) => forward(req, res, 'POST', '/api/test-connection', req.body));
+
+  // Bind (or change) the WHATS'ON connection of the tenant's pinned client.
+  router.put('/tenants/:clientId/binding', cockpitOnly, async (req, res) => {
+    const tenant = registeredTenant(req, res);
+    if (!tenant) return;
+    const connectionId = String(req.body?.connectionId ?? '');
+    try {
+      const found = await pinnedClient(tenant);
+      if (found.error) return res.status(found.error.status).json(found.error.body);
+      const client = found.client;
+      const changed = client.connectionId !== connectionId;
+      const next = { ...client, connectionId, channels: changed ? [] : client.channels };
+      const put = await callTenant(tenant, 'PUT', `/api/clients/${encodeURIComponent(client.id)}`, next);
+      if (put.status !== 200) return res.status(put.status).json(put.body);
+      audit(db, req, `Bound connection '${connectionId || '(none)'}' on tenant '${tenant.name}'`);
+      res.json({ ok: true, client: next });
+    } catch (err) {
+      res.status(502).json({ error: 'tenant_unreachable', detail: `${tenant.name} at ${tenant.instanceUrl}: ${err.message}` });
+    }
+  });
+
+  // Pull the channel list from the bound database and store it on the client.
+  router.post('/tenants/:clientId/channels', cockpitOnly, async (req, res) => {
+    const tenant = registeredTenant(req, res);
+    if (!tenant) return;
+    try {
+      const found = await pinnedClient(tenant);
+      if (found.error) return res.status(found.error.status).json(found.error.body);
+      const client = found.client;
+      if (!client.connectionId) return res.status(409).json({ error: 'no_connection_bound', detail: 'Bind a connection first.' });
+      const pulled = await callTenant(tenant, 'POST', '/api/channels', { connectionId: client.connectionId });
+      if (pulled.status !== 200) return res.status(pulled.status).json(pulled.body);
+      const channels = Array.isArray(pulled.body) ? pulled.body : [];
+      const put = await callTenant(tenant, 'PUT', `/api/clients/${encodeURIComponent(client.id)}`, { ...client, channels });
+      if (put.status !== 200) return res.status(put.status).json(put.body);
+      res.json({ ok: true, channels });
+    } catch (err) {
+      res.status(502).json({ error: 'tenant_unreachable', detail: `${tenant.name} at ${tenant.instanceUrl}: ${err.message}` });
+    }
+  });
+
+  router.get('/tenants/:clientId/agents', cockpitOnly, (req, res) => forward(req, res, 'GET', '/api/agents'));
+  router.post('/tenants/:clientId/agents/enrol-token', cockpitOnly, (req, res) => forward(req, res, 'POST', '/api/agents/enrol-token', {}));
+  router.delete('/tenants/:clientId/agents/:agentId', cockpitOnly,
+    (req, res) => forward(req, res, 'DELETE', `/api/agents/${encodeURIComponent(req.params.agentId)}`));
+
+  // ── Shared metrics: machine endpoint — authenticated by the share token, not a session ──
+
   router.post('/ingest', cockpitOnly, (req, res) => {
     const token = req.headers['x-share-token'];
     const tenant = token

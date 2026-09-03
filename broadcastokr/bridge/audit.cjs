@@ -3,6 +3,8 @@
  * (cloud) or is 'operator' (desktop) — never from a request body.
  */
 function actorName(db, req) {
+  // The cockpit acting over the operator channel (R6-1) — a principal, not a user row
+  if (req.user?.operator) return 'Mediagenix operator';
   if (req.user?.id) {
     const u = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
     return u?.name || `user#${req.user.id}`;
