@@ -6,6 +6,24 @@ const {
 const { getKpiTemplates } = require('../whatson/templates.cjs');
 const { applySyncedValue } = require('../liveSync.cjs');
 
+const MASKED = '***';
+
+/**
+ * What /api/test-connection should actually try. The form sends a plaintext
+ * password; a *stored* connection re-tested from the client only holds the
+ * mask the API handed it (GET /api/connections), so the literal "***" used
+ * to be sent to the database and every saved connection tested red (R1 rig,
+ * finding 27). With an id and a masked or absent password, the stored secret
+ * is substituted — still ciphertext here; `decrypt` unwraps it at use.
+ */
+function resolveTestConnection(body, config) {
+  const conn = body || {};
+  const masked = conn.password === undefined || conn.password === '' || conn.password === MASKED;
+  if (!masked || !conn.id) return conn;
+  const stored = (config.connections || []).find((c) => c.id === conn.id);
+  return stored ? { ...conn, password: stored.password } : conn;
+}
+
 /**
  * The WHATS'ON-facing route family: connection management, schema browsing,
  * query preview, and KPI/live-KR execution. Mounted at /api. `core` comes
@@ -70,7 +88,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
 
   // Test connection (supports both Oracle and PostgreSQL)
   router.post('/test-connection', async (req, res) => {
-    const { type, host, port, service, user, password, clientDir } = req.body;
+    const { type, host, port, service, user, password, clientDir } = resolveTestConnection(req.body, loadConfig());
     const dbType = type || 'oracle';
     // The form sends a plaintext password; a stored connection re-tested from
     // the client sends back what it holds. `decrypt` passes plaintext through
@@ -501,4 +519,4 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   return router;
 }
 
-module.exports = { createWhatsonRouter };
+module.exports = { createWhatsonRouter, resolveTestConnection };
