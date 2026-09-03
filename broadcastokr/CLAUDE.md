@@ -59,6 +59,7 @@ KPI { name, unit, direction, target, current, trend[] }
 - KR history capped at 100 entries per KR, pruned to 75 via `pruneHistory()` in `src/utils/history.ts`
 - Monitoring mode: `monitorUntil` on Goal/Client — when active, every sync writes history entry
 - Template materialization: one goal per client, SQL overrides per KR template per client
+- Live-KR query entry has three paths that all end in the same editable textarea: a preset (`GET /api/kpi/templates`, filtered by the connection's dialect), the guided builder (`QueryBuilder` → `buildKRQuery`), or hand-written SQL. The AI-assist layer is a decision spike (`docs/saas/2026-09-03-query-assist-spike.md`), not built
 - `syncTemplateToGoals` propagates title, start, target, sql, unit, direction, timeframeDays, connectionId
 - `updateClient` with connection change rebinds all live KRs and resets syncStatus to 'pending'
 - KR edit matching by `kr.id` (not index) to preserve history during reorder/delete
@@ -73,7 +74,7 @@ KPI { name, unit, direction, target, current, trend[] }
 ```
 components/
   layout/     — AppShell, Sidebar, Header
-  goals/      — CheckInModal, GoalFormFields
+  goals/      — CheckInModal, GoalFormFields, LiveKRConfigPanel (presets · Build it · Write SQL), QueryBuilder (dropdowns → SQL)
   tasks/      — CreateTaskModal, TaskDetailModal, TaskCard
   kpi/        — KPIConfigModal (609 lines, extraction candidate), LiveKPIPanel
   templates/  — TemplateForm, TemplateCard, MaterializeModal
@@ -91,6 +92,7 @@ components/
 ## Utilities (src/utils/)
 - `colors.ts` — goalStatus, progressColor, statusIcon, kpiStatus, roleColor
 - `progress.ts` — krProgress (direction-aware KR progress, single source of truth)
+- `queryBuilder.ts` — buildKRQuery: deterministic single-value SELECT (count / percent-where / average, optional condition + last-N-days binds) per dialect; identifiers validated, literals escaped; columnKind classifies browser types
 - `history.ts` — pruneHistory (100 cap, prune to 75)
 - `reportHelpers.ts` — computeTrend, computePeriodDelta, computeGoalProgressTimeline
 - `dates.ts` — daysUntil, getUrgencyBadge, formatTime, formatTimeAgo
