@@ -1,42 +1,63 @@
 # Pickup Prompt — Next Session
 
-## 2026-09-04 — R1 day two (paste this block)
+## 2026-09-04 — D-3 then R6-1, with the rig ticking (paste this block)
 
-We're continuing BroadcastOKR (app in `broadcastokr/`). R1's local rig is **up and
-the 7–14-day clock started 2026-09-03**. Read, in order:
-`docs/saas/readiness/r1-findings.md` (29 findings, the R1-5 checklist all ticked,
-daily log), `docs/gpm/state/r1-backlog-2026-09-03.md` (R1-6/R1-7 remain), then
-`docs/saas/readiness-instructions.md` §R1 (corrected from the rig). `CLAUDE.md` is
-current.
+We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
+`docs/gpm/state/DECISIONS-2026-09-03.md` (five decisions taken at the end of day one —
+they set today's order), `docs/gpm/state/dataplane-backlog-2026-09-02.md` story **D-3**
+(the work), `docs/saas/2026-08-31-readiness-plan.md` §R6 item 1 (what follows it), and
+`docs/saas/readiness/r1-findings.md` (34 findings, all fix-now shipped; daily log at the
+bottom). `CLAUDE.md` is current.
 
-**Where we are:** `readiness/r1-local-rig` merged to main as `77473f3` (CI green:
-check, e2e, editions client/internal). Day one shipped four fix-now commits from the rig — rate-limit IPv6 keying, cloud editions calling
-the bridge same-origin (the UI could not reach its own bridge before), and
-execute-batch persisting a KR's own result (a user's sync vanished at the next
-change poll), re-testing a stored connection with its stored secret (finding 27) — plus the
-runbook corrections. Suites: 255 vitest · 144 bridge (143 on
-Windows — the `0600` case) · lint 0 · build green.
+**Where we are:** main is `850e5c4` (CI green). Day one of R1 shipped eight rig-found fixes
+(rate-limit IPv6, same-origin bridge URL, execute-batch persistence, stored-secret
+connection test, descriptive connection-test failures, modal focus steal, Postgres schema
+case, constraint 400s / Postgres numbers / honest startup lines), the query-assist feature
+(presets + guided builder in the live-KR panel; AI layer deferred to v1.1 by decision), and
+release **0.9.1** (`installer/BroadcastOKR Setup 0.9.1.exe`, built from `850e5c4`). Suites:
+271 vitest · 160 bridge (159 on Windows — the `0600` case) · lint 0 · build green.
 
-**Rig on this PC:** Keycloak 26.0.8 native on **8081** (Docker cannot be installed);
-cockpit :3100, tenant0 :3101 started with `node --env-file=local-rig/<inst>/.env
-bridge/server.cjs`; Oracle 19c `LOCAL` holds a **real WHATS'ON PSI schema** (agent
-reads it via `brokr_reader`); Postgres 17 `brokr_rig` on :5433 with the test schema;
-agent `local-agent` every 60 s. `scripts/local-rig/start-rig.ps1` (idempotent,
-`-Stop`) is wired to a user Startup-folder shortcut; Oracle services need an elevated
-`Start-Service` after a reboot. Users: `owner` (owner), `member` (promoted to
-manager on tenant0).
+**Decisions in force (DECISIONS-2026-09-03.md):** D-3 → connections move into the tenant
+SQLite DB; R6-1's connection binding and token minting live on the **cockpit** (Mediagenix
+onboards clients); AI query assist is a v1.1 investigation; Entra spot-check (R1b) parked;
+Yannick reads the Dashboard himself during the unattended run and consults before entering
+real OKRs on the cockpit.
 
-**Decisions taken 2026-09-03** (`DECISIONS-2026-09-03.md`): D-3 → connections move into
-the tenant SQLite DB (build next, before R6-1); R6-1's connection binding + tokens live on
-the **cockpit**; AI query assist deferred to v1.1; Entra spot-check parked; Yannick reads the
-Dashboard himself during the run and consults before entering real OKRs. Small rig findings
-14/19/23/26 are done; the timeframe "30" was the field's placeholder.
+**Today — D-3, then R6-1, on branch `feature/d3-connections-in-db`:**
+1. Open by asking Yannick the two sub-decisions D-3's ST0 left open: (a) delete semantics —
+   refuse while referenced (recommended) vs forced delete → KRs `disconnected`; (b) move
+   `kpiDefinitions` with the connections (recommended), leave `kpi-history.json`. Record the
+   answers as the ST0 ADR in `docs/gpm/state/` (it also closes R6 item 4).
+2. D-3: migration 007 (additive `connections` table, tenant-scoped), one-time import of
+   `config.json` on first start (file left in place, renamed `.migrated`), credential cipher
+   on the column, referential check on delete, backups now cover connections, API shapes for
+   `/api/connections` unchanged. FF-6 must stay green (additive, no `MIN_SUPPORTED` bump).
+3. R6-1 on the cockpit: per client — bind/change connection, mint/re-mint share token, mint
+   enrol token, list agents with last-seen, revoke. Exit: no operator action needs curl.
+4. Then the rest of R6 (fleet board in Compare, TD-2 modals, period archive), R3, R7.
 
-**Today:** (1) daily-log line in `r1-findings.md` — values still arriving, staleness
-honest, first backup pair in `local-rig/*/backups/`, `bridge.log` size; (2) then the parallel work named in the backlog: D-3's decision spike and R6-1
-(admin UIs — finding 29 shows why: the client edition cannot bind its own
-connection). R1-6 content still needs Mediagenix's real OKRs on the cockpit — that
-is Yannick's, not the assistant's.
+**Rig on this PC (gitignored `local-rig/`):** Keycloak 26.0.8 native on **8081** (no Docker
+here); cockpit :3100, tenant0 :3101, agent `local-agent` every 60 s; Oracle 19c `LOCAL` is a
+**real WHATS'ON PSI schema**, Postgres 17 `brokr_rig` :5433 has the test schema. Users
+`owner`/`owner`, `member`/`member` (manager on tenant0). `scripts/local-rig/start-rig.ps1`
+(idempotent, `-Stop`) runs from a Startup-folder shortcut; Oracle services need an elevated
+`Start-Service` after a reboot. Bridges start with `node --env-file=local-rig/<inst>/.env
+bridge/server.cjs`. Clock day 1 = 2026-09-03; Yannick logs the daily line.
+
+**Parallel:** Yannick installs 0.9.1 on the remote desktop against populated support
+databases — watch for Oracle **thin** mode working without a client (finding 16) and what
+"Refresh from database" returns for channels on a real schema (finding 4). Findings from
+that go in `r1-findings.md` as usual.
+
+**Gotchas learned today:** `npm run electron:build` fails with EPERM while the rig's
+bridges/agent run — `start-rig.ps1 -Stop`, build, `npm run rebuild:node`, start again.
+Never name a PowerShell parameter `$args` (finding 34). Repo files are CRLF — match line
+endings in scripted edits. Playwright on this PC is load-sensitive: give probes long
+timeouts and hard `timeout` wrappers; a hung probe leaves nothing behind, but a busy
+machine makes `newPage` take 30 s. Only `src/editions/` reads VITE_EDITION.
+
+**Working discipline:** unchanged — GPM backlog per EPIC, branch per EPIC, commit per story,
+suites + lint + build green before each commit, merge `--no-ff`, push, watch CI.
 
 ---
 
