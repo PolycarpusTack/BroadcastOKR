@@ -1,6 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { useDeployment } from '../context/DeploymentContext';
+import { bridgeFetch } from '../store/bridgeSync';
+import { FleetBoard } from '../components/compare/FleetBoard';
+import type { FleetTenant } from '../utils/fleetBoard';
 import { useStore } from '../store/store';
 import { useShallow } from 'zustand/react/shallow';
 import { PillBadge } from '../components/ui/PillBadge';
@@ -64,6 +69,31 @@ function formatValue(value: number, unit: string): string {
 export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePageProps) {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const { permissions } = useAuth();
+  const { mode } = useDeployment();
+
+  // Cockpit: the fleet board (tenants × shared KRs) is the primary surface
+  // here (R6-2); the template grid stays one toggle away.
+  const [view, setView] = useState<'fleet' | 'templates'>(mode === 'cockpit' ? 'fleet' : 'templates');
+  const [fleet, setFleet] = useState<FleetTenant[]>([]);
+  const showFleet = mode === 'cockpit' && view === 'fleet';
+
+  useEffect(() => {
+    if (!showFleet || !bridgeConnected) return;
+    let cancelled = false;
+    const load = () => bridgeFetch<FleetTenant[]>('/api/cockpit/metrics', undefined, { retries: 0 })
+      .then((data) => { if (!cancelled) setFleet(data); })
+      .catch(() => {});
+    load();
+    const timer = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [showFleet, bridgeConnected]);
+
+  const labelColumn = useCallback(async (key: string, label: string) => {
+    await bridgeFetch(`/api/cockpit/fleet-labels/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify({ label }) }, { retries: 0 });
+    const data = await bridgeFetch<FleetTenant[]>('/api/cockpit/metrics', undefined, { retries: 0 });
+    setFleet(data);
+  }, []);
 
   const { goalTemplates, clients, goals, syncLiveKRBatch } = useStore(
     useShallow((s) => ({
@@ -362,7 +392,32 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
         </div>
       )}
 
+      {/* Cockpit: fleet board ↔ template grid */}
+      {mode === 'cockpit' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          {(['fleet', 'templates'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600, fontFamily: FONT_BODY, cursor: 'pointer',
+                border: `1px solid ${view === v ? PRIMARY_COLOR : theme.border}`,
+                background: view === v ? PRIMARY_COLOR + '18' : 'transparent',
+                color: view === v ? PRIMARY_COLOR : theme.textSecondary,
+              }}
+            >
+              {v === 'fleet' ? 'Fleet board' : 'Template grid'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showFleet && (
+        <FleetBoard fleet={fleet} canEdit={permissions.canDelete} onLabel={labelColumn} theme={theme} />
+      )}
+
       {/* Header row */}
+      {!showFleet && (
       <div style={headerRowStyle}>
         {/* Template selector */}
         <select
@@ -393,9 +448,10 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
           </button>
         )}
       </div>
+      )}
 
       {/* Empty states */}
-      {goalTemplates.length === 0 && (
+      {!showFleet && goalTemplates.length === 0 && (
         <div style={emptyStyle}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
           <div style={{ fontWeight: 600, marginBottom: 6, color: theme.text }}>
@@ -424,7 +480,7 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
         </div>
       )}
 
-      {goalTemplates.length > 0 && !selectedTemplateId && (
+      {!showFleet && goalTemplates.length > 0 && !selectedTemplateId && (
         <div style={emptyStyle}>
           Select a template above to compare client health checks.
         </div>
