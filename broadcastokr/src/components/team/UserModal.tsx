@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
 import {
@@ -59,57 +59,23 @@ export function UserModal({
 }: UserModalProps) {
   const isEdit = !!user;
 
-  const [name, setName] = useState('');
-  const [initials, setInitials] = useState('');
-  const [initialsManual, setInitialsManual] = useState(false);
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<User['role']>('member');
-  const [dept, setDept] = useState('');
-  const [title, setTitle] = useState('');
-  const [color, setColor] = useState(PRESET_COLORS[0]);
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
-  const [skillsRaw, setSkillsRaw] = useState('');
+  // Initial state from props, once per mount — the parent remounts by key (TD-2).
+  const [name, setName] = useState(user?.name ?? '');
+  const [initials, setInitials] = useState(user?.av ?? '');
+  const [initialsManual, setInitialsManual] = useState(!!user);
+  const [email, setEmail] = useState(user?.email ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [role, setRole] = useState<User['role']>(user?.role ?? 'member');
+  const [dept, setDept] = useState(user?.dept ?? '');
+  const [title, setTitle] = useState(user?.title ?? '');
+  const [color, setColor] = useState(user?.color ?? PRESET_COLORS[0]);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? '');
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>(user?.clientIds ?? []);
+  const [skillsRaw, setSkillsRaw] = useState((user?.skills ?? []).join(', '));
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [reassignTo, setReassignTo] = useState<string>('');
 
-  /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
-     modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
-  useEffect(() => {
-    if (!open) return;
-    setShowDeleteConfirm(false);
-    setReassignTo('');
-    if (user) {
-      setName(user.name);
-      setInitials(user.av);
-      setInitialsManual(true);
-      setEmail(user.email ?? '');
-      setPhone(user.phone ?? '');
-      setRole(user.role);
-      setDept(user.dept);
-      setTitle(user.title);
-      setColor(user.color);
-      setAvatarUrl(user.avatarUrl ?? '');
-      setSelectedClientIds(user.clientIds ?? []);
-      setSkillsRaw((user.skills ?? []).join(', '));
-    } else {
-      setName('');
-      setInitials('');
-      setInitialsManual(false);
-      setEmail('');
-      setPhone('');
-      setRole('member');
-      setDept('');
-      setTitle('');
-      setColor(PRESET_COLORS[0]);
-      setAvatarUrl('');
-      setSelectedClientIds([]);
-      setSkillsRaw('');
-    }
-  }, [open, user]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleNameChange(value: string) {
     setName(value);

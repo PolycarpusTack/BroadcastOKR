@@ -428,6 +428,7 @@ export function TeamPage() {
 
       {/* Modals */}
       <UserModal
+        key={userModalOpen ? (editingUser?.id ?? 'new') : 'closed'}
         open={userModalOpen}
         onClose={() => {
           setUserModalOpen(false);
@@ -444,6 +445,7 @@ export function TeamPage() {
         teamLeadCount={editingUser ? teams.filter((t) => t.leadId === editingUser.id).length : 0}
       />
       <TeamModal
+        key={teamModalOpen ? (editingTeam?.id ?? 'new') : 'closed'}
         open={teamModalOpen}
         onClose={() => {
           setTeamModalOpen(false);

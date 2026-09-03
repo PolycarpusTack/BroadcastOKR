@@ -146,7 +146,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 286 tests across 53 test files (vitest; not on PATH, use the npm script)
+- `npm test` — 288 tests across 54 test files (vitest; not on PATH, use the npm script)
 - `npm run test:bridge` — 197 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 196/197 on Windows: `agent.test.cjs` asserts a `0600` identity file
 - `npm run lint` — 0 errors, gated in CI
 - `better-sqlite3` is native and can only be built for ONE runtime at a time. `npm run rebuild:node` targets system Node (`npm run bridge`, `npm test`); `npm run rebuild:electron` targets Electron (`npm run electron:dev`, packaging). `electron:build*` now force-rebuilds for Electron itself, so packaging is safe from either state — but run `npm run rebuild:node` afterwards to get the dev bridge back. Stop any running bridge/agent first (`scripts/local-rig/start-rig.ps1 -Stop`) — a loaded `better_sqlite3.node` makes the Electron rebuild fail with EPERM. **Do not trust electron-builder's own rebuild step**: on 2026-09-02 it treated a system-Node build as up to date and shipped an installer whose bridge died on `require` (NODE_MODULE_VERSION 127 vs 145)
@@ -175,7 +175,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 
 - 2026-08-31 hardening pass (GPM, `docs/gpm/state/`): goal-template route contract fixed + contract-tested in CI, first-connect migration replaces the data-wipe path, bridge ships in packaged Electron builds (fork from inside app.asar, writable paths → userData), check-in propagation fixed (updated_at bump + ISO-vs-sqlite `since` normalization), bridge-write failures toast, audit 24→0, lint 0 + CI gate, shared live-KR batch builder (`src/utils/liveSync.ts`)
 
-- 2026-09-04 — R6-1 exit passed on the rig through the real cockpit UI (findings 35/36 fixed). R6-2 shipped: fleet board in Compare (cockpit), history-lite + template-id alignment + cockpit-side labels. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
+- 2026-09-04 — R6-3 (TD-2) closed: the three modals remount by key, no `set-state-in-effect` suppressions left. R6-1 exit passed on the rig through the real cockpit UI (findings 35/36 fixed). R6-2 shipped: fleet board in Compare (cockpit), history-lite + template-id alignment + cockpit-side labels. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
 
 - 2026-09-03 (late) — R6-1 shipped: operator channel cockpit → tenant (bridge + UI). On the cockpit a client's **Tenant** modal registers the instance, binds/adds/tests its WHATS'ON connection, pulls channels, mints the share token and agent enrolment tokens, lists/revokes agents; the client edition's Settings page gets the same agents panel. Finding 29 closed. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
 
