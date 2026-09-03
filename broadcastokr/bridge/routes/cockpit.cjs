@@ -8,6 +8,10 @@ const { callTenant, normalizeInstanceUrl } = require('../cockpit/tenantClient.cj
 const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const MAX_METRICS = 500;
 const MASKED = '***';
+// Pre-R6-2 tenants push without krTemplateId; the cockpit must keep accepting them (FF-6).
+const REQUIRED_SHARE_FIELDS = SHARE_FIELDS.filter((f) => f !== 'krTemplateId');
+const HISTORY_KEEP = 100;
+const HISTORY_SHOWN = 30;
 
 /**
  * Cockpit side of the two channels.
@@ -221,49 +225,85 @@ function createCockpitRouter(db, { cipher } = {}) {
       return res.status(400).json({ error: 'Invalid metrics array' });
     }
     for (const m of body.metrics) {
-      const keys = Object.keys(m).sort();
-      if (JSON.stringify(keys) !== JSON.stringify([...SHARE_FIELDS].sort())
+      const keys = Object.keys(m);
+      if (!keys.every((k) => SHARE_FIELDS.includes(k))
+        || !REQUIRED_SHARE_FIELDS.every((k) => keys.includes(k))
         || typeof m.krId !== 'string'
         || typeof m.value !== 'number' || !Number.isFinite(m.value)
         || typeof m.target !== 'number' || !Number.isFinite(m.target)
         || (m.direction !== 'hi' && m.direction !== 'lo')
-        || typeof m.timestamp !== 'string') {
+        || typeof m.timestamp !== 'string'
+        || (m.krTemplateId !== undefined && m.krTemplateId !== null && typeof m.krTemplateId !== 'string')) {
         audit(db, req, `Rejected out-of-contract metric from '${tenant.name}'`);
         return res.status(400).json({ error: 'Metric outside the sharing contract' });
       }
     }
 
-    const upsert = db.prepare(`INSERT INTO shared_metrics (tenant_client_id, kr_id, value, target, direction, timestamp, received_at)
-      VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    const upsert = db.prepare(`INSERT INTO shared_metrics (tenant_client_id, kr_id, value, target, direction, timestamp, received_at, kr_template_id)
+      VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?)
       ON CONFLICT(tenant_client_id, kr_id) DO UPDATE SET
         value = excluded.value, target = excluded.target, direction = excluded.direction,
-        timestamp = excluded.timestamp, received_at = excluded.received_at`);
-    for (const m of body.metrics) {
-      upsert.run(tenant.client_id, m.krId, m.value, m.target, m.direction, m.timestamp);
-    }
+        timestamp = excluded.timestamp, received_at = excluded.received_at, kr_template_id = excluded.kr_template_id`);
+    // History-lite (R6-2): one point per distinct tenant timestamp, newest 100 kept.
+    const addPoint = db.prepare(`INSERT OR IGNORE INTO shared_metric_history (tenant_client_id, kr_id, value, target, timestamp) VALUES (?, ?, ?, ?, ?)`);
+    const prune = db.prepare(`DELETE FROM shared_metric_history WHERE tenant_client_id = ? AND kr_id = ? AND timestamp NOT IN (
+      SELECT timestamp FROM shared_metric_history WHERE tenant_client_id = ? AND kr_id = ? ORDER BY timestamp DESC LIMIT ${HISTORY_KEEP})`);
+    db.transaction(() => {
+      for (const m of body.metrics) {
+        upsert.run(tenant.client_id, m.krId, m.value, m.target, m.direction, m.timestamp, m.krTemplateId || null);
+        addPoint.run(tenant.client_id, m.krId, m.value, m.target, m.timestamp);
+        prune.run(tenant.client_id, m.krId, tenant.client_id, m.krId);
+      }
+    })();
     res.json({ ok: true, received: body.metrics.length });
   });
 
-  // Fleet view (session-authenticated like every other GET)
+  // Fleet view (session-authenticated like every other GET). Each metric
+  // carries its template id, the cockpit-side label resolved for it (by
+  // template across tenants, else by tenant+KR), and the last points.
   router.get('/metrics', cockpitOnly, (req, res) => {
     const rows = db.prepare(`
       SELECT m.tenant_client_id, c.name AS tenant_name, c.color,
-             m.kr_id, m.value, m.target, m.direction, m.timestamp, m.received_at
+             m.kr_id, m.kr_template_id, m.value, m.target, m.direction, m.timestamp, m.received_at
       FROM shared_metrics m JOIN clients c ON c.id = m.tenant_client_id
       ORDER BY c.name, m.kr_id
     `).all();
+    const labels = new Map(db.prepare('SELECT key, label FROM fleet_labels').all().map((r) => [r.key, r.label]));
+    const points = db.prepare(`SELECT value, target, timestamp FROM shared_metric_history
+      WHERE tenant_client_id = ? AND kr_id = ? ORDER BY timestamp DESC LIMIT ${HISTORY_SHOWN}`);
 
     const byTenant = new Map();
     for (const r of rows) {
       if (!byTenant.has(r.tenant_client_id)) {
         byTenant.set(r.tenant_client_id, { tenantId: r.tenant_client_id, tenantName: r.tenant_name, color: r.color, metrics: [] });
       }
+      const label = (r.kr_template_id && labels.get(`tpl:${r.kr_template_id}`))
+        || labels.get(`kr:${r.tenant_client_id}:${r.kr_id}`) || null;
       byTenant.get(r.tenant_client_id).metrics.push({
-        krId: r.kr_id, value: r.value, target: r.target,
+        krId: r.kr_id, krTemplateId: r.kr_template_id || null, label,
+        value: r.value, target: r.target,
         direction: r.direction, timestamp: r.timestamp, receivedAt: r.received_at,
+        history: points.all(r.tenant_client_id, r.kr_id).reverse(),
       });
     }
     res.json([...byTenant.values()]);
+  });
+
+  // Column labels for the fleet board — Mediagenix's own words, never the
+  // tenant's. 'tpl:<krTemplateId>' names a column across tenants;
+  // 'kr:<tenantClientId>:<krId>' names one hand-made KR. Empty label deletes.
+  router.put('/fleet-labels/:key', cockpitOnly, (req, res) => {
+    const key = String(req.params.key || '');
+    if (!/^(tpl:[^:]+|kr:[^:]+:[^:]+)$/.test(key)) return res.status(400).json({ error: 'key must be tpl:<krTemplateId> or kr:<tenantClientId>:<krId>' });
+    const label = String(req.body?.label ?? '').trim().slice(0, 80);
+    if (!label) {
+      db.prepare('DELETE FROM fleet_labels WHERE key = ?').run(key);
+    } else {
+      db.prepare(`INSERT INTO fleet_labels (key, label, updated_at) VALUES (?, ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at`).run(key, label);
+    }
+    audit(db, req, label ? `Labelled fleet column ${key} as '${label}'` : `Cleared fleet column label ${key}`);
+    res.json({ ok: true, key, label: label || null });
   });
 
   return router;
