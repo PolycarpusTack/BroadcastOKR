@@ -9,11 +9,12 @@ daily log), `docs/gpm/state/r1-backlog-2026-09-03.md` (R1-6/R1-7 remain), then
 `docs/saas/readiness-instructions.md` §R1 (corrected from the rig). `CLAUDE.md` is
 current.
 
-**Where we are:** branch `readiness/r1-local-rig`, not yet merged. Day one shipped
-three fix-now commits from the rig — rate-limit IPv6 keying, cloud editions calling
+**Where we are:** `readiness/r1-local-rig` merged to main as `77473f3` (CI green:
+check, e2e, editions client/internal). Day one shipped four fix-now commits from the rig — rate-limit IPv6 keying, cloud editions calling
 the bridge same-origin (the UI could not reach its own bridge before), and
 execute-batch persisting a KR's own result (a user's sync vanished at the next
-change poll) — plus the runbook corrections. Suites: 255 vitest · 144 bridge (143 on
+change poll), re-testing a stored connection with its stored secret (finding 27) — plus the
+runbook corrections. Suites: 255 vitest · 144 bridge (143 on
 Windows — the `0600` case) · lint 0 · build green.
 
 **Rig on this PC:** Keycloak 26.0.8 native on **8081** (Docker cannot be installed);
@@ -26,10 +27,7 @@ agent `local-agent` every 60 s. `scripts/local-rig/start-rig.ps1` (idempotent,
 manager on tenant0).
 
 **Today:** (1) daily-log line in `r1-findings.md` — values still arriving, staleness
-honest, first backup pair in `local-rig/*/backups/`, `bridge.log` size; (2) merge
-`readiness/r1-local-rig` `--no-ff`, push, watch CI; (3) finding 27 (re-testing a
-stored connection sends `***`) is the one backlog-high item — small, do it first;
-(4) then the parallel work named in the backlog: D-3's decision spike and R6-1
+honest, first backup pair in `local-rig/*/backups/`, `bridge.log` size; (2) then the parallel work named in the backlog: D-3's decision spike and R6-1
 (admin UIs — finding 29 shows why: the client edition cannot bind its own
 connection). R1-6 content still needs Mediagenix's real OKRs on the cockpit — that
 is Yannick's, not the assistant's.
