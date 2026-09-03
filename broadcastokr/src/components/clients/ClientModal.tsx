@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { PillBadge } from '../ui/PillBadge';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
@@ -48,80 +48,62 @@ function emptyOverrides(templates: GoalTemplate[]): Record<string, Record<string
   return overrides;
 }
 
+/**
+ * The form's starting point, computed once per mount. The parent remounts the
+ * modal by key when it opens or the client changes (TD-2), so there is no
+ * prop→state reset effect and a connection list refreshing mid-edit no longer
+ * wipes what the operator typed.
+ */
+function initialClientForm(client: Client | undefined, connections: DBConnection[], templates: GoalTemplate[]) {
+  const overrides = emptyOverrides(templates);
+  const overrideEnabled: Record<string, Record<string, boolean>> = {};
+  for (const t of templates) {
+    overrideEnabled[t.id] = {};
+    for (const krt of t.krTemplates) {
+      const existing = client?.sqlOverrides?.[t.id]?.[krt.id];
+      overrides[t.id][krt.id] = existing ?? '';
+      overrideEnabled[t.id][krt.id] = !!existing;
+    }
+  }
+  const conn = client ? connections.find((c) => c.id === client.connectionId) : undefined;
+  return {
+    name: client?.name ?? '',
+    color: client?.color ?? PRESET_COLORS[0],
+    connectionId: client?.connectionId ?? '',
+    connMode: (client ? (conn ? 'existing' : 'new') : (connections.length > 0 ? 'existing' : 'new')) as 'existing' | 'new',
+    connDraft: conn
+      ? {
+        type: conn.type as ConnectionDraft['type'],
+        host: conn.host,
+        port: String(conn.port),
+        service: conn.service || '',
+        schema: conn.schema || 'PSI',
+        user: conn.user,
+        // Never echo a stored password back into the form.
+        password: '',
+        clientDir: conn.clientDir || '',
+      }
+      : emptyConnectionDraft(),
+    tagsRaw: (client?.tags ?? []).join(', '),
+    overrides,
+    overrideEnabled,
+  };
+}
+
 export function ClientModal({ open, onClose, theme, client, connections, templates, onSave, saveConnection, testConnection, onConnectionCreated }: ClientModalProps) {
   const isEdit = !!client;
 
-  const [name, setName] = useState('');
-  const [color, setColor] = useState(PRESET_COLORS[0]);
-  const [connectionId, setConnectionId] = useState('');
-  const [connMode, setConnMode] = useState<'existing' | 'new'>('existing');
-  const [connDraft, setConnDraft] = useState<ConnectionDraft>(emptyConnectionDraft);
-  const [tagsRaw, setTagsRaw] = useState('');
-  const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>({});
-  const [overrideEnabled, setOverrideEnabled] = useState<Record<string, Record<string, boolean>>>({});
+  const [initial] = useState(() => initialClientForm(client, connections, templates));
+  const [name, setName] = useState(initial.name);
+  const [color, setColor] = useState(initial.color);
+  const [connectionId, setConnectionId] = useState(initial.connectionId);
+  const [connMode, setConnMode] = useState<'existing' | 'new'>(initial.connMode);
+  const [connDraft, setConnDraft] = useState<ConnectionDraft>(initial.connDraft);
+  const [tagsRaw, setTagsRaw] = useState(initial.tagsRaw);
+  const [overrides, setOverrides] = useState<Record<string, Record<string, string>>>(initial.overrides);
+  const [overrideEnabled, setOverrideEnabled] = useState<Record<string, Record<string, boolean>>>(initial.overrideEnabled);
   const [saving, setSaving] = useState(false);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
-     modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
-  useEffect(() => {
-    if (!open) return;
-    if (client) {
-      setName(client.name);
-      setColor(client.color);
-      setConnectionId(client.connectionId);
-      // Try to find matching connection to populate DB fields
-      const conn = connections.find(c => c.id === client.connectionId);
-      if (conn) {
-        setConnMode('existing');
-        setConnDraft({
-          type: conn.type as ConnectionDraft['type'],
-          host: conn.host,
-          port: String(conn.port),
-          service: conn.service || '',
-          schema: conn.schema || 'PSI',
-          user: conn.user,
-          // Never echo a stored password back into the form.
-          password: '',
-          clientDir: conn.clientDir || '',
-        });
-      } else {
-        setConnMode('new');
-      }
-      setTagsRaw((client.tags ?? []).join(', '));
-      // Reconstruct override state from existing sqlOverrides
-      const initialOverrides: Record<string, Record<string, string>> = emptyOverrides(templates);
-      const initialEnabled: Record<string, Record<string, boolean>> = {};
-      for (const t of templates) {
-        initialEnabled[t.id] = {};
-        for (const krt of t.krTemplates) {
-          const existing = client.sqlOverrides?.[t.id]?.[krt.id];
-          initialOverrides[t.id][krt.id] = existing ?? '';
-          initialEnabled[t.id][krt.id] = !!existing;
-        }
-      }
-      setOverrides(initialOverrides);
-      setOverrideEnabled(initialEnabled);
-    } else {
-      setName('');
-      setColor(PRESET_COLORS[0]);
-      setConnectionId('');
-      setConnMode(connections.length > 0 ? 'existing' : 'new');
-      setConnDraft(emptyConnectionDraft());
-      setTagsRaw('');
-      const initialOverrides: Record<string, Record<string, string>> = emptyOverrides(templates);
-      const initialEnabled: Record<string, Record<string, boolean>> = {};
-      for (const t of templates) {
-        initialEnabled[t.id] = {};
-        for (const krt of t.krTemplates) {
-          initialOverrides[t.id][krt.id] = '';
-          initialEnabled[t.id][krt.id] = false;
-        }
-      }
-      setOverrides(initialOverrides);
-      setOverrideEnabled(initialEnabled);
-    }
-  }, [open, client, connections, templates]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleToggleOverride(templateId: string, krTemplateId: string, enabled: boolean) {
     setOverrideEnabled((prev) => ({

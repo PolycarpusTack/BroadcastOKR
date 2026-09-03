@@ -362,6 +362,7 @@ export function ClientsPage({
 
       {/* Client modal (add / edit) */}
       <ClientModal
+        key={modalOpen ? (editingClient?.id ?? 'new') : 'closed'}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         theme={theme}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
 import {
@@ -44,37 +44,16 @@ export function TeamModal({
 }: TeamModalProps) {
   const isEdit = !!team;
 
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('');
-  const [color, setColor] = useState(PRESET_COLORS[0]);
-  const [memberIds, setMemberIds] = useState<number[]>([]);
-  const [leadId, setLeadId] = useState<string>('');
-  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  // Initial state from props, once per mount — the parent remounts by key (TD-2).
+  const [name, setName] = useState(team?.name ?? '');
+  const [icon, setIcon] = useState(team?.icon ?? '');
+  const [color, setColor] = useState(team?.color ?? PRESET_COLORS[0]);
+  const [memberIds, setMemberIds] = useState<number[]>(team?.members ?? []);
+  const [leadId, setLeadId] = useState<string>(team?.leadId != null ? String(team.leadId) : '');
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>(team?.clientIds ?? []);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- prop→state reset when the
-     modal (re)opens; the remount-by-key refactor is tracked as TD-2 */
-  useEffect(() => {
-    if (!open) return;
-    setShowDeleteConfirm(false);
-    if (team) {
-      setName(team.name);
-      setIcon(team.icon ?? '');
-      setColor(team.color);
-      setMemberIds(team.members ?? []);
-      setLeadId(team.leadId != null ? String(team.leadId) : '');
-      setSelectedClientIds(team.clientIds ?? []);
-    } else {
-      setName('');
-      setIcon('');
-      setColor(PRESET_COLORS[0]);
-      setMemberIds([]);
-      setLeadId('');
-      setSelectedClientIds([]);
-    }
-  }, [open, team]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleMember(userId: number) {
     setMemberIds((prev) => {
