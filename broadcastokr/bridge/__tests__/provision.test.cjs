@@ -30,6 +30,12 @@ describe('instance provisioning', () => {
     assert.ok(fs.existsSync(path.join(dir, '.env')));
     assert.ok(fs.existsSync(path.join(dir, 'broadcastokr.db')));
 
+    // A provisioned instance must never rely on the BRIDGE_API_KEY fallback for
+    // credentials at rest: API access and stored passwords rotate independently.
+    const envText = fs.readFileSync(path.join(dir, '.env'), 'utf8');
+    assert.match(envText, /^BRIDGE_API_KEY=[0-9a-f]{48}$/m);
+    assert.match(envText, /^BRIDGE_ENCRYPTION_KEY=[0-9a-f]{64}$/m);
+
     assert.throws(() => execFileSync(process.execPath, [SCRIPT, '--dir', dir, '--name', 'X', '--mode', 'client'], { stdio: 'pipe' }),
       /refusing to overwrite|Command failed/);
   });

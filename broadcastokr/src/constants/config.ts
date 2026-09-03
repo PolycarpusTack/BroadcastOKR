@@ -1,11 +1,20 @@
 /** App-wide configuration constants */
 
+import { BUILD_EDITION } from '../editions/entitlements';
+
 /** Primary brand color used across UI */
 export const PRIMARY_COLOR = '#3805E3';
 export const PRIMARY_GRADIENT = 'linear-gradient(135deg, #3805E3 0%, #5B33F0 100%)';
 
-/** Bridge service defaults */
-export const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://localhost:3001';
+/**
+ * Bridge service defaults. The desktop edition talks to a bridge on its own
+ * port; the cloud editions are *served by* their bridge (BRIDGE_APP_DIR), so
+ * the API is same-origin — a leaked ':3001' default there left a provisioned
+ * instance unable to reach itself (R1 rig, 2026-09-03). VITE_BRIDGE_URL still
+ * overrides both, and an explicit empty string means same-origin.
+ */
+const DEFAULT_BRIDGE_URL = BUILD_EDITION === 'desktop' ? 'http://localhost:3001' : '';
+export const BRIDGE_URL: string = import.meta.env.VITE_BRIDGE_URL ?? DEFAULT_BRIDGE_URL;
 export const BRIDGE_API_KEY = import.meta.env.VITE_BRIDGE_API_KEY || '';
 export const BRIDGE_POLL_INTERVAL_MS = 900_000; // 15 minutes
 /** Live KR data older than this is flagged stale in the UI (4 missed polls) */

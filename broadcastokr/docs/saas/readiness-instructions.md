@@ -14,26 +14,58 @@ Runs entirely on your machine: local Oracle + Postgres are the real-driver test,
 Keycloak (Docker) is the real-OIDC test. The corporate Entra tenant is only a short
 spot-check at the end (R1b) — testing stays local.
 
-**You must provide:** Docker Desktop running; your local Oracle and Postgres
-credentials; Node 22. Nothing corporate.
+**You must provide:** Docker Desktop running — or, when Docker cannot be installed
+(no admin rights: the case on 2026-09-03), a JDK 17+ on PATH and the Keycloak zip;
+your local Oracle and Postgres credentials; Node 22. Nothing corporate.
+
+**Ports on this PC (2026-09-03):** Keycloak **8081** (8080 is taken by an Apache
+`httpd`), cockpit 3100, tenant0 3101, Oracle 1521 (service `local`), Postgres 17
+on 5433 (`brokr_rig`). Treat the IdP port as a variable: `KC_PORT` below.
 
 **Steps:**
+0. **Prerequisites, in the shell you will actually use:** `docker info` succeeds
+   (2026-09-02: the CLI was not on the Git-Bash PATH); `node --version` ≥ 22;
+   `npm run rebuild:node` if the dev bridge fails on the better-sqlite3 ABI;
+   `git check-ignore local-rig` prints the path. Day-by-day plan and the
+   "verify last review's fixes on the rig" checklist:
+   `docs/gpm/state/r1-backlog-2026-09-03.md`; findings go to
+   `docs/saas/readiness/r1-findings.md` as they happen.
 1. **IdP:** `docker compose -f scripts/local-rig/keycloak-compose.yml up -d` — a
    Keycloak with realm `brokr` pre-imported: client `brokr-local` (secret
    `brokr-local-dev-secret`, redirect URIs for ports 3100/3101) and users
-   `owner`/`owner`, `member`/`member`. Issuer: `http://localhost:8080/realms/brokr`
+   `owner`/`owner`, `member`/`member`. Issuer: `http://localhost:<KC_PORT>/realms/brokr`
    (the bridge's `allowInsecure` path accepts http:// issuers for exactly this).
+   **Without Docker** (what actually ran): download `keycloak-26.0.x.zip` from the
+   GitHub releases into `local-rig/keycloak/`, unzip, copy
+   `scripts/local-rig/brokr-realm.json` to `<kc>/data/import/`, then with
+   `JAVA_HOME` set and `KC_BOOTSTRAP_ADMIN_USERNAME/PASSWORD=admin`:
+   `bin\kc.bat start-dev --import-realm --http-port <KC_PORT>`. Same realm, same
+   behaviour; ~30 s to first `/.well-known/openid-configuration`. The compose file
+   pins 8080 — change the port mapping if that port is busy.
 2. **Test schemas:** load `scripts/local-rig/psi-test-schema.postgres.sql` into your
    Postgres and `psi-test-schema.oracle.sql` into your Oracle (header comments carry
    the exact commands, including creating a **read-only** `brokr_reader` account for
    the agent — use it, that's part of what R1 validates).
+   **If your Oracle already holds a real WHATS'ON `PSI` schema** (it did on this PC:
+   `LOCAL`, non-CDB), do **not** load the Oracle test schema — it collides on
+   `CREATE TABLE PSITRANSMISSION`. Create `brokr_reader` with `CREATE SESSION` and
+   `SELECT` on `PSITRANSMISSION`, `PSISCHEDULE`, `PSIMATERIALPART` and run against the
+   real data (the better test). Note `PSICHANNEL` does not exist there and dated
+   presets return 0 for old data — findings 3–5.
 3. **Instances:** provision two —
    `node scripts/provision-instance.mjs --dir ./local-rig/cockpit --name "Mediagenix" --mode cockpit --base-url http://localhost:3100 --oidc-issuer http://localhost:8080/realms/brokr --oidc-client-id brokr-local --oidc-client-secret brokr-local-dev-secret`
    and the same with `--dir ./local-rig/tenant0 --name "Tenant Zero" --mode client --base-url http://localhost:3101`.
    Build the app bundles (`VITE_EDITION=internal npx vite build --outDir local-rig/cockpit/app`,
    `VITE_EDITION=client npx vite build --outDir local-rig/tenant0/app`), set
    `BRIDGE_APP_DIR` to each in the generated `.env`s plus `BRIDGE_PORT=3100`/`3101`,
-   `BRIDGE_HOST=127.0.0.1`, and start both bridges with their env files.
+   `BRIDGE_HOST=127.0.0.1` (the script writes 3001 / 0.0.0.0), and start each bridge
+   with **its own env file** — the bridge only auto-loads `bridge/.env`:
+   `node --env-file=local-rig/cockpit/.env bridge/server.cjs` (and `tenant0`). A dev
+   `bridge/.env` is still merged underneath (dotenv never overrides), so keep it free
+   of instance-shaped values. Since 2026-09-02 the script also emits a dedicated
+   `BRIDGE_ENCRYPTION_KEY`; read the startup lines **on both stdout and stderr** —
+   re-encrypted counts go to stdout, unreadable/unprotected warnings to stderr.
+   `scripts/local-rig/start-rig.ps1` does all of this idempotently (and `-Stop`).
 4. **Sign in** at http://localhost:3100 and :3101 with `owner` — first sign-in
    becomes instance owner (verify), then `member` (verify member role). Any claim
    mapping fixes go in `upsertSsoUser` (bridge/routes/auth.cjs).
@@ -41,18 +73,27 @@ credentials; Node 22. Nothing corporate.
    token (`POST /api/cockpit/tenants` — curl until R6-1's UI lands); put
    `BRIDGE_COCKPIT_URL=http://localhost:3100` + `BRIDGE_SHARE_TOKEN=<token>` in
    tenant0's `.env`, restart it.
-6. **Agent:** mint an enrol token on tenant0, then
+6. **Agent:** mint an enrol token on tenant0 (`POST /api/agents/enrol-token` as
+   owner — 15-minute, single-use), then
    `node bridge/agent.cjs enroll --instance http://localhost:3101 --token <T> --name "local-agent" --dir ./local-rig/agent`.
    Edit `local-rig/agent/agent-config.json`: add BOTH local connections (Oracle via
    `brokr_reader`, Postgres) and bindings using the preset queries from
    `bridge/whatson/templates.cjs` (e.g. Transmissions This Month against each DB).
-   `node bridge/agent.cjs run --dir ./local-rig/agent`. (Windows note: file-mode
-   0600 is a no-op on NTFS — acceptable locally, noted as a rig limitation.)
+   `node bridge/agent.cjs run --dir ./local-rig/agent`. Bindings are
+   `{ krId, connectionId, sql, timeframeDays? }`; the `krId` must already exist on
+   the instance (create the goal first — the bridge answers `unknown: [krId]`
+   otherwise). Passwords may be plaintext or `enc:v1:` from `encrypt()` with
+   `AGENT_DATA_KEY` in the agent's environment. Set `intervalMs` to 60000 for the
+   rig so staleness and backups are observable. (Windows note: file-mode 0600 is a
+   no-op on NTFS — acceptable locally, noted as a rig limitation.)
 7. **Content:** cockpit gets Mediagenix's real OKRs; tenant0 gets goals whose KR ids
    match the agent bindings; flip one KR to Shared. Verify: agent values land on
    tenant0, the shared value appears on the cockpit fleet panel, direction/staleness
    render sanely.
-8. **Dogfood 7–14 days** on your PC (bridges + Keycloak as startup tasks). Log every
+8. **Dogfood 7–14 days** on your PC. Startup: Task Scheduler was denied on the
+   corporate PC, so a user Startup-folder shortcut (`shell:startup`) runs
+   `scripts/local-rig/start-rig.ps1` hidden at logon; Oracle's Windows services
+   still need an elevated `Start-Service` after a reboot. Log every
    mock-vs-real discrepancy in `docs/saas/readiness/r1-findings.md`, triaged
    fix-now / backlog / accepted. Expect the interesting findings in Oracle driver
    behavior and Keycloak claim names.
