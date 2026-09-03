@@ -79,6 +79,7 @@ export const GoalCard = React.memo(function GoalCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{goal.title}</span>
+            {goal.archived && <PillBadge label={'\u{1F5C4} Archived'} color={theme.textMuted} />}
             {hasLiveKRs && <PillBadge label={'\u{1F4E1} Live'} color={COLOR_INFO} />}
             {isTemplateBacked && <PillBadge label={'\u{1F4CB} Template'} color={PRIMARY_COLOR} />}
           </div>
@@ -150,7 +151,7 @@ export const GoalCard = React.memo(function GoalCard({
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          {permissions.canEdit && (
+          {permissions.canEdit && !goal.archived && (
             <button onClick={(e) => { e.stopPropagation(); onEdit(goal); }} aria-label="Edit goal" style={{ background: 'none', border: `1px solid ${theme.border}`, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: theme.textSecondary, fontSize: 11, fontWeight: 600 }}>
               {'\u270E'}
             </button>
@@ -172,7 +173,7 @@ export const GoalCard = React.memo(function GoalCard({
               Key Results ({goal.keyResults.length})
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {hasLiveKRs && bridgeConnected && (
+              {hasLiveKRs && bridgeConnected && !goal.archived && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onSyncGoal(goal.id, goal.keyResults); }}
                   disabled={isSyncing}
@@ -185,7 +186,7 @@ export const GoalCard = React.memo(function GoalCard({
                   {isSyncing ? '\u{1F504} Syncing...' : '\u{1F4E1} Sync Live KRs'}
                 </button>
               )}
-              {permissions.canCheckIn && (
+              {permissions.canCheckIn && !goal.archived && (
                 goalMonitorActive ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                     <PillBadge

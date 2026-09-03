@@ -17,6 +17,7 @@ function toGoalDTO(goalRow, krs, historyMap) {
     channelScope: goalRow.channel_scope ? JSON.parse(goalRow.channel_scope) : undefined,
     templateId: goalRow.template_id || undefined,
     monitorUntil: goalRow.monitor_until || undefined,
+    archived: !!goalRow.archived,
     version: goalRow.version ?? 0,
     keyResults: krs.map(kr => ({
       id: kr.id,
@@ -136,12 +137,12 @@ function createGoalsRouter(db) {
   // POST /api/goals — create
   router.post('/', (req, res) => {
     const g = req.body;
-    db.prepare(`INSERT INTO goals (id, title, status, progress, owner, channel, period, client_ids, channel_scope, template_id, monitor_until)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    db.prepare(`INSERT INTO goals (id, title, status, progress, owner, channel, period, client_ids, channel_scope, template_id, monitor_until, archived)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(g.id, g.title, g.status, g.progress, g.owner, g.channel, g.period,
         g.clientIds ? JSON.stringify(g.clientIds) : null,
         g.channelScope ? JSON.stringify(g.channelScope) : null,
-        g.templateId || null, g.monitorUntil || null);
+        g.templateId || null, g.monitorUntil || null, g.archived ? 1 : 0);
 
     if (g.keyResults?.length) {
       upsertKeyResults(db, g.id, g.keyResults);
@@ -160,12 +161,12 @@ function createGoalsRouter(db) {
 
     const checked = typeof g.version === 'number';
     const result = db.prepare(`UPDATE goals SET title=?, status=?, progress=?, owner=?, channel=?, period=?,
-      client_ids=?, channel_scope=?, template_id=?, monitor_until=?, version=version+1, updated_at=datetime('now')
+      client_ids=?, channel_scope=?, template_id=?, monitor_until=?, archived=?, version=version+1, updated_at=datetime('now')
       WHERE id=?${checked ? ' AND version=?' : ''}`)
       .run(g.title, g.status, g.progress, g.owner, g.channel, g.period,
         g.clientIds ? JSON.stringify(g.clientIds) : null,
         g.channelScope ? JSON.stringify(g.channelScope) : null,
-        g.templateId || null, g.monitorUntil || null,
+        g.templateId || null, g.monitorUntil || null, g.archived ? 1 : 0,
         ...(checked ? [req.params.id, g.version] : [req.params.id]));
 
     if (result.changes === 0) {

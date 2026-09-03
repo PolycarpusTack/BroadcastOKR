@@ -13,6 +13,7 @@ import { PillBadge } from '../components/ui/PillBadge';
 import { LiveKPIPanel } from '../components/kpi/LiveKPIPanel';
 import { SystemHealthPanel } from '../components/dashboard/SystemHealthPanel';
 import { FleetMetricsPanel } from '../components/dashboard/FleetMetricsPanel';
+import { activeGoals } from '../utils/goals';
 import { progressColor, statusIcon, kpiStatus } from '../utils/colors';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
 import { cardStyle as makeCardStyle } from '../utils/styles';
@@ -42,7 +43,7 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const { theme, dark } = useTheme();
   const navigate = useNavigate();
-  const { goals, tasks, kpis, users } = useStore(
+  const { goals: allGoals, tasks, kpis, users } = useStore(
     useShallow((s) => ({
       goals: s.goals,
       tasks: s.tasks,
@@ -50,6 +51,8 @@ export function DashboardPage({
       users: s.users,
     })),
   );
+  // Archived periods stay out of the operational picture (R6-5)
+  const goals = useMemo(() => activeGoals(allGoals), [allGoals]);
 
   const activeTasks = useMemo(() => tasks.filter((t) => t.status !== 'done'), [tasks]);
   const urgentTasks = useMemo(() =>

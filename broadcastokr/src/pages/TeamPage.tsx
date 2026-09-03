@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { activeGoals } from '../utils/goals';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../store/store';
@@ -65,7 +66,7 @@ export function TeamPage() {
 
   const goalsByOwner = useMemo(() => {
     const map = new Map<number, typeof goals>();
-    for (const g of goals) {
+    for (const g of activeGoals(goals)) {
       const list = map.get(g.owner);
       if (list) list.push(g);
       else map.set(g.owner, [g]);

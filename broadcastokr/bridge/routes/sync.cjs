@@ -102,7 +102,7 @@ function createSyncRouter(db, dbPath) {
   // POST /api/sync/migrate-from-local — one-time import from localStorage format
   router.post('/migrate-from-local', (req, res) => {
     const data = req.body;
-    const insertGoal = db.prepare(`INSERT OR IGNORE INTO goals (id, title, status, progress, owner, channel, period, client_ids, channel_scope, template_id, monitor_until) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const insertGoal = db.prepare(`INSERT OR IGNORE INTO goals (id, title, status, progress, owner, channel, period, client_ids, channel_scope, template_id, monitor_until, archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const insertKR = db.prepare(`INSERT OR IGNORE INTO key_results (id, goal_id, title, start_val, target_val, current_val, progress, status, live_config, sync_status, sync_error, last_sync_at, kr_template_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const insertHistory = db.prepare(`INSERT INTO kr_history (kr_id, timestamp, value, confidence, note, actor, source) VALUES (?, ?, ?, ?, ?, ?, ?)`);
     const insertTask = db.prepare(`INSERT OR IGNORE INTO tasks (id, title, description, status, priority, assignee, channel, due, task_type, client_ids, channel_scope, goal_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -154,7 +154,7 @@ function createSyncRouter(db, dbPath) {
         insertGoal.run(g.id, g.title, g.status, g.progress, g.owner, g.channel, g.period,
           g.clientIds ? JSON.stringify(g.clientIds) : null,
           g.channelScope ? JSON.stringify(g.channelScope) : null,
-          g.templateId || null, g.monitorUntil || null);
+          g.templateId || null, g.monitorUntil || null, g.archived ? 1 : 0);
         (g.keyResults || []).forEach((kr, idx) => {
           insertKR.run(kr.id, g.id, kr.title, kr.start, kr.target, kr.current, kr.progress, kr.status,
             kr.liveConfig ? JSON.stringify(kr.liveConfig) : null,

@@ -120,7 +120,7 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
   const allRows = useMemo<GridRow[]>(() => {
     if (!selectedTemplate) return [];
     return goals
-      .filter((g) => g.templateId === selectedTemplate.id && g.clientIds?.length)
+      .filter((g) => !g.archived && g.templateId === selectedTemplate.id && g.clientIds?.length)
       .map((goal) => {
         const primaryClientId = goal.clientIds?.[0];
         const client = clients.find((c) => c.id === primaryClientId);

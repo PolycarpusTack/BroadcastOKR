@@ -188,6 +188,11 @@ export function TenantModal({ open, onClose, client, theme, api = defaultApi }: 
             {summary?.shareTokenMintedAt ? 'Re-mint share token' : 'Mint share token'}
           </button>
         </div>
+        {summary?.shareTokenMintedAt && !shareToken && (
+          <div style={{ marginTop: 6, fontSize: 11.5, color: COLOR_WARNING }}>
+            Re-minting replaces the token the instance is pushing with: its pushes are refused until the new one is in its .env and it restarts.
+          </div>
+        )}
         {shareToken && (
           <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${COLOR_WARNING}`, background: theme.bgMuted }}>
             <div style={{ fontSize: 12, color: theme.text, marginBottom: 6 }}>Put these in the tenant instance's .env and restart it — the token is shown once:</div>

@@ -119,7 +119,7 @@ finish from the pack without engineering involvement.
    — `docs/gpm/state/ADR-2026-09-03-connection-store.md`: keep both, share the
    store (D-3), name them "Dashboard KPI" vs "live KR".
 5. **Period lifecycle minimum:** archive a goal period (read-only past quarters) —
-   the smallest slice of the rollover gap flagged in the evaluation.
+   the smallest slice of the rollover gap flagged in the evaluation. **DONE 2026-09-04** (R6-5).
 
 **Exit:** no operator action requires curl; the five items closed; anything else
 discovered goes to the next plan, not this one.

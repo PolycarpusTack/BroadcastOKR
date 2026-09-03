@@ -123,7 +123,7 @@ export function ClientsPage({
   }, [testClientHealth]);
 
   function goalCountFor(clientId: string) {
-    return goals.filter((g) => g.clientIds?.includes(clientId)).length;
+    return goals.filter((g) => !g.archived && g.clientIds?.includes(clientId)).length;
   }
 
   function handleAddClient() {
