@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { useDeployment } from '../../context/DeploymentContext';
+import { FLEET_IN_BUILD } from '../../editions/entitlements';
 import { bridgeFetch } from '../../store/bridgeSync';
 import { formatTimeAgo } from '../../utils/dates';
 import { COLOR_SUCCESS, COLOR_WARNING, COLOR_DANGER, FONT_HEADING, FONT_MONO, PRIMARY_COLOR } from '../../constants/config';
@@ -58,9 +59,12 @@ export function FleetMetricsPanel({ connected = false }: { connected?: boolean }
         <span style={{ fontSize: 11, color: theme.textMuted }}>
           opt-in values pushed by tenant instances
         </span>
-        <a href="#/compare" style={{ marginLeft: 'auto', fontSize: 11, color: PRIMARY_COLOR, fontWeight: 600, textDecoration: 'none' }}>
-          Open the fleet board →
-        </a>
+        {/* Build-time gate (FF-1): the route literal must not reach client bundles */}
+        {FLEET_IN_BUILD && (
+          <a href="#/compare" style={{ marginLeft: 'auto', fontSize: 11, color: PRIMARY_COLOR, fontWeight: 600, textDecoration: 'none' }}>
+            Open the fleet board →
+          </a>
+        )}
       </div>
 
       {fleet.length === 0 ? (
