@@ -26,6 +26,12 @@ agent `local-agent` every 60 s. `scripts/local-rig/start-rig.ps1` (idempotent,
 `Start-Service` after a reboot. Users: `owner` (owner), `member` (promoted to
 manager on tenant0).
 
+**Decisions taken 2026-09-03** (`DECISIONS-2026-09-03.md`): D-3 → connections move into
+the tenant SQLite DB (build next, before R6-1); R6-1's connection binding + tokens live on
+the **cockpit**; AI query assist deferred to v1.1; Entra spot-check parked; Yannick reads the
+Dashboard himself during the run and consults before entering real OKRs. Small rig findings
+14/19/23/26 are done; the timeframe "30" was the field's placeholder.
+
 **Today:** (1) daily-log line in `r1-findings.md` — values still arriving, staleness
 honest, first backup pair in `local-rig/*/backups/`, `bridge.log` size; (2) then the parallel work named in the backlog: D-3's decision spike and R6-1
 (admin UIs — finding 29 shows why: the client edition cannot bind its own

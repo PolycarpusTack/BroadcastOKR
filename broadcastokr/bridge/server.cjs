@@ -125,11 +125,14 @@ app.use('/api/agent', agentRouters.machine);
 // Client instances push their opted-in metrics to the cockpit (T2-3)
 if (MODE === 'client' && process.env.BRIDGE_COCKPIT_URL && process.env.BRIDGE_SHARE_TOKEN) {
   const { startSharePushLoop } = require('./cockpit/pushLoop.cjs');
+  const shareIntervalMs = Number(process.env.BRIDGE_SHARE_INTERVAL_MS) || 5 * 60 * 1000;
   startSharePushLoop(db, {
     cockpitUrl: process.env.BRIDGE_COCKPIT_URL,
     shareToken: process.env.BRIDGE_SHARE_TOKEN,
-    intervalMs: Number(process.env.BRIDGE_SHARE_INTERVAL_MS) || 5 * 60 * 1000,
+    intervalMs: shareIntervalMs,
   });
+  // An operator reads the startup lines once; a silent channel looks like no channel (R1 rig, finding 23).
+  console.log(`  Sharing opted-in KRs to ${process.env.BRIDGE_COCKPIT_URL} every ${Math.round(shareIntervalMs / 60000)} min.`);
 }
 
 // ── WHATS'ON access (the agent core) ──
@@ -168,6 +171,13 @@ if (credentialReport.unreadable > 0) {
   console.warn(`  WARNING: ${credentialReport.unreadable} stored connection password(s) cannot be read with the `
     + 'configured key — restored from another machine, or the key was rotated? '
     + 'Re-enter those passwords on the Clients page; nothing has been changed on disk.');
+}
+// Warnings go to stderr; the banner to stdout. Someone capturing only stdout
+// (the R1 rig did at first — finding 26) must at least learn there is something
+// to read on the other stream.
+const startupWarnings = (credentialReport.unprotected > 0 ? 1 : 0) + (credentialReport.unreadable > 0 ? 1 : 0);
+if (startupWarnings > 0) {
+  console.log(`  ${startupWarnings} startup warning(s) — see stderr.`);
 }
 
 const core = createWhatsonCore({ decryptPassword: cipher.decrypt });

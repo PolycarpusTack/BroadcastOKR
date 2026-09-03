@@ -77,7 +77,7 @@ function getTablesQuery(connConfig) {
     const schema = (connConfig.schema || 'public').toLowerCase();
     return {
       sql: `SELECT table_name AS "TABLE_NAME",
-            (SELECT reltuples::bigint FROM pg_class WHERE relname = t.table_name) AS "NUM_ROWS"
+            (SELECT CASE WHEN reltuples < 0 THEN NULL ELSE reltuples::bigint END FROM pg_class WHERE relname = t.table_name) AS "NUM_ROWS"
             FROM information_schema.tables t
             WHERE t.table_schema = $1 AND t.table_type = 'BASE TABLE'
             ORDER BY table_name`,
@@ -119,6 +119,31 @@ function wrapPreviewQuery(connConfig, sql) {
 function getTestQuery(connConfig) {
   if (connConfig.type === 'postgres') return 'SELECT 1 AS test';
   return 'SELECT 1 AS test FROM DUAL';
+}
+
+/**
+ * pg hands back bigint/numeric/count() results as strings to protect precision;
+ * for KR scalars and previews that only made the two dialects disagree (R1 rig,
+ * finding 14: Oracle 85, Postgres "85"). Numbers that fit a JS number become
+ * numbers; anything else — very large integers, text, dates — is left alone.
+ * Column names are upper-cased to match Oracle's output.
+ */
+const NUMERIC_STRING = /^-?\d+(\.\d+)?$/;
+function coerceNumeric(val) {
+  if (typeof val !== 'string' || !NUMERIC_STRING.test(val)) return val;
+  const n = Number(val);
+  if (!Number.isFinite(n)) return val;
+  if (!val.includes('.') && !Number.isSafeInteger(n)) return val;
+  return n;
+}
+function normalizePgRows(rows) {
+  return rows.map((row) => {
+    const normalized = {};
+    for (const [key, val] of Object.entries(row)) {
+      normalized[key.toUpperCase()] = coerceNumeric(val);
+    }
+    return normalized;
+  });
 }
 
 /**
@@ -188,14 +213,7 @@ function createWhatsonCore({ decryptPassword }) {
     // Convert Oracle-style :bind_name to PostgreSQL $1, $2, ... placeholders
     const { text, values } = convertBinds(sql, binds);
     const result = await pool.query(text, values);
-    // Normalize column names to UPPER_CASE for consistency with Oracle output
-    return result.rows.map(row => {
-      const normalized = {};
-      for (const [key, val] of Object.entries(row)) {
-        normalized[key.toUpperCase()] = val;
-      }
-      return normalized;
-    });
+    return normalizePgRows(result.rows);
   }
 
   async function runQuery(connConfig, sql, binds = {}) {
@@ -262,6 +280,8 @@ const SCALAR_MESSAGES = {
 };
 
 module.exports = {
+  normalizePgRows,
+  coerceNumeric,
   oracledb,
   pg,
   QUERY_TIMEOUT_MS,
