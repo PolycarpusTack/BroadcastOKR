@@ -116,6 +116,8 @@ function createAgentRouters(db) {
       db.prepare("UPDATE goals SET updated_at = datetime('now') WHERE id = ?").run(goalId);
     }
 
+    // One line per accepted push, so the tenant's log shows the agent is alive (finding 23).
+    console.log(`  [agent] ${agent.name}: applied ${applied} value(s)${unknown.length ? `, unknown KR ids: ${unknown.join(', ')}` : ''}`);
     res.json({ ok: true, applied, unknown });
   });
 
