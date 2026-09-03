@@ -7,6 +7,8 @@ import { useStore } from '../store/store';
 import { useShallow } from 'zustand/react/shallow';
 import { ClientModal } from '../components/clients/ClientModal';
 import { ClientRow } from '../components/clients/ClientRow';
+import { TenantModal } from '../components/clients/TenantModal';
+import { useDeployment } from '../context/DeploymentContext';
 import { toConnectionInput } from '../utils/connections';
 import { DeleteConfirmModal } from '../components/clients/DeleteConfirmModal';
 import type { HealthStatus } from '../components/clients/HealthDot';
@@ -45,6 +47,9 @@ export function ClientsPage({
   onStopBridge,
 }: ClientsPageProps) {
   const [bridgeAction, setBridgeAction] = useState('');
+  // Cockpit only: the per-tenant operations modal (R6-1)
+  const [tenantClient, setTenantClient] = useState<Client | null>(null);
+  const { mode } = useDeployment();
   const { theme } = useTheme();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
@@ -341,6 +346,7 @@ export function ClientsPage({
                 getChannels={getChannels}
                 onEdit={handleEditClient}
                 onDelete={handleDeleteClick}
+                onManageTenant={mode === 'cockpit' && permissions.canDelete ? setTenantClient : undefined}
                 onUpdateClient={updateClient}
                 onHealthUpdate={(clientId, status) => setHealth((prev) => ({ ...prev, [clientId]: status }))}
                 theme={theme}
@@ -349,6 +355,10 @@ export function ClientsPage({
           </div>
         )}
       </div>
+
+      {mode === 'cockpit' && (
+        <TenantModal key={tenantClient?.id ?? 'none'} open={!!tenantClient} onClose={() => setTenantClient(null)} client={tenantClient} theme={theme} />
+      )}
 
       {/* Client modal (add / edit) */}
       <ClientModal

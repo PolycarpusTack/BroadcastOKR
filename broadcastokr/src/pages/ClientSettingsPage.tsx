@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useStore } from '../store/store';
 import { toConnectionInput } from '../utils/connections';
+import { AgentsPanel } from '../components/clients/AgentsPanel';
+import { ownAgentsApi } from '../utils/cockpitApi';
 import { COLOR_SUCCESS, COLOR_DANGER, FONT_HEADING, FONT_MONO } from '../constants/config';
 import type { DBConnection } from '../types';
 
@@ -139,6 +141,12 @@ export function ClientSettingsPage({ bridgeConnected = false, testConnection, ge
             ))}
         </div>
       </div>
+
+      {bridgeConnected && (
+        <div style={card}>
+          <AgentsPanel api={ownAgentsApi} canManage={permissions.canDelete} theme={theme} />
+        </div>
+      )}
     </div>
   );
 }

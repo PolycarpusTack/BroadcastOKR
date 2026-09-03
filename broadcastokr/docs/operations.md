@@ -160,14 +160,43 @@ provisioned instance with its own file — `node --env-file=<instance>/.env
 bridge/server.cjs` — and read **both** stdout and stderr at startup: the banner is
 on stdout, credential warnings on stderr.
 
+## Operator channel (cockpit → client instances)
+
+Mediagenix onboards a client on the **cockpit**: binding the instance's WHATS'ON
+connection, minting its share token, and enrolling or revoking its connector
+agents all happen on the cockpit's Clients page (**Tenant** button on the client
+row). The cockpit reaches the instance through the operator channel:
+
+1. `provision-instance.mjs --mode client` writes a `BRIDGE_OPERATOR_TOKEN` into
+   the instance's `.env` (a random 32-byte secret; keep it with the instance's
+   other secrets).
+2. On the cockpit, open the client's **Tenant** modal, enter the instance URL and
+   that token, and register. The cockpit stores the token encrypted under its own
+   `BRIDGE_ENCRYPTION_KEY` and shows whether the instance answers and accepts it.
+3. From then on the modal binds / adds / tests connections *on the tenant*, pulls
+   channels, mints the share token (shown once, with the two `.env` lines to put
+   on the instance), and mints agent enrolment tokens (shown once, with the exact
+   `agent.cjs enroll` command).
+
+What the token can do on the instance is a closed list (`OPERATOR_ALLOW` in
+`bridge/middleware/rbac.cjs`): connections, test-connection, channels, the pinned
+client's row, and the agents routes. Every other route answers 403; a wrong token
+answers 401. Actions are audited on the instance as `Mediagenix operator`. The
+instance prints `Operator channel: enabled` at startup when the token is set. To
+rotate: change the value in the instance's `.env`, restart it, and re-enter it on
+the cockpit (the modal's **Update**). Removing the variable disables the channel.
+
+The channel runs cockpit → instance inside the platform, over TLS. It never
+reaches a customer site: agents remain outbound-only and still receive no SQL.
+
 ## Connector agent
 
 Runs at the customer site, outbound-only, and pushes numeric scalars to the
 instance's `/api/agent/ingest`; SQL never crosses the network. Enrolment:
 
 ```bash
-# on the instance, as owner (15-minute, single-use token)
-curl -X POST -b brokr_session=… https://<instance>/api/agents/enrol-token
+# on the instance's Settings page as owner, or on the cockpit's Tenant modal
+# (15-minute, single-use token; the UI shows the command below filled in)
 # at the site
 node bridge/agent.cjs enroll --instance https://<instance> --token <T> --name "site" --dir /etc/brokr-agent
 node bridge/agent.cjs run --dir /etc/brokr-agent

@@ -44,6 +44,8 @@ export interface ClientRowProps {
   getChannels?: (connectionId: string) => Promise<Array<{ id: string; name: string; internalValue?: string; channelKind?: string }>>;
   onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
+  /** Cockpit only (R6-1): opens the tenant-instance operations for this client. */
+  onManageTenant?: (client: Client) => void;
   onUpdateClient: (id: string, patch: Partial<Client>) => void;
   onHealthUpdate: (clientId: string, status: HealthStatus) => void;
   theme: ReturnType<typeof useTheme>['theme'];
@@ -62,6 +64,7 @@ export const ClientRow = memo(function ClientRow({
   getChannels,
   onEdit,
   onDelete,
+  onManageTenant,
   onUpdateClient,
   onHealthUpdate,
   theme,
@@ -163,6 +166,26 @@ export const ClientRow = memo(function ClientRow({
         >
           {channelCount === 0 ? 'No channels' : `${channelCount} channel${channelCount !== 1 ? 's' : ''}`}
         </span>
+        {/* Tenant instance (cockpit) */}
+        {onManageTenant && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onManageTenant(client); }}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: `1px solid ${PRIMARY_COLOR}60`,
+              background: 'transparent',
+              color: PRIMARY_COLOR,
+              fontSize: 11,
+              fontFamily: FONT_BODY,
+              fontWeight: 600,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Tenant
+          </button>
+        )}
         {/* Edit button */}
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(client); }}

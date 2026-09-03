@@ -51,6 +51,20 @@ instance. Sequence D-3 before R6-1, or R6-1 writes to a store that is about to m
 
 **Lands in:** R6-1 (admin UIs), after D-3.
 
+## D-3 sub-decisions (evening) — recorded in `ADR-2026-09-03-connection-store.md`
+
+Delete refuses while referenced (no forced cascade); `kpiDefinitions` move with the
+connections, `kpi-history.json` stays a file. The ADR also closes R6 item 4.
+
+## R6-1 sub-decisions (late evening) — recorded in `r6-backlog-2026-09-03.md` ST0
+
+**Operator channel, cockpit → tenant instance:** each client instance is
+provisioned with `BRIDGE_OPERATOR_TOKEN`; the cockpit stores the instance URL and
+that token and forwards a closed list of management calls. Rejected: binding on
+the tenant as owner (reverses the decision above), binding at provisioning only.
+**Agents panel on both surfaces:** the client edition's Settings page and the
+cockpit's tenant modal, one component.
+
 ## R1b — Corporate Entra spot-check — parked
 
 **Decision:** not now; a later conversation. Stays a precondition for the first
