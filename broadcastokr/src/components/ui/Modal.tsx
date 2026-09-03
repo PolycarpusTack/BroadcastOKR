@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useId } from 'react';
+import { useEffect, useRef, useId } from 'react';
 import type { ReactNode } from 'react';
 import type { Theme } from '../../types';
 import { FONT_HEADING } from '../../constants/config';
@@ -12,47 +12,61 @@ interface ModalProps {
   theme: Theme;
 }
 
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function Modal({ open, onClose, title, children, width = 560, theme }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-      return;
-    }
-    if (e.key === 'Tab' && dialogRef.current) {
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  }, [onClose]);
+  // Callers pass inline arrows, so onClose is a new function on every render.
+  // Read it through a ref: the focus/keydown effect below must depend on `open`
+  // only — keyed on onClose it re-ran on every keystroke of a controlled form
+  // and moved focus to the first focusable element, the Close button (R1 rig,
+  // finding 31: "every letter typed jumps to the X").
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
     document.addEventListener('keydown', handleKeyDown);
     const prev = document.activeElement as HTMLElement | null;
-    requestAnimationFrame(() => {
-      const first = dialogRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
+    const frame = requestAnimationFrame(() => {
+      // Land on the first control in the body (the form's first field); the
+      // Close button in the header is the fallback for content without one.
+      const first = bodyRef.current?.querySelector<HTMLElement>(FOCUSABLE)
+        ?? dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE);
       first?.focus();
     });
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener('keydown', handleKeyDown);
       prev?.focus();
     };
-  }, [open, handleKeyDown]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -103,10 +117,10 @@ export function Modal({ open, onClose, title, children, width = 560, theme }: Mo
             aria-label="Close"
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: theme.textFaint, padding: 4 }}
           >
-            {'\u2715'}
+            {'✕'}
           </button>
         </div>
-        <div style={{ padding: '16px 24px 24px' }}>{children}</div>
+        <div ref={bodyRef} style={{ padding: '16px 24px 24px' }}>{children}</div>
       </div>
     </div>
   );

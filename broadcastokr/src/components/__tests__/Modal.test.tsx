@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Modal } from '../ui/Modal';
 import type { Theme } from '../../types';
 
@@ -66,6 +67,32 @@ describe('Modal', () => {
     );
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps focus in a controlled field while typing, even with an inline onClose', async () => {
+    // R1 rig, finding 31: the parent re-renders on every keystroke and passes
+    // a new onClose each time; the focus effect must not run again and pull
+    // focus onto the Close button.
+    function Harness() {
+      const [title, setTitle] = useState('');
+      return (
+        <Modal open onClose={() => {}} title="New Goal" theme={theme}>
+          <input aria-label="Goal title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Modal>
+      );
+    }
+    render(<Harness />);
+    const nextFrame = () => act(() => new Promise<void>((r) => { requestAnimationFrame(() => r()); }));
+    await nextFrame();
+    const input = screen.getByLabelText('Goal title');
+    expect(input).toHaveFocus();
+
+    for (const value of ['A', 'Ac', 'Ach']) {
+      fireEvent.change(input, { target: { value } });
+      await nextFrame();
+      expect(input).toHaveFocus();
+    }
+    expect(input).toHaveValue('Ach');
   });
 
   it('has aria-modal and aria-labelledby', () => {
