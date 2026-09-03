@@ -48,6 +48,8 @@ interface AppStore {
   checkInKR: (goalId: string, krId: string, entry: { value: number; confidence?: Confidence; note?: string; actor: string }) => void;
   setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
   updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => Promise<void>;
+  /** Archive (or restore) every goal of one period — R6-5. Returns the ids touched. */
+  setPeriodArchived: (period: string, archived: boolean) => string[];
   deleteGoal: (id: string) => void;
 
   // Live KR sync
@@ -301,6 +303,16 @@ export const useStore = create<AppStore>()(
           return { goals };
         });
         return putVersioned('goals', id);
+      },
+
+      setPeriodArchived: (period, archived) => {
+        const ids = get().goals.filter((g) => g.period === period && !!g.archived !== archived).map((g) => g.id);
+        set((s) => ({
+          goals: s.goals.map((g) => (ids.includes(g.id) ? { ...g, archived } : g)),
+        }));
+        // Same convention as every other mutation: the write is fired, failures toast.
+        for (const id of ids) void putVersioned('goals', id);
+        return ids;
       },
 
       deleteGoal: (id) => {

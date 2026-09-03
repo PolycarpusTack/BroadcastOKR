@@ -31,7 +31,7 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON (PSI) e
 
 ## Core Domain Types
 ```
-Goal { id, title, status, progress, owner, channel, period, keyResults[], clientIds[], channelScope, templateId, monitorUntil }
+Goal { id, title, status, progress, owner, channel, period, keyResults[], clientIds[], channelScope, templateId, monitorUntil, archived? }
 KeyResult { id, title, start, target, current, progress, status, liveConfig?, syncStatus?, syncError?, lastSyncAt?, krTemplateId?, history? }
 LiveKRConfig { connectionId, sql, unit, direction, timeframeDays? }
 KRHistoryEntry { timestamp, value, confidence?, note?, actor, source: 'check-in'|'sync' }
@@ -43,7 +43,7 @@ KPI { name, unit, direction, target, current, trend[] }
 ```
 
 ## Store Actions (src/store/store.ts)
-**Goals**: addGoal, setGoals, updateGoal, deleteGoal, checkInKR (with history), setMonitor (goal/client)
+**Goals**: addGoal, setGoals, updateGoal, deleteGoal, checkInKR (with history), setMonitor (goal/client), setPeriodArchived (R6-5: archive/restore every goal of a period)
 **Live Sync**: syncLiveKR, syncLiveKRError, syncLiveKRBatch (monitoring-aware history)
 **Tasks**: addTask, setTasks, moveTask, toggleSubtask, addBulkTasks, updateTask, deleteTask
 **KPIs**: setKPIs
@@ -69,6 +69,7 @@ KPI { name, unit, direction, target, current, trend[] }
 - `POST /api/kpi/execute-batch` is `canEdit`, but a non-owner's queries must match the KR's stored `liveConfig` byte-for-byte (`isStoredQuery` in `routes/whatson.cjs`) — only owners run ad hoc SQL. `addGoal`/`updateGoal` return the bridge-write promise so callers sync *after* the write lands
 - Credentials: `enc:v1:` marks ciphertext; pre-marker values were written under `BRIDGE_API_KEY`, which `createCredentialCipher` takes as `legacyKey` for the startup rewrap. A value that cannot be read is never rewritten — it is counted as `unreadable`, logged, and exposed on `/api/health` (`credentials.unreadable`) → SystemHealthPanel warning. Desktop key lives in `electron/credentialKey.cjs` (`sealed:`/`plain:` marker; never overwrites an unreadable file)
 - Oracle `:named` binds auto-converted to PostgreSQL `$1` positional via `convertBinds()`
+- **Period archive** (R6-5): `Goal.archived` (migration 010). Active views read through `activeGoals()` in `src/utils/goals.ts`; archived goals are read-only cards, skipped by the bridge sync loop and the share payload, still in Reports. Goals page: Active/Archived filter, owner "Archive period…" / "Restore period…"
 - **Fleet board** (R6-2): the share payload carries `krTemplateId` (an id — titles still never leave a tenant; FF-4's sentinel stands) so the cockpit lines the same template KR up across tenants; `shared_metric_history` keeps the newest 100 points per metric (migration 009); labels are the cockpit's own (`fleet_labels`). UI: `FleetBoard` in Compare (default view in cockpit mode; `src/utils/fleetBoard.ts` builds columns/rows), `FleetMetricsPanel` on the Dashboard links to it
 - **Operator channel** (R6-1, `docs/gpm/state/r6-backlog-2026-09-03.md` ST0): a client instance provisioned with `BRIDGE_OPERATOR_TOKEN` accepts it in `X-Operator-Token` as an operator principal (`req.user.operator`, client mode only, checked before the dev escape); `OPERATOR_ALLOW` in `middleware/rbac.cjs` is the closed list it may call; audited as `Mediagenix operator`. The cockpit stores each tenant's URL + token (migration 008, ciphertext) and forwards a fixed set of calls — no generic proxy. UI: `TenantModal` (cockpit Clients page, owner) and `AgentsPanel` (both editions), API in `src/utils/cockpitApi.ts`
 - **Connection store is the database** (D-3, `docs/gpm/state/ADR-2026-09-03-connection-store.md`): `connections` + `kpi_definitions` + `bridge_settings` tables (migration 007), behind the unchanged `createConfigStore` interface in `bridge/whatson/store.cjs`. `BRIDGE_CONFIG_PATH` is only the one-time import source (`config.json` → rows → renamed `.migrated`; `BRIDGE_CONFIG_IMPORT=dry-run` to preview). Deleting a referenced connection is refused with `409 connection_in_use` (clients, live KRs and Dashboard KPIs named); `bridgeFetch` treats only `error: 'version_conflict'` 409s as CAS conflicts. Backups are the `.db` alone
@@ -146,8 +147,8 @@ Frontend-only persona switching (no backend auth). Three roles:
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 288 tests across 54 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 197 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 196/197 on Windows: `agent.test.cjs` asserts a `0600` identity file
+- `npm test` — 293 tests across 56 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 199 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 198/199 on Windows: `agent.test.cjs` asserts a `0600` identity file
 - `npm run lint` — 0 errors, gated in CI
 - `better-sqlite3` is native and can only be built for ONE runtime at a time. `npm run rebuild:node` targets system Node (`npm run bridge`, `npm test`); `npm run rebuild:electron` targets Electron (`npm run electron:dev`, packaging). `electron:build*` now force-rebuilds for Electron itself, so packaging is safe from either state — but run `npm run rebuild:node` afterwards to get the dev bridge back. Stop any running bridge/agent first (`scripts/local-rig/start-rig.ps1 -Stop`) — a loaded `better_sqlite3.node` makes the Electron rebuild fail with EPERM. **Do not trust electron-builder's own rebuild step**: on 2026-09-02 it treated a system-Node build as up to date and shipped an installer whose bridge died on `require` (NODE_MODULE_VERSION 127 vs 145)
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
@@ -175,7 +176,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 
 - 2026-08-31 hardening pass (GPM, `docs/gpm/state/`): goal-template route contract fixed + contract-tested in CI, first-connect migration replaces the data-wipe path, bridge ships in packaged Electron builds (fork from inside app.asar, writable paths → userData), check-in propagation fixed (updated_at bump + ISO-vs-sqlite `since` normalization), bridge-write failures toast, audit 24→0, lint 0 + CI gate, shared live-KR batch builder (`src/utils/liveSync.ts`)
 
-- 2026-09-04 — R6-3 (TD-2) closed: the three modals remount by key, no `set-state-in-effect` suppressions left. R6-1 exit passed on the rig through the real cockpit UI (findings 35/36 fixed). R6-2 shipped: fleet board in Compare (cockpit), history-lite + template-id alignment + cockpit-side labels. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
+- 2026-09-04 — R6-5 shipped (period archive) — R6 list complete: no operator action needs curl. R6-3 (TD-2) closed: the three modals remount by key, no `set-state-in-effect` suppressions left. R6-1 exit passed on the rig through the real cockpit UI (findings 35/36 fixed). R6-2 shipped: fleet board in Compare (cockpit), history-lite + template-id alignment + cockpit-side labels. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
 
 - 2026-09-03 (late) — R6-1 shipped: operator channel cockpit → tenant (bridge + UI). On the cockpit a client's **Tenant** modal registers the instance, binds/adds/tests its WHATS'ON connection, pulls channels, mints the share token and agent enrolment tokens, lists/revokes agents; the client edition's Settings page gets the same agents panel. Finding 29 closed. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
 

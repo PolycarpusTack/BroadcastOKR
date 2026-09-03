@@ -55,7 +55,7 @@ async function runKRSyncOnce(db, { executeQuery }) {
     SELECT kr.id, kr.goal_id, kr.current_val, kr.live_config,
            g.monitor_until, g.client_ids
     FROM key_results kr JOIN goals g ON kr.goal_id = g.id
-    WHERE kr.live_config IS NOT NULL
+    WHERE kr.live_config IS NOT NULL AND g.archived = 0
   `).all();
 
   let synced = 0;

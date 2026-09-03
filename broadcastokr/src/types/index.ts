@@ -112,6 +112,9 @@ export interface Goal {
   channelScope?: ChannelScope;
   templateId?: string;
   monitorUntil?: string;
+  /** A closed period's record (R6-5): kept and reported on, out of the active
+   *  views, read-only, no longer synced or shared. */
+  archived?: boolean;
   /** Optimistic-concurrency counter, maintained by the bridge */
   version?: number;
 }

@@ -13,9 +13,9 @@ const SHARE_FIELDS = ['krId', 'value', 'target', 'direction', 'timestamp', 'krTe
 
 function buildSharePayload(db) {
   const rows = db.prepare(`
-    SELECT id, current_val, target_val, start_val, live_config, last_sync_at, kr_template_id
-    FROM key_results
-    WHERE shared_with_mediagenix = 1
+    SELECT kr.id, kr.current_val, kr.target_val, kr.start_val, kr.live_config, kr.last_sync_at, kr.kr_template_id
+    FROM key_results kr JOIN goals g ON g.id = kr.goal_id
+    WHERE kr.shared_with_mediagenix = 1 AND g.archived = 0
   `).all();
 
   return {

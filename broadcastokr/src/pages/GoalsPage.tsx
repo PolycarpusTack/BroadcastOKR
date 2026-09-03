@@ -25,6 +25,7 @@ import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
 import type { Goal, KeyResult, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../hooks/useBridge';
 import { currentPeriod } from '../utils/periods';
+import { activeGoals, periodsWithGoals } from '../utils/goals';
 
 interface GoalsPageProps {
   /** Bridge connected? */
@@ -69,7 +70,7 @@ export function GoalsPage({
   // Owner-only, cloud editions: KR-level "share with Mediagenix" toggle
   const showSharing = mode !== 'desktop' && permissions.canDelete;
   const {
-    goals, addGoal, checkInKR, updateGoal, deleteGoal, syncLiveKRBatch, setMonitor,
+    goals, addGoal, checkInKR, updateGoal, deleteGoal, syncLiveKRBatch, setMonitor, setPeriodArchived,
     goalTemplates, clients, users,
     addGoalTemplate, updateGoalTemplate, deleteGoalTemplate,
     materializeTemplate, syncTemplateToGoals,
@@ -82,6 +83,7 @@ export function GoalsPage({
       deleteGoal: s.deleteGoal,
       syncLiveKRBatch: s.syncLiveKRBatch,
       setMonitor: s.setMonitor,
+      setPeriodArchived: s.setPeriodArchived,
       goalTemplates: s.goalTemplates,
       clients: s.clients,
       users: s.users,
@@ -114,6 +116,8 @@ export function GoalsPage({
   const [filterChannel, setFilterChannel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterClient, setFilterClient] = useState('all');
+  // R6-5: archived goals stay out of the active list unless asked for
+  const [showArchived, setShowArchived] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingGoalId, setSyncingGoalId] = useState<string | null>(null);
@@ -158,11 +162,12 @@ export function GoalsPage({
   }, [createOpen, editGoalId, refreshConnections]);
 
   const filtered = useMemo(() => goals.filter((g) => {
+    if (!!g.archived !== showArchived) return false;
     if (filterChannel !== 'all' && g.channel !== Number(filterChannel)) return false;
     if (filterStatus !== 'all' && goalStatus(g.progress) !== filterStatus) return false;
     if (filterClient !== 'all' && !(g.clientIds?.includes(filterClient))) return false;
     return true;
-  }), [goals, filterChannel, filterStatus, filterClient]);
+  }), [goals, filterChannel, filterStatus, filterClient, showArchived]);
 
   const selectStyle = useMemo(() => makeSelectStyle(theme), [theme]);
 
@@ -365,7 +370,7 @@ export function GoalsPage({
   /** Sync all live KRs across all goals */
   const syncAllLiveKRs = useCallback(async () => {
     if (!executeBatch) return;
-    const queries = buildLiveKRQueries(goals);
+    const queries = buildLiveKRQueries(activeGoals(goals));
     if (queries.length === 0) { toast('No live KRs to sync', COLOR_INFO, '\u{1F4E1}'); return; }
 
     setSyncingGoalId('all');
@@ -381,7 +386,16 @@ export function GoalsPage({
     }
   }, [executeBatch, goals, syncLiveKRBatch, toast]);
 
-  const hasAnyLiveKRs = goals.some((g) => g.keyResults.some((kr) => kr.liveConfig));
+  const hasAnyLiveKRs = activeGoals(goals).some((g) => g.keyResults.some((kr) => kr.liveConfig));
+
+  const archivablePeriods = useMemo(() => periodsWithGoals(goals, false), [goals]);
+  const restorablePeriods = useMemo(() => periodsWithGoals(goals, true), [goals]);
+  const handlePeriodArchive = (period: string, archived: boolean) => {
+    if (!period) return;
+    const ids = setPeriodArchived(period, archived);
+    toast(`${archived ? 'Archived' : 'Restored'} ${ids.length} goal${ids.length === 1 ? '' : 's'} of ${period}`, archived ? COLOR_INFO : COLOR_SUCCESS, archived ? '\u{1F5C4}' : '\u{1F4C2}');
+    logAction(`${archived ? 'Archived' : 'Restored'} period ${period} (${ids.length} goals)`, currentUser.name, PRIMARY_COLOR);
+  };
 
   // Template helpers
   const materializingTemplate = materializeTemplateId
@@ -560,6 +574,10 @@ export function GoalsPage({
           <option value="at_risk">At Risk</option>
           <option value="behind">Behind</option>
         </select>
+        <select aria-label="Show active or archived goals" value={showArchived ? 'archived' : 'active'} onChange={(e) => setShowArchived(e.target.value === 'archived')} style={selectStyle}>
+          <option value="active">Active goals</option>
+          <option value="archived">Archived goals</option>
+        </select>
         {clients.length > 0 && (
           <select aria-label="Filter goals by client" value={filterClient} onChange={(e) => setFilterClient(e.target.value)} style={selectStyle}>
             <option value="all">All Clients</option>
@@ -569,6 +587,18 @@ export function GoalsPage({
           </select>
         )}
         <div style={{ flex: 1 }} />
+        {permissions.canDelete && !showArchived && archivablePeriods.length > 0 && (
+          <select aria-label="Archive period" value="" onChange={(e) => handlePeriodArchive(e.target.value, true)} style={selectStyle}>
+            <option value="">{'\u{1F5C4} Archive period\u2026'}</option>
+            {archivablePeriods.map((p) => <option key={p.period} value={p.period}>{p.period} ({p.count})</option>)}
+          </select>
+        )}
+        {permissions.canDelete && showArchived && restorablePeriods.length > 0 && (
+          <select aria-label="Restore period" value="" onChange={(e) => handlePeriodArchive(e.target.value, false)} style={selectStyle}>
+            <option value="">{'\u{1F4C2} Restore period\u2026'}</option>
+            {restorablePeriods.map((p) => <option key={p.period} value={p.period}>{p.period} ({p.count})</option>)}
+          </select>
+        )}
         {hasAnyLiveKRs && bridgeConnected && (
           <button
             onClick={syncAllLiveKRs}
@@ -594,7 +624,7 @@ export function GoalsPage({
 
       {/* Goal Cards */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: theme.textFaint, fontSize: 14 }}>No goals match your filters</div>
+        <div style={{ textAlign: 'center', padding: 60, color: theme.textFaint, fontSize: 14 }}>{showArchived ? 'No archived goals' : 'No goals match your filters'}</div>
       ) : (
         filtered.map((goal) => (
           <GoalCard
