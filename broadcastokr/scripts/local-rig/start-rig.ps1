@@ -30,9 +30,12 @@ function Listening([int]$port) {
   [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
 }
 
-function Start-Detached($name, $file, $args, $cwd, $logDir, $envVars) {
+# NB: the parameter must not be called $args — PowerShell reserves that name and
+# silently drops the value, which launched a bare `node` REPL instead of the
+# bridge on 2026-09-03 (finding 34).
+function Start-Detached($name, $file, $argList, $cwd, $logDir, $envVars) {
   foreach ($k in $envVars.Keys) { Set-Item -Path "Env:$k" -Value $envVars[$k] }
-  $p = Start-Process -FilePath $file -ArgumentList $args -WorkingDirectory $cwd `
+  $p = Start-Process -FilePath $file -ArgumentList $argList -WorkingDirectory $cwd `
     -RedirectStandardOutput (Join-Path $logDir "$name.out.log") `
     -RedirectStandardError (Join-Path $logDir "$name.err.log") `
     -WindowStyle Hidden -PassThru
