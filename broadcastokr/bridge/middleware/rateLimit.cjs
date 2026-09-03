@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { canonicalPath } = require('./auth.cjs');
 
 /**
@@ -21,10 +21,13 @@ function createRateLimitMiddleware({ sessionKeyed = false } = {}) {
     skip: (req) => canonicalPath(req.path) === '/api/health',
     // Behind the cloud load balancer all traffic shares an IP — key on the
     // session cookie when present so one user can't throttle the tenant.
+    // The anonymous fallback goes through ipKeyGenerator: an IPv6 client is
+    // keyed by its /56, not by an address it can rotate (ERR_ERL_KEY_GEN_IPV6,
+    // surfaced on the R1 rig).
     ...(sessionKeyed ? {
       keyGenerator: (req) => {
         const m = /(?:^|;\s*)brokr_session=([^;]+)/.exec(req.headers.cookie || '');
-        return m ? m[1] : (req.ip || 'unknown');
+        return m ? m[1] : (req.ip ? ipKeyGenerator(req.ip) : 'unknown');
       },
     } : {}),
     message: { error: 'Too many requests — slow down and retry shortly.' },

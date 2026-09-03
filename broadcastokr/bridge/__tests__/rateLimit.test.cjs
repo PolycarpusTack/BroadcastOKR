@@ -7,6 +7,22 @@ process.env.BRIDGE_RATE_LIMIT = '3';
 process.env.BRIDGE_RATE_WINDOW_MS = '60000';
 const { createRateLimitMiddleware } = require('../middleware/rateLimit.cjs');
 
+describe('session-keyed rate limit (cloud modes)', () => {
+  it('builds without an express-rate-limit validation error and keys anonymous IPv6 by subnet', () => {
+    const errors = [];
+    const orig = console.error;
+    console.error = (...args) => errors.push(args.map(String).join(' '));
+    try {
+      const mw = createRateLimitMiddleware({ sessionKeyed: true });
+      assert.equal(typeof mw, 'function');
+    } finally {
+      console.error = orig;
+    }
+    assert.ok(!errors.some((e) => e.includes('ERR_ERL_KEY_GEN_IPV6')),
+      `keyGenerator must use ipKeyGenerator for the IP fallback: ${errors.join(' | ')}`);
+  });
+});
+
 describe('rate limit middleware', () => {
   let server;
   let base;
