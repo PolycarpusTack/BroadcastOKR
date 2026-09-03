@@ -1,5 +1,72 @@
 # Pickup Prompt — Next Session
 
+## 2026-09-04 (day) — R6 done; next R7 (0.9.2 release cut) then R3 (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
+`docs/gpm/state/r6-backlog-2026-09-03.md` (R6-1..R6-5 all DONE with their decisions),
+`docs/gpm/state/DECISIONS-2026-09-03.md` (day-one decisions plus the D-3, R6-1 and R6-2
+sub-decisions), `docs/saas/2026-08-31-readiness-plan.md` §R7 and §R3 (what is next),
+`docs/saas/readiness/r1-findings.md` (37 findings; 35–37 from last night's rig work; daily
+log at the bottom — day 2 line is Yannick's). `CLAUDE.md` is current.
+
+**Where we are:** main is `4ca2635`, CI green (all four jobs). The R6 list is closed:
+- **R6-1** operator channel (cockpit → tenant) — bridge `d24a3b0`, UI `73f9de4`, **rig exit
+  passed through the real cockpit UI** (finding 35): register, bind, channels, share token,
+  enrol an agent from the shown command, revoke. Findings 36 (health table count) and 37
+  (re-minting the share token cuts the running channel — now warned in the modal) fixed.
+- **R6-2** fleet board (merge `dba61de`): share payload carries `krTemplateId` (id, not
+  title — FF-4 stands); cockpit keeps `shared_metric_history` (newest 100), labels columns on
+  its own side (`fleet_labels`); Compare opens on the board in cockpit mode.
+- **R6-3** TD-2 closed (merge `9232bbe`): modals remount by key, zero
+  `set-state-in-effect` suppressions.
+- **R6-5** period archive (merge `46dff3c`): `Goal.archived` (migration 010), Active/Archived
+  filter, owner Archive/Restore period selects, read-only cards, loop + payload skip archived.
+- **FF-1 lesson** (merge `4ca2635`): the R6-2 and R6-3 merges went red on CI — a literal
+  `#/compare` href in the runtime-gated `FleetMetricsPanel` reached the client bundle. Any
+  fleet route literal must sit behind `FLEET_IN_BUILD` (build-time constant, folded away).
+  Run `node scripts/check-edition-bundle.mjs client <dist>` locally before pushing fleet UI.
+Suites: 293 vitest · 199 bridge (198 on Windows — the `0600` case) · lint 0 · build green.
+Migrations now go to 010.
+
+**Rig (this PC, gitignored `local-rig/`):** running the working tree at each bridge's start
+time — cockpit started on the R6-2 merge, tenant0 on the R6-3 merge, so **migration 010 is
+not applied on the rig yet**; both `config.json` are `.migrated`; tenant0's `.env` holds
+`BRIDGE_OPERATOR_TOKEN` and a re-minted `BRIDGE_SHARE_TOKEN` (channel healthy again since
+00:39). Cockpit has tenant0 registered at `http://localhost:3101`; Oracle bound, 4 channels;
+throwaway agents revoked. To bring the rig to `4ca2635`: `scripts/local-rig/start-rig.ps1
+-Stop`, rebuild both bundles (`VITE_EDITION=internal npx vite build --outDir
+local-rig/cockpit/app`, `VITE_EDITION=client … local-rig/tenant0/app`), start again, read
+the startup logs. Then look at the fleet board on the cockpit (Compare) — tenant0 pushes every
+minute, so the sparkline has points by now; name the column (`tpl:` label) as owner.
+
+**Next — R7, release engineering (M):** 0.9.2 carries D-3, R6-1..R6-5 and three migrations
+(007–010); a tagged release is the natural cut. Decompose R7 at kickoff (`r7-backlog-…`):
+`release.yml` on `v*` tags (full CI → desktop installers via `electron:build*` with the
+better-sqlite3 rebuild order → instance image → agent bundle → GitHub Release with notes),
+version on health + in-app + desktop upgrade signal, FF-5 golden fixtures captured at tag
+time. Remember the 2026-09-02 gotcha: force the Electron rebuild, never trust electron-builder's
+"up to date". Then **R3** entitlements (server-side tiers per instance).
+
+**Parallel:** Yannick installs 0.9.1 on the remote desktop against populated support
+databases (its `config.json` becomes the import source under 0.9.2). Watch findings 16 (thin
+mode) and 4/15 (channels on a real schema). Yannick logs the day-2 line and checks the
+backups directory for the first scheduled `.db` snapshot.
+
+**Gotchas learned last night:** the Bash tool collapses `\` to `\` — use the Edit tool
+for source lines that need backslashes (finding 36's `ESCAPE '\'`). Python scripted edits:
+`encoding='utf-8'`, detect the file's line ending (`TeamPage.tsx` is LF; most files CRLF),
+and remember each `rep()` writes immediately — a later assertion failure leaves earlier
+edits applied. PowerShell calls that wait on the rig go to the background past 180 s; read
+their output file. Playwright drivers live in the scratchpad and need
+`NODE_PATH=<repo>/node_modules`. `react-hooks/set-state-in-effect` is enforced: kick loads
+off in a `setTimeout(…, 0)` or `.then`. After a `--no-ff` merge, branch again before the
+next story (R6-1 landed as direct commits on main for that reason).
+
+**Working discipline:** unchanged. GPM backlog per EPIC, branch per EPIC, commit per story,
+suites + lint + build green before each commit, merge `--no-ff`, push, watch CI.
+
+---
+
 ## 2026-09-04 — rig restart on the new main, R6-1 exit on the rig, then R6-2/3/5 (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
