@@ -115,7 +115,9 @@ finish from the pack without engineering involvement.
    suppressions.
 4. **KPI-vs-LiveKR consolidation decision** (the evaluation's parallel-subsystem
    finding): decide merge-or-name-the-difference, execute the small end of it
-   (shared config store or explicit naming), record the ADR.
+   (shared config store or explicit naming), record the ADR. **DONE 2026-09-03**
+   — `docs/gpm/state/ADR-2026-09-03-connection-store.md`: keep both, share the
+   store (D-3), name them "Dashboard KPI" vs "live KR".
 5. **Period lifecycle minimum:** archive a goal period (read-only past quarters) —
    the smallest slice of the rollover gap flagged in the evaluation.
 

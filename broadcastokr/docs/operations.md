@@ -34,24 +34,23 @@ to the database file; the desktop app uses its user-data directory), pruned to
 the newest 14. Snapshots use SQLite's online backup API, so they are consistent
 even while writes are happening.
 
-**Each snapshot is a pair.** The connection store lives outside SQLite, so every
-run writes two files under one timestamp:
+**One snapshot is the whole tenant.** WHATS'ON connections and Dashboard KPI
+definitions are rows in the database (since 0.9.2 — before that they lived in
+`config.json` and every snapshot was a `.db` + `.config.json` pair). A snapshot
+restored on its own brings the goals, tasks, history *and* the connections back.
+Old paired snapshots are still pruned as a unit, so a surviving old pair never
+loses its config half.
 
 ```
-broadcastokr-<stamp>.db            the tenant database (goals, tasks, history)
-broadcastokr-<stamp>.config.json   the connection store (WHATS'ON connections, KPI definitions)
+broadcastokr-<stamp>.db            the tenant database (goals, tasks, history, connections, KPI definitions)
 ```
 
-They are pruned together, so a restore is always a matched pair. Restoring the
-`.db` alone brings the OKRs back without the database connections that feed
-them — take both.
-
-> **The backup directory holds credentials.** The config copy carries stored
-> connection passwords, encrypted exactly as `config.json` holds them (i.e. only
+> **The backup directory holds credentials.** The snapshot carries stored
+> connection passwords, encrypted exactly as the database holds them (i.e. only
 > if `BRIDGE_ENCRYPTION_KEY` is set — see Credentials below). Give the backup
 > directory the same protection as the bridge's data directory.
 
-> **A backup is only complete with its key.** The passwords in the config copy
+> **A backup is only complete with its key.** The passwords in the snapshot
 > decrypt only under the key that wrote them. On a server that is
 > `BRIDGE_ENCRYPTION_KEY` — keep it with the backup policy, not in the backup
 > directory. On the **desktop app** the key is generated on first run and sealed
@@ -63,8 +62,8 @@ them — take both.
 > passwords it cannot read — nothing is silently lost, but nothing is silently
 > recovered either.
 
-For off-machine copies, ship the whole backup directory (both files of each
-pair) elsewhere with a cron job:
+For off-machine copies, ship the whole backup directory elsewhere with a cron
+job:
 
 ```bash
 # Daily copy at 2 AM of the scheduler's paired snapshots
@@ -74,20 +73,19 @@ pair) elsewhere with a cron job:
 ### Manual Backup
 
 ```bash
-# Via API — database only; pair it with a copy of config.json yourself
+# Via API — a fresh online snapshot, connections included
 curl -H "Authorization: Bearer <KEY>" http://bridge:3001/api/sync/backup -o backup.db
-cp bridge/config.json backup.config.json
 
-# Or copy the files directly (stop the bridge first, or use the API for a consistent .db)
+# Or copy the file directly (stop the bridge first, or use the API for a consistent .db)
 cp bridge/broadcastokr.db backups/broadcastokr-$(date +%Y%m%d).db
-cp bridge/config.json      backups/broadcastokr-$(date +%Y%m%d).config.json
 ```
 
 ### Restore
 
 1. Stop the bridge
-2. Replace `broadcastokr.db` with the snapshot's `.db` **and** `config.json`
-   with its `.config.json` — the same timestamp, never a mix
+2. Replace `broadcastokr.db` with the snapshot's `.db`. Restoring a pre-0.9.2
+   pair: put its `.config.json` at `BRIDGE_CONFIG_PATH` as `config.json` too —
+   the first start imports it (see Updating)
 3. Make sure the encryption key the snapshot was written under is configured
    (server: `BRIDGE_ENCRYPTION_KEY`; desktop: the same machine and account, or
    plan to re-enter passwords)
@@ -95,6 +93,14 @@ cp bridge/config.json      backups/broadcastokr-$(date +%Y%m%d).config.json
    passwords it re-encrypted, left unprotected, or cannot read with the key it has
 
 ## Credentials
+
+WHATS'ON connections (and Dashboard KPI definitions) are rows in the tenant
+database — `connections` and `kpi_definitions`, migration 007 — so they are
+migrated, versioned, backed up and tenant-scoped like everything else. There is
+no file to edit by hand; the Clients page and `POST /api/connections` are the
+write path. A connection that a client, a live KR or a Dashboard KPI still
+names cannot be deleted: the API answers `409 connection_in_use` naming them,
+and the operator rebinds first.
 
 Database connection passwords are encrypted at rest with AES-256-GCM, under a key
 derived (PBKDF2, 100k iterations) from `BRIDGE_ENCRYPTION_KEY`. `BRIDGE_API_KEY`
@@ -251,9 +257,18 @@ npm install --production
 
 Migrations run automatically on startup — no manual steps needed.
 
+**Upgrading to 0.9.2 or later from an install with `config.json`:** the first
+start imports the file's connections and KPI definitions into the database
+(existing rows win), records that it did, and renames the file to
+`config.json.migrated` — leave it there for one release as your own backup, then
+delete it. The import happens once: a `config.json` that appears later is not
+read. To see what would be imported without writing anything, start once with
+`BRIDGE_CONFIG_IMPORT=dry-run`. Passwords the file held in the clear are sealed
+in the same start when `BRIDGE_ENCRYPTION_KEY` is set (see Credentials).
+
 ## Security Notes
 
 - `BRIDGE_API_KEY` must be set in production — without it, auth is disabled
-- Database passwords in `config.json` are encrypted when `BRIDGE_API_KEY` is set
+- Database passwords in the `connections` table are encrypted when `BRIDGE_ENCRYPTION_KEY` (or the `BRIDGE_API_KEY` fallback) is set
 - The bridge only executes SELECT queries against external databases (enforced server-side)
 - CORS origins are configurable — set `BRIDGE_CORS_ORIGINS` to match your deployment
