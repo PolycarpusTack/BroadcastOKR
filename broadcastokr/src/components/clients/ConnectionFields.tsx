@@ -3,7 +3,7 @@ import type { Theme } from '../../types';
 import type { DBConnection } from '../../hooks/useBridge';
 import { inputStyle, labelStyle } from '../../styles/formStyles';
 import { COLOR_SUCCESS, COLOR_DANGER, FONT_BODY, FONT_MONO } from '../../constants/config';
-import { DEFAULT_PORT, draftToConnectionInput, type ConnectionDraft } from './connectionDraft';
+import { DEFAULT_PORT, DEFAULT_SCHEMA, draftToConnectionInput, type ConnectionDraft } from './connectionDraft';
 
 export interface ConnectionFieldsProps {
   draft: ConnectionDraft;
@@ -29,7 +29,12 @@ export function ConnectionFields({
     // Only follow the dialect while the port is still a default, so an
     // operator's custom port survives a type change.
     const portIsDefault = Object.values(DEFAULT_PORT).includes(draft.port);
-    set({ type, port: portIsDefault ? DEFAULT_PORT[type] : draft.port });
+    const schemaIsDefault = Object.values(DEFAULT_SCHEMA).includes(draft.schema);
+    set({
+      type,
+      port: portIsDefault ? DEFAULT_PORT[type] : draft.port,
+      schema: schemaIsDefault ? DEFAULT_SCHEMA[type] : draft.schema,
+    });
   };
 
   const small = { ...inputStyle(theme), fontSize: 12 };
@@ -66,7 +71,7 @@ export function ConnectionFields({
           </div>
           <div>
             <label style={smallLabel} htmlFor="conn-schema">Schema</label>
-            <input id="conn-schema" style={small} value={draft.schema} onChange={(e) => set({ schema: e.target.value })} placeholder="PSI" />
+            <input id="conn-schema" style={small} value={draft.schema} onChange={(e) => set({ schema: e.target.value })} placeholder={DEFAULT_SCHEMA[draft.type]} />
           </div>
         </div>
 

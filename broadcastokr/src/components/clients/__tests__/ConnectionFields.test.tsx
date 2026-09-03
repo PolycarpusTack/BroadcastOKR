@@ -45,6 +45,18 @@ describe('ConnectionFields', () => {
     expect((screen.getByLabelText('Port') as HTMLInputElement).value).toBe('15432');
   });
 
+  it('follows the dialect default schema case, but never overwrites a custom one', () => {
+    render(<Harness />);
+    expect((screen.getByLabelText('Schema') as HTMLInputElement).value).toBe('PSI');
+
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'postgres' } });
+    expect((screen.getByLabelText('Schema') as HTMLInputElement).value).toBe('psi');
+
+    fireEvent.change(screen.getByLabelText('Schema'), { target: { value: 'won_prod' } });
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'oracle' } });
+    expect((screen.getByLabelText('Schema') as HTMLInputElement).value).toBe('won_prod');
+  });
+
   it('reports the test verdict and clears it once the form is edited again', async () => {
     const testConnection = vi.fn().mockResolvedValue({ ok: true, message: 'Oracle connection successful' });
     render(<Harness testConnection={testConnection} />);
@@ -86,7 +98,7 @@ describe('draftToConnection', () => {
 
     expect(conn).toMatchObject({
       id: 'conn_1', name: 'VRT DB', type: 'postgres',
-      host: 'db', service: 'whatson', schema: 'PSI', user: 'psi',
+      host: 'db', service: 'whatson', schema: 'psi', user: 'psi',
     });
     expect(conn.port).toBe(5432); // empty port falls back to the dialect default
     expect(conn.clientDir).toBeUndefined();
