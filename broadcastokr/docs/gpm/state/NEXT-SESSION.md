@@ -1,5 +1,82 @@
 # Pickup Prompt — Next Session
 
+## 2026-09-04 — rig restart on the new main, R6-1 exit on the rig, then R6-2/3/5 (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
+`docs/gpm/state/DECISIONS-2026-09-03.md` (day-one decisions plus the D-3 and R6-1
+sub-decisions taken that evening), `docs/gpm/state/ADR-2026-09-03-connection-store.md`
+(D-3 ST0 ADR — also closes R6 item 4), `docs/gpm/state/r6-backlog-2026-09-03.md` (R6
+backlog; R6-1a/b DONE, ST0 ADR for the operator channel; R6-2/3/5 not started),
+`docs/saas/readiness/r1-findings.md` (34 findings; 29 closed by R6-1; daily log at the
+bottom). `CLAUDE.md` is current.
+
+**Where we are:** main is `73f9de4` (pushed; check CI first thing). Late on day one, two
+EPIC stories shipped:
+- **D-3** (merge `e06548b`): connections + Dashboard KPI definitions moved from
+  `config.json` into the tenant database (migration 007, additive). One-shot import on
+  first start (`config.json` → rows → renamed `.migrated`; `BRIDGE_CONFIG_IMPORT=dry-run`
+  previews), refuse-while-referenced delete (`409 connection_in_use`), backups are the
+  `.db` alone, `bridgeFetch` treats only `error: 'version_conflict'` 409s as CAS conflicts.
+- **R6-1** (`d24a3b0` bridge, `73f9de4` UI — **landed as direct commits on main, not a
+  `--no-ff` merge**: the session stayed on main after the D-3 merge; content is complete,
+  the branch `feature/d3-connections-in-db` is stale at `833e939` and can be deleted):
+  operator channel cockpit → tenant. Client instances get `BRIDGE_OPERATOR_TOKEN`
+  (provisioned); the cockpit stores URL + token per tenant (migration 008) and forwards a
+  closed list of calls. Cockpit Clients page → **Tenant** button → `TenantModal`
+  (register, reachability, share token, bind/add/test connection, channels, agents);
+  `AgentsPanel` also on the client edition's Settings page.
+Suites: 279 vitest · 192 bridge (191 on Windows — the `0600` case) · lint 0 · build green.
+
+**Rig state to fix first (this PC, gitignored `local-rig/`):** both bridges and the agent
+are still running the pre-D-3 code from the Startup shortcut. On the new main: stop the rig
+(`scripts/local-rig/start-rig.ps1 -Stop`), add `BRIDGE_OPERATOR_TOKEN=<random hex>` to
+`local-rig/tenant0/.env`, start again. First start of each bridge imports its `config.json`
+(tenant0 has the two rig connections; the cockpit has whatever was saved there) and
+renames it `.migrated` — read both startup logs for the `Imported N connection(s)` line
+and `credentials: {unreadable: 0}` on `/api/health`. Then the **R6-1 exit on the rig**: on
+the cockpit as owner, Clients → Tenant Zero → Tenant: register `http://localhost:3101` +
+the token, expect "Reachable · v0.9.1 · operator token accepted", see the two connections,
+bind Oracle, pull channels (finding 4/15 still apply: bare ids on the real schema), mint an
+enrol token and enrol a throwaway agent from it, revoke it. No curl anywhere. Findings go in
+`r1-findings.md`; Yannick logs the daily line (day 2 = 2026-09-04) and checks the backups
+directory for the first scheduled `.db` snapshot.
+
+**Then, on a fresh branch per story family (`feature/r6-2-fleet-board` etc.), commit per
+story, `--no-ff` merge, push, watch CI:** R6-2 fleet board in Compare (tenants × KRs with the
+sparkline/trend vocabulary, replacing the v1 dashboard panel as primary), R6-3 TD-2 modal
+remount-by-key (removing the three lint suppressions), R6-5 period archive. Decompose each
+at pull time in `r6-backlog-2026-09-03.md`. After R6: R3 (entitlements), R7 (release
+engineering — 0.9.2 carries D-3 + R6-1, so a tagged release is the natural next cut).
+
+**Decisions in force:** connections live in the tenant DB (D-3); delete refuses while
+referenced; kpiDefinitions moved, kpi-history.json stays a file; one DB per instance is the
+tenant boundary (no `client_id` on connections); operator channel is the cockpit's write
+path into a tenant (closed allowlist, audited as `Mediagenix operator`); the client edition
+keeps its "contact your Mediagenix operator" message; AI query assist v1.1; Entra (R1b)
+parked; Yannick reads the Dashboard himself during the unattended run and consults before
+entering real OKRs on the cockpit.
+
+**Parallel:** Yannick installs 0.9.1 on the remote desktop against populated support
+databases (0.9.1 predates D-3 — its `config.json` becomes the import source when 0.9.2 is
+installed over it). Watch for Oracle thin mode without a client (finding 16) and what
+"Refresh from database" returns on a real schema (finding 4).
+
+**Gotchas:** `npm run electron:build` fails with EPERM while the rig runs — `-Stop`, build,
+`npm run rebuild:node`, start again. Never name a PowerShell parameter `$args`. Repo files
+are CRLF — new files written by tooling arrive LF; normalise before committing. Python
+scripted edits must open files with `encoding='utf-8'` (em dashes). Playwright on this PC is
+load-sensitive; so is the bridge suite (two spawn-heavy suites printed `not ok` headers under
+the full parallel run and pass in isolation — rerun before believing a failure). Only
+`src/editions/` reads `VITE_EDITION`. `react-hooks/set-state-in-effect` is enforced: kick
+async loads off with a `setTimeout(…, 0)` or `.then`, never call a state-setting function
+synchronously in an effect. **After a `--no-ff` merge, check out the feature branch again
+before the next story.**
+
+**Working discipline:** unchanged. GPM backlog per EPIC, branch per EPIC, commit per story,
+suites + lint + build green before each commit, merge `--no-ff`, push, watch CI.
+
+---
+
 ## 2026-09-04 — D-3 then R6-1, with the rig ticking (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
