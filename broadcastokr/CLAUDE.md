@@ -160,7 +160,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 - `npm run bridge` — Start Express bridge on localhost:3001
 - `node scripts/build-agent-bundle.mjs` — connector-agent tarball (`dist-agent/`, require graph checked); `node scripts/capture-protocol-fixtures.mjs` — FF-5 verify/capture; `Dockerfile` — instance image (`EDITION`, `MODE` args); `../.github/workflows/release.yml` — one `v*` tag → installers + GHCR images + agent bundle + GitHub Release (R7)
 
-## Current State (2026-09-03)
+## Current State (2026-09-04)
 
 ### What's done
 - Full React app with Dashboard, Goals, Tasks, Team, Reports, Clients, Compare pages
@@ -177,7 +177,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 
 - 2026-08-31 hardening pass (GPM, `docs/gpm/state/`): goal-template route contract fixed + contract-tested in CI, first-connect migration replaces the data-wipe path, bridge ships in packaged Electron builds (fork from inside app.asar, writable paths → userData), check-in propagation fixed (updated_at bump + ISO-vs-sqlite `since` normalization), bridge-write failures toast, audit 24→0, lint 0 + CI gate, shared live-KR batch builder (`src/utils/liveSync.ts`)
 
-- 2026-09-04 — R7 release engineering: `release.yml` on `v*` tags, instance `Dockerfile`, agent bundle script, FF-5 capture script, desktop update signal (`src/utils/updates.ts`, daily GitHub check, toast + System Health line). R6-5 shipped (period archive) — R6 list complete: no operator action needs curl. R6-3 (TD-2) closed: the three modals remount by key, no `set-state-in-effect` suppressions left. R6-1 exit passed on the rig through the real cockpit UI (findings 35/36 fixed). R6-2 shipped: fleet board in Compare (cockpit), history-lite + template-id alignment + cockpit-side labels. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
+- 2026-09-04 — **0.9.2 released by CI alone** (`v0.9.2`: Windows/Linux installers, `ghcr.io/polycarpustack/broadcastokr-instance:0.9.2-{client,cockpit}`, `brokr-agent-0.9.2.tgz`). R7 release engineering: `release.yml` on `v*` tags, instance `Dockerfile`, agent bundle script, FF-5 capture script, desktop update signal (`src/utils/updates.ts`, daily GitHub check, toast + System Health line). R6-5 shipped (period archive) — R6 list complete: no operator action needs curl. R6-3 (TD-2) closed: the three modals remount by key, no `set-state-in-effect` suppressions left. R6-1 exit passed on the rig through the real cockpit UI (findings 35/36 fixed). R6-2 shipped: fleet board in Compare (cockpit), history-lite + template-id alignment + cockpit-side labels. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
 
 - 2026-09-03 (late) — R6-1 shipped: operator channel cockpit → tenant (bridge + UI). On the cockpit a client's **Tenant** modal registers the instance, binds/adds/tests its WHATS'ON connection, pulls channels, mints the share token and agent enrolment tokens, lists/revokes agents; the client edition's Settings page gets the same agents panel. Finding 29 closed. R6 backlog: `docs/gpm/state/r6-backlog-2026-09-03.md`
 

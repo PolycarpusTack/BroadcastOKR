@@ -132,7 +132,8 @@ discovered goes to the next plan, not this one.
 - Version surfaced in-app and on health; upgrade-available signal for desktop.
 
 **Exit:** a tagged release produced end-to-end by CI alone; FF-5 fixtures for the new
-version exist without manual work.
+version exist without manual work. **DONE 2026-09-04** — `v0.9.2`, run 33835056555
+(`docs/gpm/state/r7-backlog-2026-09-04.md`).
 
 ---
 

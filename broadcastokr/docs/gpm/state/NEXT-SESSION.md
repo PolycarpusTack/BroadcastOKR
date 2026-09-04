@@ -1,5 +1,53 @@
 # Pickup Prompt — Next Session
 
+## 2026-09-04 (later) — 0.9.2 is out; next R3 entitlements (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
+`docs/gpm/state/r7-backlog-2026-09-04.md` (R7 DONE — how the release pipeline works and what
+the three runs taught), `docs/saas/2026-08-31-readiness-plan.md` §R3 and
+`docs/saas/readiness-instructions.md` §R3 (what is next), `docs/gpm/state/r6-backlog-2026-09-03.md`
+(R6 DONE), `docs/saas/readiness/r1-findings.md` (37 findings; daily log — day-2 line is
+Yannick's). `CLAUDE.md` is current.
+
+**Where we are:** main is `cb18ff5` (+ this docs commit), CI green. **`v0.9.2` was produced by CI
+alone** (run 33835056555): `BroadcastOKR.Setup.0.9.2.exe`, `BroadcastOKR-0.9.2.AppImage`,
+`broadcastokr_0.9.2_amd64.deb`, `brokr-agent-0.9.2.tgz`, generated notes, and
+`ghcr.io/polycarpustack/broadcastokr-instance:0.9.2-{client,cockpit}` (+ `latest-*`). It took
+three runs; both fixes were in the workflow (fixture-PR `base` on a tag checkout; release job
+downloads by pattern, no buildx build-record uploads). The tag was moved twice before anything was
+published — never move a tag that has a Release. R6 is complete (R6-1..R6-5), TD-2 closed. Suites:
+297 vitest · 200 bridge (199 on Windows — the `0600` case) · lint 0 · build green. Migrations to 010.
+
+**Rig (this PC):** running the working tree from the R6-5 merge (`cd782f0`, migration 010 applied);
+the tree is now at the R7 merge — a `start-rig.ps1 -Stop` / start brings it level (rebuild the two
+bundles first). The released Windows installer is in `installer/`; installing it over 0.9.1 on this
+PC (its `config.json` becomes the import source) is Yannick's call. No Docker here, so the released
+images cannot run on this rig; the readiness plan's "staging rig runs the released image" is open
+until a Docker host exists (R2 territory).
+
+**Next — R3, entitlements & usage metering (M):** tiers in the existing ENTITLEMENTS mechanism
+(`src/editions/entitlements.ts`, `bridge/editions.cjs`), enforced **server-side** per instance from a
+licence value in the provisioned env; caps on live KRs, sharing, agent count, seats/channels; a
+usage snapshot on `/api/health` (signed-in) and on the cockpit per tenant. Decompose at kickoff
+(`r3-backlog-…`); the first decision is the licence carrier (signed token in the env vs a plain
+tier name) — ask Yannick, recommend a signed value the cockpit mints (it already holds per-tenant
+secrets). Then R2 (fleet operations: manifests, upgrade path, monitoring, restore drill).
+
+**Parallel:** Yannick installs 0.9.2 on the remote desktop against populated support databases.
+Watch findings 16 (thin mode) and 4/15 (channels on a real schema).
+
+**Gotchas (still true):** the assistant's Bash tool collapses a doubled backslash — Edit tool for
+those lines; Python scripted edits need `encoding='utf-8'` and per-file line-ending detection, and
+each `rep()` writes immediately. Long PowerShell/gh waits go to the background past the tool
+timeout — read the output file. `gh api` paths must not start with `/` in this shell. Fleet route
+literals go behind `FLEET_IN_BUILD` (FF-1). After a `--no-ff` merge, branch again before the next
+story.
+
+**Working discipline:** unchanged. GPM backlog per EPIC, branch per EPIC, commit per story,
+suites + lint + build green before each commit, merge `--no-ff`, push, watch CI.
+
+---
+
 ## 2026-09-04 (day) — R6 done; next R7 (0.9.2 release cut) then R3 (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
