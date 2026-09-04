@@ -75,12 +75,22 @@ jobs:
           done
 
       - name: Protocol fixtures (FF-5) — verify, capture a new version if needed
+        id: fixtures
         working-directory: broadcastokr
-        run: node scripts/capture-protocol-fixtures.mjs
+        run: |
+          node scripts/capture-protocol-fixtures.mjs
+          if [ -n "$(git status --porcelain bridge/__tests__/fixtures)" ]; then
+            echo "captured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "captured=false" >> "$GITHUB_OUTPUT"
+          fi
 
+      # The checkout is a tag, so the action needs the base branch spelled out.
       - name: Open a PR when new fixtures were captured
+        if: steps.fixtures.outputs.captured == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
+          base: main
           commit-message: "test(bridge): FF-5 fixtures captured at ${{ github.ref_name }}"
           title: "FF-5 fixtures captured at ${{ github.ref_name }}"
           body: "Golden requests for the new protocol version, captured by the release workflow. Review, then merge."
