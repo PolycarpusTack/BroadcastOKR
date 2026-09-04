@@ -25,10 +25,11 @@ import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
 import { checkForNewerRelease, type LatestRelease } from './utils/updates';
 import { useStore } from './store/store';
-import { COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR } from './constants/config';
+import { COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR, FONT_MONO } from './constants/config';
 import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
 import { useActivityLog } from './context/ActivityLogContext';
 import { DeploymentProvider } from './context/DeploymentContext';
+import { editionLabel, editionTitle } from './editions/editionLabel';
 import { BUILD_EDITION, FLEET_IN_BUILD, setRuntimeMode, setRuntimeLicence, hasFeature, type TenancyMode, type Tier } from './editions/entitlements';
 import { logger } from './utils/logger';
 import { useSetupWizard } from './components/wizard/useSetupWizard';
@@ -76,6 +77,11 @@ export default function App() {
   const tier: Tier = health?.tier ?? 'enterprise';
   useEffect(() => { setRuntimeLicence(health?.tier, health?.entitlements); }, [health]);
   const fleet = hasFeature('fleet', mode);
+
+  // R6-6: the browser tab says which edition this is. A client instance is
+  // pinned to one client row; its name arrives with the first sync.
+  const pinnedClientName = useStore((s) => (mode === 'client' ? s.clients[0]?.name : undefined));
+  useEffect(() => { document.title = editionTitle(mode, pinnedClientName); }, [mode, pinnedClientName]);
 
   // First-run detection for the setup wizard. `null` means "not known yet" —
   // the wizard must never auto-open on a guess, only on a positive zero.
@@ -218,7 +224,14 @@ export default function App() {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: theme.bg, color: theme.text }}>
         <div style={{ textAlign: 'center', padding: 40, borderRadius: 14, border: `1px solid ${theme.border}`, background: theme.bgCard, maxWidth: 360 }}>
-          <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>BroadcastOKR</div>
+          <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>BroadcastOKR</div>
+          {/* R6-6: say which edition this is before anyone signs in (health is public and carries the mode) */}
+          <div
+            data-testid="edition-label"
+            style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: '1px', textTransform: 'uppercase', color: editionLabel(mode).accent, fontWeight: 600, marginBottom: 16 }}
+          >
+            {editionLabel(mode).name}
+          </div>
           {authStatus === 'loading' ? (
             <div role="status" style={{ color: theme.textMuted, fontSize: 14 }}>Checking your session…</div>
           ) : (

@@ -1,9 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDeployment } from '../../context/DeploymentContext';
 import { FLEET_IN_BUILD } from '../../editions/entitlements';
+import { editionLabel } from '../../editions/editionLabel';
+import { useStore } from '../../store/store';
 import type { Theme, User } from '../../types';
 import { Avatar } from '../ui/Avatar';
-import { PRIMARY_COLOR, PRIMARY_GRADIENT, COLOR_COBALT_MID, FONT_HEADING, FONT_BODY, FONT_MONO } from '../../constants/config';
+import { PRIMARY_COLOR, COLOR_COBALT_MID, FONT_HEADING, FONT_BODY, FONT_MONO } from '../../constants/config';
 
 // Fleet entries fold out of client-edition bundles (FLEET_IN_BUILD is a
 // build-time constant); the runtime `can('fleet')` filter below handles a
@@ -32,8 +34,12 @@ interface SidebarProps {
 export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { can } = useDeployment();
+  const { can, mode } = useDeployment();
   const nav = NAV.filter((item) => !item.fleet || can('fleet'));
+  // R6-6: a client instance is pinned to exactly one client row — its name
+  // is the instance's name. The cockpit and desktop name themselves.
+  const pinnedClientName = useStore((s) => (mode === 'client' ? s.clients[0]?.name : undefined));
+  const edition = editionLabel(mode, pinnedClientName);
 
   return (
     <aside
@@ -72,7 +78,7 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
             width: 32,
             height: 32,
             borderRadius: 7,
-            background: PRIMARY_GRADIENT,
+            background: edition.iconBackground,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -85,7 +91,12 @@ export function Sidebar({ open, onToggle, theme, user, actLogCount, onOpenLog }:
         {open && (
           <div>
             <div style={{ fontFamily: FONT_HEADING, fontSize: 17, fontWeight: 700, color: '#F0F4FF', letterSpacing: '-0.4px' }}>BroadcastOKR</div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: '9.5px', color: '#3D4F68', letterSpacing: '0.8px', textTransform: 'uppercase' as const }}>Operations Goals</div>
+            <div
+              data-testid="edition-label"
+              style={{ fontFamily: FONT_MONO, fontSize: '9.5px', color: edition.accent, letterSpacing: '0.8px', textTransform: 'uppercase' as const, fontWeight: edition.cloud ? 600 : 400 }}
+            >
+              {edition.name}
+            </div>
           </div>
         )}
       </button>

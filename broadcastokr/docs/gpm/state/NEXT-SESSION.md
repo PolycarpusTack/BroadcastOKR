@@ -25,6 +25,9 @@ elevated `Start-Service` first).
    → Tenant Zero → "Licence and usage" card). Optional: one restart with
    `BRIDGE_TIER=starter` to see the Goals page degrade, then put enterprise back.
 4. Then open the R4 decisions with Yannick (below) before touching code.
+5. R6-6 "say which edition this is" is **DONE** (same day): sign-in card, sidebar brand
+   (amber for the cockpit) and browser title read "MGX Cockpit" vs "Client · Tenant Zero".
+   Rig bundles were rebuilt from the working tree; a hard refresh on :3100 / :3101 shows it.
 
 **Model routing for what remains** (which model should hold which task — pick per task, not per
 session):
