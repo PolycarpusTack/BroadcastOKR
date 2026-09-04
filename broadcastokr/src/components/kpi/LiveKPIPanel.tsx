@@ -12,7 +12,8 @@ interface LiveKPIPanelProps {
   syncing: boolean;
   drivers?: DriverStatus;
   theme: Theme;
-  onConfigure: () => void;
+  /** Absent when the licence has no live KRs (R3): the panel then shows no Configure button. */
+  onConfigure?: () => void;
   onStartBridge: () => Promise<{ ok: boolean; message: string }>;
   onStopBridge: () => Promise<{ ok: boolean; message: string }>;
   onSyncNow: () => Promise<void>;
@@ -141,7 +142,7 @@ export const LiveKPIPanel = memo(function LiveKPIPanel({
           )}
 
           {/* Configure button */}
-          <button onClick={onConfigure} style={smallBtn(PRIMARY_COLOR)}>Configure</button>
+          {onConfigure && <button onClick={onConfigure} style={smallBtn(PRIMARY_COLOR)}>Configure</button>}
         </div>
       </div>
 

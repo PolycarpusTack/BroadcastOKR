@@ -31,9 +31,12 @@ const name = arg('name');
 const mode = arg('mode', 'client');
 const baseUrl = arg('base-url', 'https://CHANGE-ME.example');
 const color = arg('color', '#3805E3');
+const tier = arg('tier', 'pro');
+const capOf = (name) => { const v = arg(name); return v === undefined ? '' : String(Number(v) || ''); };
+const caps = { channels: capOf('cap-channels'), seats: capOf('cap-seats'), agents: capOf('cap-agents') };
 
-if (!dir || !name || !['client', 'cockpit'].includes(mode)) {
-  console.error('usage: provision-instance.mjs --dir <path> --name <client name> --mode client|cockpit [--base-url URL] [--oidc-*]');
+if (!dir || !name || !['client', 'cockpit'].includes(mode) || !['starter', 'pro', 'enterprise'].includes(tier)) {
+  console.error('usage: provision-instance.mjs --dir <path> --name <client name> --mode client|cockpit [--tier starter|pro|enterprise] [--cap-channels N] [--cap-seats N] [--cap-agents N] [--base-url URL] [--oidc-*]');
   process.exit(2);
 }
 
@@ -76,6 +79,13 @@ BRIDGE_API_KEY=${crypto.randomBytes(24).toString('hex')}
 BRIDGE_ENCRYPTION_KEY=${crypto.randomBytes(32).toString('hex')}
 BRIDGE_CORS_ORIGINS=${baseUrl}
 ${mode === 'client' ? `
+# Licence (R3) — plain values, operator-controlled: the tier, and caps (blank = unlimited).
+# Seats count owners and managers; members are viewers and free.
+BRIDGE_TIER=${tier}
+BRIDGE_CAP_CHANNELS=${caps.channels}
+BRIDGE_CAP_SEATS=${caps.seats}
+BRIDGE_CAP_AGENTS=${caps.agents}
+
 # Operator channel — the cockpit registers this instance with this token and
 # manages its WHATS'ON connection and connector agents from its Clients page
 # (docs/operations.md, Operator channel).

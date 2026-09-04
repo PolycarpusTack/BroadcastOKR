@@ -14,7 +14,7 @@ const app = express();
 // (utils/router.cjs); these two settings cover the mounts and /api/health.
 app.set('case sensitive routing', true);
 app.set('strict routing', true);
-const { MODE } = require('./editions.cjs');
+const { MODE, TIER, TIER_CONFIGURED, ENTITLEMENTS, CAPS, hasEntitlement } = require('./editions.cjs');
 const { version: APP_VERSION } = require('./package.json');
 const { PROTOCOL_VERSION, MIN_SUPPORTED } = require('./protocol.cjs');
 const { createCredentialCipher } = require('./utils/credentials.cjs');
@@ -78,6 +78,9 @@ app.use(createRateLimitMiddleware({ sessionKeyed: MODE !== 'desktop' }));
 app.use(createProtocolMiddleware());
 app.use(createAuthMiddleware({ mode: MODE, apiKey: BRIDGE_API_KEY, db, insecureNoAuth: INSECURE_NO_AUTH, operatorToken: process.env.BRIDGE_OPERATOR_TOKEN }));
 app.use(createRbacMiddleware({ mode: MODE, insecureNoAuth: INSECURE_NO_AUTH, db }));
+// Licence gates (R3, FF-8): after RBAC, on machine paths too
+const { createEntitlementMiddleware } = require('./middleware/entitlements.cjs');
+app.use(createEntitlementMiddleware({ hasEntitlement, tier: TIER }));
 app.use(createLoggingMiddleware());
 
 // Mounted in every mode: /me and /logout are OIDC-independent, and a desktop
@@ -103,14 +106,19 @@ app.use('/api/users', createUsersRouter(db));
 app.use('/api/teams', createTeamsRouter(db));
 app.use('/api/sync', createSyncRouter(db, DB_PATH));
 app.use('/api/activity', createActivityRouter(db));
+const { createUsageRouter } = require('./routes/usage.cjs');
+app.use('/api/usage', createUsageRouter(db));
 
 const { createAgentRouters } = require('./routes/agent.cjs');
 const agentRouters = createAgentRouters(db);
 app.use('/api/agents', agentRouters.ops);
 app.use('/api/agent', agentRouters.machine);
 
-// Client instances push their opted-in metrics to the cockpit (T2-3)
-if (MODE === 'client' && process.env.BRIDGE_COCKPIT_URL && process.env.BRIDGE_SHARE_TOKEN) {
+// Client instances push their opted-in metrics to the cockpit (T2-3) — when licensed (R3)
+if (MODE === 'client' && process.env.BRIDGE_COCKPIT_URL && process.env.BRIDGE_SHARE_TOKEN && !hasEntitlement('sharing')) {
+  console.log(`  Sharing channel configured but not in the ${TIER} licence — not started.`);
+}
+if (MODE === 'client' && process.env.BRIDGE_COCKPIT_URL && process.env.BRIDGE_SHARE_TOKEN && hasEntitlement('sharing')) {
   const { startSharePushLoop } = require('./cockpit/pushLoop.cjs');
   const shareIntervalMs = Number(process.env.BRIDGE_SHARE_INTERVAL_MS) || 5 * 60 * 1000;
   startSharePushLoop(db, {
@@ -220,7 +228,9 @@ app.use('/api', createWhatsonRouter({
 }));
 
 const KR_SYNC_INTERVAL_MS = Number(process.env.BRIDGE_KR_SYNC_INTERVAL_MS) || 15 * 60 * 1000;
-startKRSyncLoop(db, { executeQuery: executeKrQuery, intervalMs: KR_SYNC_INTERVAL_MS });
+if (hasEntitlement('liveKRs')) {
+  startKRSyncLoop(db, { executeQuery: executeKrQuery, intervalMs: KR_SYNC_INTERVAL_MS });
+}
 
 // ── Health ──
 
@@ -230,7 +240,7 @@ const { getSession } = require('./sessions.cjs');
 app.get('/api/health', (req, res) => {
   // Cloud instances reveal operational stats only to signed-in callers
   if (MODE !== 'desktop' && !INSECURE_NO_AUTH && !getSession(db, parseCookies(req)[SESSION_COOKIE_NAME])) {
-    return res.json({ status: 'ok', mode: MODE, version: APP_VERSION, protocolVersion: PROTOCOL_VERSION, minSupported: MIN_SUPPORTED });
+    return res.json({ status: 'ok', mode: MODE, tier: TIER, version: APP_VERSION, protocolVersion: PROTOCOL_VERSION, minSupported: MIN_SUPPORTED });
   }
   let dbStats = null;
   try {
@@ -246,6 +256,9 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     mode: MODE,
+    tier: TIER,
+    entitlements: ENTITLEMENTS,
+    caps: CAPS,
     version: APP_VERSION,
     protocolVersion: PROTOCOL_VERSION,
     minSupported: MIN_SUPPORTED,
@@ -287,6 +300,10 @@ app.listen(PORT, HOST, () => {
   console.log(`  ──────────────────────────`);
   console.log(`  Running on http://${HOST}:${PORT}`);
   console.log(`  Mode: ${MODE}`);
+  if (MODE === 'client') {
+    const capText = Object.entries(CAPS).filter(([, v]) => v !== null).map(([k, v]) => `${k} ${v}`).join(', ') || 'none';
+    console.log(`  Licence: ${TIER}${TIER_CONFIGURED ? '' : ' (BRIDGE_TIER not set — running unrestricted)'} · caps: ${capText}`);
+  }
   console.log(`  Drivers: Oracle=${oracledb ? 'yes' : 'no'}, PostgreSQL=${pg ? 'yes' : 'no'}`);
   console.log(`  Database: ${DB_PATH} (connections included)`);
   console.log(`  History: ${HISTORY_PATH}\n`);

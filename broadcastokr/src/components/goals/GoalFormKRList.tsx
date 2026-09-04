@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useDeployment } from '../../context/DeploymentContext';
 import type { Theme, LiveKRConfig } from '../../types';
 import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../../hooks/useBridge';
 import { COLOR_INFO } from '../../constants/config';
@@ -37,7 +38,9 @@ export function GoalFormKRList({
   const krInputStyle = { ...inputStyle, padding: '8px 10px', borderRadius: 6, fontSize: 12 };
   const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: theme.textMuted, display: 'block' as const, marginBottom: 4 };
 
-  const bridgeAvailable = connections.length > 0;
+  const { entitled } = useDeployment();
+  // A live KR needs the licence as well as a connection (R3): without it the toggle is not offered
+  const bridgeAvailable = connections.length > 0 && entitled('liveKRs');
 
   const updateKR = (i: number, patch: Partial<GoalFormKR>) => {
     const u = [...krs];

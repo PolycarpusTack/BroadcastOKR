@@ -160,6 +160,39 @@ provisioned instance with its own file — `node --env-file=<instance>/.env
 bridge/server.cjs` — and read **both** stdout and stderr at startup: the banner is
 on stdout, credential warnings on stderr.
 
+## Licence: tiers and caps (R3)
+
+A client instance is licensed by plain values in its `.env`, written by
+`provision-instance.mjs --tier starter|pro|enterprise [--cap-channels N]
+[--cap-seats N] [--cap-agents N]` and readable on the cockpit through the operator
+channel (Tenant modal → "Licence and usage"). Instances run in Mediagenix's cloud,
+so the env is operator-controlled; a signed licence is recorded as a residual for
+instances outside that control.
+
+| Tier | Includes |
+|---|---|
+| `starter` | manual key results and check-ins |
+| `pro` | + live KRs (bridge and agent), goal templates, connector agents, history and reports |
+| `enterprise` | + the Mediagenix sharing channel (fleet board); later Insights AI |
+
+Caps are numbers, independent of the tier; blank means unlimited. **Seats** count
+owners and managers — members are viewers and free. **Channels** count across the
+instance's client. **Agents** count enrolled, unrevoked agents.
+
+Enforcement is server-side (FF-8): a route outside the tier answers
+`403 {error:'entitlement', feature, tier}`; a write past a cap answers
+`403 {error:'entitlement_cap', dimension, cap, requested}`. The live-KR sync loop and
+the sharing push loop do not start on an instance whose licence lacks them. The UI
+reads the tier from `/api/health` and hides the affordances (live toggle, Templates,
+sharing, agent enrolment, KPI configuration). `BRIDGE_TIER` unset on a client
+instance means enterprise, and the startup banner says so. The desktop edition and
+the cockpit are unrestricted.
+
+`GET /api/usage` (owner; the cockpit over the operator channel) reports the tier,
+caps, seats (editors / viewers), channels, agents, live and shared KRs, active and
+archived goals. `GET /api/cockpit/usage` aggregates every registered tenant with
+totals and a per-tier count — the invoicing input.
+
 ## Operator channel (cockpit → client instances)
 
 Mediagenix onboards a client on the **cockpit**: binding the instance's WHATS'ON

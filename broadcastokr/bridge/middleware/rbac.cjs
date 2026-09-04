@@ -83,6 +83,8 @@ const POLICY = [
   { method: 'POST', path: /^\/api\/agents\/enrol-token$/, perm: 'ownerOnly' },
   { method: 'DELETE', path: /^\/api\/agents(\/|$)/, perm: 'ownerOnly' },
   { method: 'GET', path: /^\/api\/sync\/backup$/, perm: 'ownerOnly' },
+  // Licence and usage (R3): the instance's owner, and the cockpit over the operator channel
+  { method: 'GET', path: /^\/api\/usage$/, perm: 'ownerOnly' },
 ];
 
 /**
@@ -102,6 +104,7 @@ const OPERATOR_ALLOW = [
   { method: 'GET', path: /^\/api\/agents$/ },
   { method: 'POST', path: /^\/api\/agents\/enrol-token$/ },
   { method: 'DELETE', path: /^\/api\/agents\/[^/]+$/ },
+  { method: 'GET', path: /^\/api\/usage$/ },
 ];
 
 function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } = {}) {

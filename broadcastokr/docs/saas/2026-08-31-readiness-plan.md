@@ -71,7 +71,9 @@ following the runbook only.
   (the entitlement twin of FF-3).
 
 **Exit:** a staging instance provisioned at each tier behaves per its entitlement;
-one fleet usage report covers everything an invoice needs.
+one fleet usage report covers everything an invoice needs. **DONE 2026-09-04** (FF-8
+`entitlements.test.cjs` spawns an instance per tier; `GET /api/cockpit/usage`;
+`docs/gpm/state/r3-backlog-2026-09-04.md`).
 
 ## R4 — Security hardening residuals · L
 

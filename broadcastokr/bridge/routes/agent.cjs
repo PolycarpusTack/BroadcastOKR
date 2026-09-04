@@ -2,6 +2,7 @@ const { createRouter } = require('../utils/router.cjs');
 const crypto = require('crypto');
 const { audit } = require('../audit.cjs');
 const { applySyncedValue } = require('../liveSync.cjs');
+const { capViolation } = require('../entitlements.cjs');
 
 const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const ENROL_TTL_MS = 15 * 60 * 1000;
@@ -23,6 +24,10 @@ function createAgentRouters(db) {
   // ── Operator surface ──
 
   ops.post('/enrol-token', (req, res) => {
+    // Agents cap (R3): counts enrolled, unrevoked agents; a token is the promise of one more
+    const active = db.prepare('SELECT COUNT(*) AS c FROM agents WHERE revoked_at IS NULL').get().c;
+    const overCap = capViolation('agents', active + 1);
+    if (overCap) return res.status(403).json(overCap);
     const token = crypto.randomBytes(24).toString('hex');
     db.prepare('INSERT INTO agent_enrol_tokens (token_hash, expires_at) VALUES (?, ?)')
       .run(sha256(token), new Date(Date.now() + ENROL_TTL_MS).toISOString());

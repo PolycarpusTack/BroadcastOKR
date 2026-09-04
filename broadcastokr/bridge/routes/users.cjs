@@ -1,5 +1,6 @@
 const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
+const { capViolation, editorCountAfter } = require('../entitlements.cjs');
 
 function toUserDTO(row) {
   return {
@@ -20,6 +21,9 @@ function createUsersRouter(db) {
 
   router.post('/', (req, res) => {
     const u = req.body;
+    // Seats (R3): owners and managers occupy one; members are viewers and free
+    const overCap = capViolation('seats', editorCountAfter(db, { id: u.id, role: u.role }));
+    if (overCap) return res.status(403).json(overCap);
     db.prepare(`INSERT INTO users (id, name, role, av, color, dept, title, email, phone, avatar_url, client_ids, skills)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(u.id, u.name, u.role, u.av, u.color, u.dept, u.title, u.email || null, u.phone || null,
@@ -31,6 +35,8 @@ function createUsersRouter(db) {
     const u = req.body;
     const before = db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.params.id);
     if (before && u.role && before.role !== u.role) {
+      const overCap = capViolation('seats', editorCountAfter(db, { id: req.params.id, role: u.role }));
+      if (overCap) return res.status(403).json(overCap);
       audit(db, req, `Changed role of ${before.name}: ${before.role} → ${u.role}`);
     }
     db.prepare(`UPDATE users SET name=?, role=?, av=?, color=?, dept=?, title=?, email=?, phone=?,

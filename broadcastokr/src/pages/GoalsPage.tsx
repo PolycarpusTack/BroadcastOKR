@@ -66,9 +66,11 @@ export function GoalsPage({
   const { currentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
-  const { mode } = useDeployment();
+  const { mode, entitled } = useDeployment();
   // Owner-only, cloud editions: KR-level "share with Mediagenix" toggle
-  const showSharing = mode !== 'desktop' && permissions.canDelete;
+  const showSharing = mode !== 'desktop' && permissions.canDelete && entitled('sharing');
+  const templatesEntitled = entitled('templates');
+  const liveKRsEntitled = entitled('liveKRs');
   const {
     goals, addGoal, checkInKR, updateGoal, deleteGoal, syncLiveKRBatch, setMonitor, setPeriodArchived,
     goalTemplates, clients, users,
@@ -485,7 +487,8 @@ export function GoalsPage({
         >
           Goals
         </button>
-        <button
+        {templatesEntitled && (
+<button
           onClick={() => setView('templates')}
           style={{
             padding: '6px 16px',
@@ -500,6 +503,7 @@ export function GoalsPage({
         >
           Templates ({goalTemplates.length})
         </button>
+)}
       </div>
 
       {/* Staleness banner — live KR data older than threshold */}
@@ -599,7 +603,7 @@ export function GoalsPage({
             {restorablePeriods.map((p) => <option key={p.period} value={p.period}>{p.period} ({p.count})</option>)}
           </select>
         )}
-        {hasAnyLiveKRs && bridgeConnected && (
+        {hasAnyLiveKRs && bridgeConnected && liveKRsEntitled && (
           <button
             onClick={syncAllLiveKRs}
             disabled={syncingGoalId === 'all'}

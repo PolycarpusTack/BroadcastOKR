@@ -93,6 +93,17 @@ export function SystemHealthPanel({ theme, connected, health, updateAvailable = 
                   {' · '}bridge <b style={{ color: health.version === __APP_VERSION__ ? theme.text : COLOR_WARNING }}>{health.version}</b>
                 </>
               )}
+              {health.tier && health.mode !== 'desktop' && (
+                <div style={{ marginTop: 4 }}>
+                  licence <b style={{ color: theme.text }}>{health.tier}</b>
+                  {health.caps && Object.values(health.caps).some((v) => v !== null) && (
+                    <span style={{ color: theme.textMuted }}>
+                      {' · caps '}
+                      {Object.entries(health.caps).filter(([, v]) => v !== null).map(([k, v]) => `${k} ${v}`).join(', ')}
+                    </span>
+                  )}
+                </div>
+              )}
               {updateAvailable && (
                 <div style={{ marginTop: 4, color: COLOR_WARNING }}>
                   {'⬆️'} {updateAvailable.version} is available —{' '}
