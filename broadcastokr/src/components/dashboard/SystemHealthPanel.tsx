@@ -1,4 +1,5 @@
 import type { Theme } from '../../types';
+import type { LatestRelease } from '../../utils/updates';
 import type { BridgeHealth } from '../../hooks/useBridge';
 import { formatUptime } from '../../utils/dates';
 import {
@@ -10,6 +11,7 @@ interface SystemHealthPanelProps {
   theme: Theme;
   connected: boolean;
   health: BridgeHealth | null;
+  updateAvailable?: LatestRelease | null;
 }
 
 function Stat({ theme, label, value, color }: { theme: Theme; label: string; value: string; color?: string }) {
@@ -30,7 +32,7 @@ function DriverDot({ theme, label, up, color }: { theme: Theme; label: string; u
   );
 }
 
-export function SystemHealthPanel({ theme, connected, health }: SystemHealthPanelProps) {
+export function SystemHealthPanel({ theme, connected, health, updateAvailable = null }: SystemHealthPanelProps) {
   const cardStyle = {
     background: theme.bgCard,
     border: `1px solid ${theme.border}`,
@@ -90,6 +92,12 @@ export function SystemHealthPanel({ theme, connected, health }: SystemHealthPane
                 <>
                   {' · '}bridge <b style={{ color: health.version === __APP_VERSION__ ? theme.text : COLOR_WARNING }}>{health.version}</b>
                 </>
+              )}
+              {updateAvailable && (
+                <div style={{ marginTop: 4, color: COLOR_WARNING }}>
+                  {'⬆️'} {updateAvailable.version} is available —{' '}
+                  <a href={updateAvailable.url} target="_blank" rel="noreferrer" style={{ color: COLOR_WARNING }}>release notes and installer</a>
+                </div>
               )}
             </div>
             <div style={{ fontSize: 10, color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Database Drivers</div>

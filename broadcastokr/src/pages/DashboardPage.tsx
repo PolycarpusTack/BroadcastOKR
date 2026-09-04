@@ -14,6 +14,7 @@ import { LiveKPIPanel } from '../components/kpi/LiveKPIPanel';
 import { SystemHealthPanel } from '../components/dashboard/SystemHealthPanel';
 import { FleetMetricsPanel } from '../components/dashboard/FleetMetricsPanel';
 import { activeGoals } from '../utils/goals';
+import type { LatestRelease } from '../utils/updates';
 import { progressColor, statusIcon, kpiStatus } from '../utils/colors';
 import { daysUntil, getUrgencyBadge } from '../utils/dates';
 import { cardStyle as makeCardStyle } from '../utils/styles';
@@ -28,6 +29,8 @@ interface DashboardPageProps {
   liveKPIs?: LiveKPI[];
   drivers?: DriverStatus;
   health?: BridgeHealth | null;
+  /** A newer desktop release, when the daily check found one (R7-2). */
+  updateAvailable?: LatestRelease | null;
   onStartBridge?: () => Promise<{ ok: boolean; message: string }>;
   onStopBridge?: () => Promise<{ ok: boolean; message: string }>;
   onSyncNow?: () => Promise<void>;
@@ -38,7 +41,7 @@ const noopVoid = () => Promise.resolve();
 
 export function DashboardPage({
   onOpenKPIConfig, bridgeConnected = false, bridgeRunning = false,
-  bridgeSyncing = false, liveKPIs = [], drivers, health = null,
+  bridgeSyncing = false, liveKPIs = [], drivers, health = null, updateAvailable = null,
   onStartBridge = noopAsync, onStopBridge = noopAsync, onSyncNow = noopVoid,
 }: DashboardPageProps) {
   const { theme, dark } = useTheme();
@@ -227,7 +230,7 @@ export function DashboardPage({
       </div>
 
       {/* System Health */}
-      <SystemHealthPanel theme={theme} connected={bridgeConnected} health={health} />
+      <SystemHealthPanel theme={theme} connected={bridgeConnected} health={health} updateAvailable={updateAvailable} />
     </div>
   );
 }
