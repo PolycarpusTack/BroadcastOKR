@@ -1,0 +1,233 @@
+name: Release
+
+# One tag builds and publishes every artifact (R7): desktop installers,
+# instance images (client + cockpit) on GHCR, the connector-agent bundle, and
+# a GitHub Release with generated notes. The tag is the version: vX.Y.Z must
+# equal both package.json versions, or the run stops before building anything.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: broadcastokr/package-lock.json
+
+      - name: Tag must equal the package versions
+        id: tag
+        working-directory: broadcastokr
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          APP=$(node -p "require('./package.json').version")
+          BRIDGE=$(node -p "require('./bridge/package.json').version")
+          echo "tag=$TAG app=$APP bridge=$BRIDGE"
+          if [ "$TAG" != "$APP" ] || [ "$TAG" != "$BRIDGE" ]; then
+            echo "::error::tag v$TAG does not match package.json ($APP) / bridge/package.json ($BRIDGE) — bump and re-tag"
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        working-directory: broadcastokr
+        run: npm ci
+
+      - name: TypeScript check
+        working-directory: broadcastokr
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: broadcastokr
+        run: npm run lint
+
+      - name: Unit tests
+        working-directory: broadcastokr
+        run: npx vitest run
+
+      - name: Bridge tests
+        working-directory: broadcastokr
+        run: node --test bridge/__tests__/*.test.cjs
+
+      - name: Build every edition and run the FF-1 sentinel check
+        working-directory: broadcastokr
+        run: |
+          for edition in desktop client internal; do
+            VITE_EDITION=$edition npx vite build --outDir dist-$edition
+            node scripts/check-edition-bundle.mjs $edition dist-$edition
+          done
+
+      - name: Protocol fixtures (FF-5) — verify, capture a new version if needed
+        working-directory: broadcastokr
+        run: node scripts/capture-protocol-fixtures.mjs
+
+      - name: Open a PR when new fixtures were captured
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "test(bridge): FF-5 fixtures captured at ${{ github.ref_name }}"
+          title: "FF-5 fixtures captured at ${{ github.ref_name }}"
+          body: "Golden requests for the new protocol version, captured by the release workflow. Review, then merge."
+          branch: ci/ff5-fixtures-${{ github.ref_name }}
+          add-paths: broadcastokr/bridge/__tests__/fixtures/**
+
+  desktop:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: electron:build
+            glob: |
+              broadcastokr/installer/*.exe
+              broadcastokr/installer/*.exe.blockmap
+          - os: ubuntu-latest
+            script: electron:build:linux
+            glob: |
+              broadcastokr/installer/*.AppImage
+              broadcastokr/installer/*.deb
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: broadcastokr/package-lock.json
+
+      - name: Install dependencies
+        working-directory: broadcastokr
+        run: npm ci
+
+      # electron:build* runs `npm run build`, then forces the better-sqlite3
+      # rebuild for Electron's ABI before electron-builder packages — the order
+      # that bit 0.9.1 (CLAUDE.md, Testing).
+      - name: Build installer
+        working-directory: broadcastokr
+        run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: ${{ matrix.glob }}
+          if-no-files-found: error
+
+  image:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: client
+            mode: client
+          - edition: internal
+            mode: cockpit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image name (GHCR needs a lower-case owner)
+        id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/broadcastokr-instance" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: broadcastokr
+          file: broadcastokr/Dockerfile
+          push: true
+          build-args: |
+            EDITION=${{ matrix.edition }}
+            MODE=${{ matrix.mode }}
+            APP_VERSION=${{ needs.verify.outputs.version }}
+          tags: |
+            ${{ steps.name.outputs.image }}:${{ needs.verify.outputs.version }}-${{ matrix.mode }}
+            ${{ steps.name.outputs.image }}:latest-${{ matrix.mode }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.verify.outputs.version }}
+
+  agent:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build the connector-agent bundle
+        working-directory: broadcastokr
+        run: node scripts/build-agent-bundle.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-bundle
+          path: broadcastokr/dist-agent/*.tgz
+          if-no-files-found: error
+
+  release:
+    needs: [verify, desktop, image, agent]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Release notes footer (images)
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          V="${{ needs.verify.outputs.version }}"
+          {
+            echo ""
+            echo "### Instance images"
+            echo '```'
+            echo "ghcr.io/$OWNER/broadcastokr-instance:$V-client"
+            echo "ghcr.io/$OWNER/broadcastokr-instance:$V-cockpit"
+            echo '```'
+            echo "Desktop installers and the connector-agent bundle are attached below. Upgrading an install that still has a config.json: the first start imports it (docs/operations.md, Updating)."
+          } > footer.md
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "BroadcastOKR $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes-file footer.md \
+            artifacts/desktop-windows-latest/* \
+            artifacts/desktop-ubuntu-latest/* \
+            artifacts/agent-bundle/*

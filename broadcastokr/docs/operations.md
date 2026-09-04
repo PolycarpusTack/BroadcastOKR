@@ -266,6 +266,40 @@ be addressed at the bridge URL:
 2. Restore from the latest backup (see Restore above)
 3. If no backup exists, delete `broadcastokr.db` — the bridge will recreate it with an empty schema on startup
 
+## Releases (R7)
+
+One tag builds everything. A release is a version-bump commit on `main`
+(`package.json` and `bridge/package.json` must both carry the version) followed by
+a tag:
+
+```bash
+npm version 0.9.2 --no-git-tag-version      # package.json + lockfile
+# set the same version in bridge/package.json, commit, then:
+git tag v0.9.2 && git push origin v0.9.2
+```
+
+`.github/workflows/release.yml` then runs the full suite (and refuses a tag that
+does not match the package versions), builds the Windows and Linux desktop
+installers, pushes the instance images
+`ghcr.io/<owner>/broadcastokr-instance:<version>-client` and `…-cockpit` (also
+`latest-client` / `latest-cockpit`), builds the connector-agent bundle
+(`brokr-agent-<version>.tgz`: `agent.cjs`, the WHATS'ON core, a manifest with the
+DB drivers as optional dependencies, a README), and publishes a GitHub Release
+with generated notes, the installers and the agent bundle attached, and the image
+names in the notes. FF-5 fixtures for a new protocol version are captured in the
+same run and land as a pull request.
+
+Locally: `node scripts/build-agent-bundle.mjs` (→ `dist-agent/`),
+`node scripts/capture-protocol-fixtures.mjs` (verifies the golden requests against
+the working tree), `docker compose build` (uses `broadcastokr/Dockerfile`; args
+`EDITION=client|internal`, `MODE=client|cockpit`).
+
+**Desktop update signal:** the desktop edition asks GitHub for the newest release
+once a day after its first healthy bridge poll and shows a passive toast plus a
+line in the Dashboard's System Health panel. Nothing is downloaded; the operator
+installs the new installer over the old one (the first start imports a leftover
+`config.json`, see below).
+
 ## Updating
 
 ### Docker

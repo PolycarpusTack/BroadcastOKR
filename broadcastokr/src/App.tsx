@@ -23,6 +23,7 @@ import { useBridge } from './hooks/useBridge';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { useToast } from './context/ToastContext';
+import { checkForNewerRelease, type LatestRelease } from './utils/updates';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR } from './constants/config';
 import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
@@ -195,6 +196,20 @@ export default function App() {
     };
   }, [toast]);
 
+  // Desktop update signal (R7-2): the desktop has no operator upgrading it, so
+  // once a day it asks GitHub for the newest release and says so, passively.
+  const [updateAvailable, setUpdateAvailable] = useState<LatestRelease | null>(null);
+  useEffect(() => {
+    if (!window.electronAPI?.isElectron || !connected) return;
+    let cancelled = false;
+    checkForNewerRelease(__APP_VERSION__).then((latest) => {
+      if (cancelled || !latest) return;
+      setUpdateAvailable(latest);
+      toast(`BroadcastOKR ${latest.version} is available — see the Dashboard's System Health panel`, COLOR_WARNING, '⬆️');
+    });
+    return () => { cancelled = true; };
+  }, [connected, toast]);
+
   // Cloud editions gate on the server session; desktop is always 'ready'
   if (authStatus !== 'ready') {
     return (
@@ -246,6 +261,7 @@ export default function App() {
               liveKPIs={liveKPIs}
               drivers={drivers}
               health={health}
+              updateAvailable={updateAvailable}
               onStartBridge={startBridge}
               onStopBridge={stopBridge}
               onSyncNow={syncNow}

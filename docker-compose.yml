@@ -2,7 +2,14 @@ version: "3.8"
 
 services:
   bridge:
-    build: ./broadcastokr/bridge
+    # The instance image: app bundle + bridge (broadcastokr/Dockerfile). Tagged
+    # images are published by the release workflow as
+    # ghcr.io/<owner>/broadcastokr-instance:<version>-{client,cockpit}.
+    build:
+      context: ./broadcastokr
+      args:
+        EDITION: client
+        MODE: client
     ports:
       - "3001:3001"
     volumes:
