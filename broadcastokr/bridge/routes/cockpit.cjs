@@ -136,12 +136,13 @@ function createCockpitRouter(db, { cipher } = {}) {
   router.get('/tenants/:clientId/status', cockpitOnly, async (req, res) => {
     const tenant = registeredTenant(req, res);
     if (!tenant) return;
-    const out = { reachable: false, version: null, mode: null, operatorAccepted: false, client: null, detail: null };
+    const out = { reachable: false, version: null, mode: null, tier: null, operatorAccepted: false, client: null, detail: null };
     try {
       const health = await callTenant({ instanceUrl: tenant.instanceUrl }, 'GET', '/api/health', undefined, { timeoutMs: 5000 });
       out.reachable = health.status === 200;
       out.version = health.body?.version || null;
       out.mode = health.body?.mode || null;
+      out.tier = health.body?.tier || null;
       if (out.reachable) {
         const probe = await callTenant(tenant, 'GET', '/api/clients');
         out.operatorAccepted = probe.status === 200;
@@ -198,6 +199,38 @@ function createCockpitRouter(db, { cipher } = {}) {
     } catch (err) {
       res.status(502).json({ error: 'tenant_unreachable', detail: `${tenant.name} at ${tenant.instanceUrl}: ${err.message}` });
     }
+  });
+
+  router.get('/tenants/:clientId/usage', cockpitOnly, (req, res) => forward(req, res, 'GET', '/api/usage'));
+
+  // Every registered tenant's licence and usage in one report — the invoicing input (R3).
+  router.get('/usage', cockpitOnly, async (req, res) => {
+    const rows = db.prepare(`SELECT c.id AS client_id, c.name, t.instance_url, t.operator_token
+      FROM clients c JOIN cockpit_tenants t ON t.client_id = c.id
+      WHERE t.instance_url != '' AND t.operator_token != '' ORDER BY c.name`).all();
+    const tenants = await Promise.all(rows.map(async (r) => {
+      let operatorToken;
+      try { operatorToken = cipher.decrypt(r.operator_token); }
+      catch { return { clientId: r.client_id, name: r.name, error: 'operator_token_unreadable' }; }
+      try {
+        const { status, body } = await callTenant({ instanceUrl: r.instance_url, operatorToken }, 'GET', '/api/usage');
+        if (status !== 200) return { clientId: r.client_id, name: r.name, error: body?.error || `HTTP ${status}` };
+        return { clientId: r.client_id, name: r.name, usage: body };
+      } catch (err) {
+        return { clientId: r.client_id, name: r.name, error: `unreachable: ${err.message}` };
+      }
+    }));
+    const reported = tenants.filter((t) => t.usage);
+    const totals = {
+      tenants: tenants.length, reporting: reported.length,
+      seats: reported.reduce((n, t) => n + t.usage.seats.editors, 0),
+      channels: reported.reduce((n, t) => n + t.usage.channels, 0),
+      agents: reported.reduce((n, t) => n + t.usage.agents.active, 0),
+      liveKRs: reported.reduce((n, t) => n + t.usage.liveKRs, 0),
+      sharedKRs: reported.reduce((n, t) => n + t.usage.sharedKRs, 0),
+      byTier: reported.reduce((m, t) => ({ ...m, [t.usage.tier]: (m[t.usage.tier] || 0) + 1 }), {}),
+    };
+    res.json({ computedAt: new Date().toISOString(), totals, tenants });
   });
 
   router.get('/tenants/:clientId/agents', cockpitOnly, (req, res) => forward(req, res, 'GET', '/api/agents'));
