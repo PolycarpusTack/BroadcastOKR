@@ -22,9 +22,24 @@ export interface TenantStatus {
   reachable: boolean;
   version: string | null;
   mode: string | null;
+  /** The tenant's licence tier (R3), from its public health. */
+  tier: 'starter' | 'pro' | 'enterprise' | null;
   operatorAccepted: boolean;
   client: Client | null;
   detail: string | null;
+}
+
+/** GET /api/usage on an instance (R3). */
+export interface TenantUsage {
+  tier: 'starter' | 'pro' | 'enterprise';
+  caps: { channels: number | null; seats: number | null; agents: number | null };
+  seats: { total: number; editors: number; viewers: number };
+  channels: number;
+  agents: { active: number; revoked: number };
+  liveKRs: number;
+  sharedKRs: number;
+  goals: { active: number; archived: number };
+  computedAt: string;
 }
 
 export interface AgentInfo {
@@ -56,6 +71,8 @@ export const cockpitApi = {
     call<{ ok: boolean; tenant: TenantSummary }>(`/api/cockpit/tenants/${clientId}`, json('PUT', input)),
 
   tenantStatus: (clientId: string) => call<TenantStatus>(`/api/cockpit/tenants/${clientId}/status`),
+
+  tenantUsage: (clientId: string) => call<TenantUsage>(`/api/cockpit/tenants/${clientId}/usage`),
 
   mintShareToken: (clientId: string) =>
     call<{ ok: boolean; clientId: string; token: string }>('/api/cockpit/tenants', json('POST', { clientId })),

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useDeployment } from '../context/DeploymentContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/store';
@@ -45,6 +46,7 @@ export function DashboardPage({
   onStartBridge = noopAsync, onStopBridge = noopAsync, onSyncNow = noopVoid,
 }: DashboardPageProps) {
   const { theme, dark } = useTheme();
+  const { entitled } = useDeployment();
   const navigate = useNavigate();
   const { goals: allGoals, tasks, kpis, users } = useStore(
     useShallow((s) => ({
@@ -117,7 +119,7 @@ export function DashboardPage({
         syncing={bridgeSyncing}
         drivers={drivers}
         theme={theme}
-        onConfigure={onOpenKPIConfig || (() => {})}
+        onConfigure={entitled('liveKRs') ? (onOpenKPIConfig || (() => {})) : undefined}
         onStartBridge={onStartBridge}
         onStopBridge={onStopBridge}
         onSyncNow={onSyncNow}

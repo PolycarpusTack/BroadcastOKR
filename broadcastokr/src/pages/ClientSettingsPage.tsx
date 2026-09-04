@@ -6,6 +6,7 @@ import { useStore } from '../store/store';
 import { toConnectionInput } from '../utils/connections';
 import { AgentsPanel } from '../components/clients/AgentsPanel';
 import { ownAgentsApi } from '../utils/cockpitApi';
+import { useDeployment } from '../context/DeploymentContext';
 import { COLOR_SUCCESS, COLOR_DANGER, FONT_HEADING, FONT_MONO } from '../constants/config';
 import type { DBConnection } from '../types';
 
@@ -24,6 +25,7 @@ interface ClientSettingsPageProps {
 export function ClientSettingsPage({ bridgeConnected = false, testConnection, getConnections, getChannels }: ClientSettingsPageProps) {
   const { theme } = useTheme();
   const { permissions } = useAuth();
+  const { entitled } = useDeployment();
   const { toast } = useToast();
   const client = useStore((s) => s.clients[0]);
   const updateClient = useStore((s) => s.updateClient);
@@ -144,7 +146,7 @@ export function ClientSettingsPage({ bridgeConnected = false, testConnection, ge
 
       {bridgeConnected && (
         <div style={card}>
-          <AgentsPanel api={ownAgentsApi} canManage={permissions.canDelete} theme={theme} />
+          <AgentsPanel api={ownAgentsApi} canManage={permissions.canDelete} canEnrol={entitled('agents')} theme={theme} />
         </div>
       )}
     </div>

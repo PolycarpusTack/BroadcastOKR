@@ -3,7 +3,8 @@ import { Modal } from '../ui/Modal';
 import { ConnectionFields } from './ConnectionFields';
 import { AgentsPanel } from './AgentsPanel';
 import { emptyConnectionDraft, draftToConnection, type ConnectionDraft } from './connectionDraft';
-import { cockpitApi as defaultApi, type CockpitApi, type TenantStatus, type TenantSummary } from '../../utils/cockpitApi';
+import { cockpitApi as defaultApi, type CockpitApi, type TenantStatus, type TenantSummary, type TenantUsage } from '../../utils/cockpitApi';
+import { TIER_FEATURES } from '../../editions/entitlements';
 import { formatTimeAgo } from '../../utils/dates';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, FONT_MONO } from '../../constants/config';
@@ -31,6 +32,7 @@ export function TenantModal({ open, onClose, client, theme, api = defaultApi }: 
 
   const [summary, setSummary] = useState<TenantSummary | null>(null);
   const [status, setStatus] = useState<TenantStatus | null>(null);
+  const [usage, setUsage] = useState<TenantUsage | null>(null);
   const [instanceUrl, setInstanceUrl] = useState('');
   const [operatorToken, setOperatorToken] = useState('');
   const [connections, setConnections] = useState<DBConnection[]>([]);
@@ -60,6 +62,7 @@ export function TenantModal({ open, onClose, client, theme, api = defaultApi }: 
           const list = await api.tenantConnections(clientId);
           setConnections(list);
           setSelected(s.client?.connectionId ?? '');
+          setUsage(await api.tenantUsage(clientId).catch(() => null));
         }
       } else {
         setStatus(null);
@@ -172,10 +175,28 @@ export function TenantModal({ open, onClose, client, theme, api = defaultApi }: 
             {summary?.instanceUrl && !status && <span style={{ color: theme.textMuted }}>Checking…</span>}
             {status && !status.reachable && <span style={{ color: COLOR_DANGER }}>✕ Unreachable{status.detail ? ` — ${status.detail}` : ''}</span>}
             {status?.reachable && !status.operatorAccepted && <span style={{ color: COLOR_WARNING }}>⚠ Reachable (v{status.version}), operator token refused{status.detail ? ` — ${status.detail}` : ''}</span>}
-            {status?.reachable && status.operatorAccepted && <span style={{ color: COLOR_SUCCESS }}>✓ Reachable · v{status.version} · operator token accepted</span>}
+            {status?.reachable && status.operatorAccepted && <span style={{ color: COLOR_SUCCESS }}>✓ Reachable · v{status.version}{status.tier ? ` · ${status.tier} licence` : ''} · operator token accepted</span>}
           </span>
         </div>
       </div>
+
+      {/* Licence and usage (R3) — the invoicing view of one tenant */}
+      {usage && (
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <div style={labelStyle(theme)}>Licence and usage</div>
+            <span style={{ fontSize: 12, color: theme.textMuted }}>{usage.tier}</span>
+          </div>
+          <div data-testid="tenant-usage" style={{ ...mono, marginTop: 8, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            <span>seats {usage.seats.editors}{usage.caps.seats !== null ? ` / ${usage.caps.seats}` : ''} <span style={{ color: theme.textMuted }}>(+{usage.seats.viewers} viewers)</span></span>
+            <span>channels {usage.channels}{usage.caps.channels !== null ? ` / ${usage.caps.channels}` : ''}</span>
+            <span>agents {usage.agents.active}{usage.caps.agents !== null ? ` / ${usage.caps.agents}` : ''}</span>
+            <span>live KRs {usage.liveKRs}</span>
+            <span>shared KRs {usage.sharedKRs}</span>
+            <span>goals {usage.goals.active} <span style={{ color: theme.textMuted }}>(+{usage.goals.archived} archived)</span></span>
+          </div>
+        </div>
+      )}
 
       {/* Share channel */}
       <div style={card}>
@@ -246,7 +267,7 @@ export function TenantModal({ open, onClose, client, theme, api = defaultApi }: 
       {/* Agents — same gate */}
       {status?.operatorAccepted && agentsApi && (
         <div style={card}>
-          <AgentsPanel api={agentsApi} canManage instanceUrl={summary?.instanceUrl} theme={theme} />
+          <AgentsPanel api={agentsApi} canManage canEnrol={status.tier ? TIER_FEATURES[status.tier].agents : true} instanceUrl={summary?.instanceUrl} theme={theme} />
         </div>
       )}
 

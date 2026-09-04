@@ -16,6 +16,10 @@ function fakeApi(overrides: Partial<CockpitApi> = {}, state: { summary: TenantSu
       return { ok: true, tenant: state.summary };
     }),
     tenantStatus: vi.fn(async () => state.status),
+    tenantUsage: vi.fn(async () => ({
+      tier: 'pro' as const, caps: { channels: 10, seats: 5, agents: 2 }, seats: { total: 3, editors: 2, viewers: 1 },
+      channels: 4, agents: { active: 1, revoked: 0 }, liveKRs: 3, sharedKRs: 1, goals: { active: 2, archived: 1 }, computedAt: '2026-09-04T00:00:00Z',
+    })),
     mintShareToken: vi.fn(async () => ({ ok: true, clientId: 't0', token: 'share-once' })),
     tenantConnections: vi.fn(async () => [
       { id: 'conn_psi', name: 'PSI', type: 'postgres' as const, host: 'db', port: 5432, service: 'w', schema: 'psi', user: 'u', password: '***' },
@@ -40,12 +44,12 @@ function fakeApi(overrides: Partial<CockpitApi> = {}, state: { summary: TenantSu
 
 const unregistered = (): { summary: TenantSummary; status: TenantStatus } => ({
   summary: { clientId: 't0', name: 'Tenant Zero', instanceUrl: '', operatorTokenSet: false, shareTokenMintedAt: null },
-  status: { reachable: false, version: null, mode: null, operatorAccepted: false, client: null, detail: null },
+  status: { reachable: false, version: null, mode: null, tier: null, operatorAccepted: false, client: null, detail: null },
 });
 
 const registered = (): { summary: TenantSummary; status: TenantStatus } => ({
   summary: { clientId: 't0', name: 'Tenant Zero', instanceUrl: 'http://tenant', operatorTokenSet: true, shareTokenMintedAt: null },
-  status: { reachable: true, version: '0.9.1', mode: 'client', operatorAccepted: true, client: { ...client, id: 'client_t0' }, detail: null },
+  status: { reachable: true, version: '0.9.1', mode: 'client', tier: 'pro', operatorAccepted: true, client: { ...client, id: 'client_t0' }, detail: null },
 });
 
 describe('TenantModal', () => {
@@ -65,7 +69,8 @@ describe('TenantModal', () => {
     const state = registered();
     const api = fakeApi({}, state);
     render(<TenantModal open onClose={() => {}} client={client} theme={theme} api={api} />);
-    await screen.findByText(/Reachable · v0.9.1 · operator token accepted/);
+    await screen.findByText(/Reachable · v0.9.1 · pro licence · operator token accepted/);
+    expect((await screen.findByTestId('tenant-usage')).textContent).toContain('seats 2 / 5');
     expect(screen.getByText(/no connection bound/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Tenant connection'), { target: { value: 'conn_psi' } });
     fireEvent.click(screen.getByText('Bind'));

@@ -92,6 +92,10 @@ export interface BridgeHealth {
    *  a backup restored elsewhere, or a rotated key. Otherwise invisible: every
    *  live KR on that connection just fails with a generic query error. */
   credentials?: { unreadable: number };
+  /** Licence (R3): tier is public; entitlements and caps come with the signed-in health */
+  tier?: 'starter' | 'pro' | 'enterprise';
+  entitlements?: Record<'liveKRs' | 'agents' | 'templates' | 'sharing', boolean>;
+  caps?: { channels: number | null; seats: number | null; agents: number | null };
 }
 
 export function useBridge() {

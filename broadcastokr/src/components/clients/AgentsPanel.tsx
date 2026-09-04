@@ -11,6 +11,8 @@ export interface AgentsPanelProps {
   canManage: boolean;
   /** Where the agent will push to — goes into the enrol command shown once. */
   instanceUrl?: string;
+  /** False when the instance's licence has no agents (R3): the list stays, minting does not. */
+  canEnrol?: boolean;
   theme: Theme;
 }
 
@@ -21,7 +23,7 @@ export interface AgentsPanelProps {
  * tenant modal (a tenant's agents, through the operator channel) — the `api`
  * prop is the only difference (R6-1).
  */
-export function AgentsPanel({ api, canManage, instanceUrl, theme }: AgentsPanelProps) {
+export function AgentsPanel({ api, canManage, instanceUrl, canEnrol = true, theme }: AgentsPanelProps) {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [minted, setMinted] = useState<{ token: string; expiresInMinutes: number } | null>(null);
@@ -72,10 +74,13 @@ export function AgentsPanel({ api, canManage, instanceUrl, theme }: AgentsPanelP
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <div style={label}>Connector agents ({agents.length})</div>
-        {canManage && (
+        {canManage && canEnrol && (
           <button onClick={mint} disabled={busy} style={{ ...buttonStyle(PRIMARY_COLOR, busy), marginLeft: 'auto', fontSize: 12, padding: '6px 12px' }}>
             New enrolment token
           </button>
+        )}
+        {canManage && !canEnrol && (
+          <span style={{ marginLeft: 'auto', fontSize: 11.5, color: theme.textMuted }}>Connector agents are not in this instance's licence.</span>
         )}
       </div>
 

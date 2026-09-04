@@ -29,7 +29,7 @@ import { COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR } from './constants/config';
 import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
 import { useActivityLog } from './context/ActivityLogContext';
 import { DeploymentProvider } from './context/DeploymentContext';
-import { BUILD_EDITION, FLEET_IN_BUILD, setRuntimeMode, hasFeature, type TenancyMode } from './editions/entitlements';
+import { BUILD_EDITION, FLEET_IN_BUILD, setRuntimeMode, setRuntimeLicence, hasFeature, type TenancyMode, type Tier } from './editions/entitlements';
 import { logger } from './utils/logger';
 import { useSetupWizard } from './components/wizard/useSetupWizard';
 
@@ -72,6 +72,9 @@ export default function App() {
     return m === 'desktop' || m === 'client' || m === 'cockpit' ? m : BUILD_EDITION;
   }, [health?.mode]);
   useEffect(() => { setRuntimeMode(mode); }, [mode]);
+  // Licence (R3): the bridge's health carries the tier and the entitlement map
+  const tier: Tier = health?.tier ?? 'enterprise';
+  useEffect(() => { setRuntimeLicence(health?.tier, health?.entitlements); }, [health]);
   const fleet = hasFeature('fleet', mode);
 
   // First-run detection for the setup wizard. `null` means "not known yet" —
@@ -237,7 +240,7 @@ export default function App() {
   }
 
   return (
-    <DeploymentProvider mode={mode}>
+    <DeploymentProvider mode={mode} tier={tier}>
     <AppShell
       onCreateTask={() => setCreateTaskOpen(true)}
       connected={connected}
