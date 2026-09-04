@@ -1,5 +1,62 @@
 # Pickup Prompt — Next Session
 
+## 2026-09-04 (evening) — R3 done; next R4 residuals (decisions), R2 needs a Docker host (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
+`docs/gpm/state/r3-backlog-2026-09-04.md` (R3 DONE — tier map, licence carrier, FF-8),
+`docs/gpm/state/r7-backlog-2026-09-04.md` (R7 DONE — the release pipeline),
+`docs/saas/2026-08-31-readiness-plan.md` §R4, §R5, §R2 (what remains), and
+`docs/saas/readiness/r1-findings.md` (37 findings; daily log — day-2 line is Yannick's).
+`CLAUDE.md` is current.
+
+**Where we are:** main is `09e3a44`, CI green. Since the last block: **R3** shipped —
+licence tiers starter/pro/enterprise and caps (channels, seats = owners+managers, agents) as
+plain values in the provisioned env; server-side gates (`403 entitlement` / `entitlement_cap`),
+loops start only when licensed, `GET /api/usage` and the cockpit's `GET /api/cockpit/usage`
+(invoicing input), UI degrades per tier, FF-8 `entitlements.test.cjs` spawns an instance per
+tier. Before that: **R7** (v0.9.2 by CI alone), **R6** complete, **D-3**. Suites: 301 vitest ·
+206 bridge (205 on Windows — the `0600` case) · lint 0 · build green. Migrations to 010.
+
+**Readiness plan status:** R1 (rig running, day 2), R3, R6, R7 DONE. Open: **R4** hardening
+residuals (agent mTLS/pinning, delete-on-revoke decision, external pen test commissioning,
+plus the new residual "signed licence for instances outside Mediagenix's control"), **R5**
+compliance evidence pack, **R2** fleet-ops machinery (manifests, upgrade path, monitoring,
+restore drill) — **R2 and the pen test need a Docker host / staging**; this PC has none.
+
+**Rig (this PC):** restarted on `09e3a44`; tenant0's `.env` now carries
+`BRIDGE_TIER=enterprise` with caps channels 10 / seats 5 / agents 2 (the sharing channel needs
+enterprise; the caps make the Licence card and System Health line non-trivial). R3-3's hand
+walk is the first step: as owner on tenant0, System Health shows "licence enterprise · caps …";
+on the cockpit, Tenant Zero's modal shows "enterprise licence" in the status line and the
+"Licence and usage" card. Then flip tenant0 to `BRIDGE_TIER=starter` for one restart and
+confirm the Goals page loses the live toggle and Templates, the sync loop line disappears from
+the startup banner, and `/api/kpi/execute-batch` answers 403 — then put enterprise back.
+
+**Next — R4 residuals that need no infrastructure (decisions first, ask Yannick):**
+1. Delete-on-revoke for agents (both behaviours exist; pick the default, wire it, document it).
+2. Agent identity hardening: 0600 file + optional OS keystore; certificate pinning of the
+   instance on the agent side (a pinned SHA-256 of the instance's TLS cert in
+   `agent-config.json`, refuse on mismatch) is the cheapest real step toward mTLS.
+3. Signed licence design note (residual): what the cockpit would sign, how instances verify.
+Then **R5** (evidence pack: generate-evidence.sh exists — extend with FF-8 output, the release
+run, the operator channel). **R2** waits for a Docker host — raise it with Yannick.
+
+**Parallel:** Yannick installs 0.9.2 on the remote desktop against populated support
+databases. Watch findings 16 (thin mode) and 4/15 (channels on a real schema).
+
+**Gotchas (still true):** the assistant's Bash tool collapses a doubled backslash — Edit tool
+for those lines; Python scripted edits need `encoding='utf-8'` and per-file line-ending
+detection, and each `rep()` writes immediately. Long PowerShell/gh waits go to the background
+past the tool timeout — read the output file. `gh api` paths must not start with `/` here.
+Fleet route literals go behind `FLEET_IN_BUILD` (FF-1). The full bridge suite now spawns
+three extra instances (FF-8) — a spawn-heavy suite printing `not ok` under load passes alone;
+rerun before believing it. After a `--no-ff` merge, branch again before the next story.
+
+**Working discipline:** unchanged. GPM backlog per EPIC, branch per EPIC, commit per story,
+suites + lint + build green before each commit, merge `--no-ff`, push, watch CI.
+
+---
+
 ## 2026-09-04 (later) — 0.9.2 is out; next R3 entitlements (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order:
