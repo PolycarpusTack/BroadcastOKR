@@ -122,7 +122,7 @@ Execution: SEQUENTIAL throughout (E4) — every story touches `store.ts`, bridge
 
 **TD-2: Modals — prop→state reset effects (B-2)** — **CLOSED 2026-09-04 (R6-3, remount-by-key)**. Artifact: ClientModal, TeamModal, UserModal (`eslint-disable react-hooks/set-state-in-effect` blocks). Type: code debt (deliberate). The reset-on-open effect pattern works but fights the react-hooks v7 compiler rules; the clean fix is remount-by-key from the parent (changes each modal's API). Principal: ~½ day. Interest: three suppression blocks to maintain. Servicing: when any of the three modals is next reworked. Origin: B-2 lint gate, 2026-08-31.
 
-**TD-1: Store — mutations without bridge writes** — Artifact: `store.ts` (`setMonitor`, `toggleSubtask`, `addBulkTasks`, `syncLiveKRBatch` results). Type: architecture debt (deliberate, now visible). Principal: ~½ day. Recurring interest: change-poll can silently revert these fields on multi-client use. Servicing decision: next refinement, after A-5's wrapper makes writes uniform. Origin: pre-existing, surfaced by 2026-08-31 evaluation.
+**TD-1 (CLOSED by T0-3/T0-10, 2026-08-31): Store — mutations without bridge writes** — Artifact: `store.ts` (`setMonitor`, `toggleSubtask`, `addBulkTasks`, `syncLiveKRBatch` results). Type: architecture debt (deliberate, now visible). Principal: ~½ day. Recurring interest: change-poll can silently revert these fields on multi-client use. Servicing decision: next refinement, after A-5's wrapper makes writes uniform. Origin: pre-existing, surfaced by 2026-08-31 evaluation.
 
 ## Validator Summary
 

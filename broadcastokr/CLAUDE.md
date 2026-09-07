@@ -15,7 +15,7 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON (PSI) e
 - `bridge/` — Express bridge server (`server.cjs`, `broadcastokr.db` incl. the `connections`/`kpi_definitions` tables, `kpi-history.json`)
 - `electron/` — Electron main process (`main.cjs`) + preload (`preload.cjs`)
 - Single `useBridge()` hook in `App.tsx` owns all bridge state; props drilled to pages
-- Zustand single store with `persist` middleware (localStorage) for goals, tasks, kpis, clients, goalTemplates
+- Zustand single store for goals, tasks, kpis, clients, goalTemplates, users, teams. `persist` (localStorage) is the offline cache; when the bridge is connected it is authoritative — every mutation writes through (`putVersioned`/`bridgePut`/`bridgePost`) and `_mergeChanges` folds the 5 s change poll back in
 - 4 React contexts: AuthContext (roles/permissions), ThemeContext (dark/light), ToastContext, ActivityLogContext
 
 ## Pages & Routes
@@ -26,7 +26,8 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON (PSI) e
 | `/tasks` | TasksPage | Kanban board (backlog→todo→in_progress→review→done) |
 | `/team` | TeamPage | Team members and responsibilities |
 | `/reports` | ReportsPage | Tasks tab (stats/compliance) + Client Goals tab (3 report views) |
-| `/clients` | ClientsPage | Client CRUD, DB connections, channels, monitoring |
+| `/clients` | ClientsPage | Client CRUD, DB connections, channels, monitoring (cockpit / desktop) |
+| `/clients` | ClientSettingsPage | The pinned client's connection, channels and agents (client edition, `!FLEET_IN_BUILD`) |
 | `/compare` | ComparePage | Multi-client goal comparison with batch SQL execution |
 
 ## Core Domain Types
@@ -44,7 +45,7 @@ KPI { name, unit, direction, target, current, trend[] }
 
 ## Store Actions (src/store/store.ts)
 **Goals**: addGoal, setGoals, updateGoal, deleteGoal, checkInKR (with history), setMonitor (goal/client), setPeriodArchived (R6-5: archive/restore every goal of a period)
-**Live Sync**: syncLiveKR, syncLiveKRError, syncLiveKRBatch (monitoring-aware history)
+**Live Sync**: syncLiveKRBatch (monitoring-aware history)
 **Tasks**: addTask, setTasks, moveTask, toggleSubtask, addBulkTasks, updateTask, deleteTask
 **KPIs**: setKPIs
 **Clients**: addClient, updateClient (rebinds live KRs on connection change), deleteClient (cascade option)
@@ -78,18 +79,25 @@ KPI { name, unit, direction, target, current, trend[] }
 ## Components Structure
 ```
 components/
+  ErrorBoundary.tsx — reload / export-backup recovery
   layout/     — AppShell, Sidebar, Header
-  goals/      — CheckInModal, GoalFormFields, LiveKRConfigPanel (presets · Build it · Write SQL), QueryBuilder (dropdowns → SQL)
-  tasks/      — CreateTaskModal, TaskDetailModal, TaskCard
-  kpi/        — KPIConfigModal (609 lines, extraction candidate), LiveKPIPanel
+  goals/      — GoalCard, CheckInModal, GoalFormFields, GoalFormChannelScope, GoalFormKRList,
+                LiveKRConfigPanel (presets · Build it · Write SQL), QueryBuilder (dropdowns → SQL)
+  tasks/      — CreateTaskModal, TaskDetailModal, TaskCard, KanbanColumn
+  kpi/        — KPIConfigModal (580 lines, extraction candidate), LiveKPIPanel
   templates/  — TemplateForm, TemplateCard, MaterializeModal
-  clients/    — ClientModal
+  clients/    — ClientModal, ClientRow, ConnectionFields, DeleteConfirmModal, HealthDot,
+                TenantModal (cockpit → tenant), AgentsPanel, connectionDraft.ts
+  compare/    — FleetBoard (cockpit view of Compare)
+  dashboard/  — SystemHealthPanel, FleetMetricsPanel
+  team/       — TeamPage's cards, modals and inline member detail
   reports/    — ClientReportView, GoalReportView, KRTemplateReportView,
                 HistoryDetail, KRSparkLine, TrendBadge, ConfidenceBadge
-  ui/         — Modal, ProgressBar, SparkLine, ChannelBadge, PillBadge, UrgencyBadge, Avatar
+  wizard/     — SetupWizard + steps/ (first-run guide), wizardSteps.ts decides which steps apply
+  ui/         — Modal, ProgressBar, SparkLine, ChannelBadge, PillBadge, Avatar
   data/       — ImportExportModal
   activity/   — ActivityLog
-  dev/        — PersonaPanel (role switcher for testing)
+  dev/        — PersonaPanel (role switcher for desktop/testing)
   toast/      — ToastContainer
   help/       — HelpModal (For Dummies user guide incl. Set It Up), DeveloperGuideModal (O'Reilly-style dev guide; linked from HelpModal)
 ```
@@ -97,15 +105,26 @@ components/
 ## Utilities (src/utils/)
 - `colors.ts` — goalStatus, progressColor, statusIcon, kpiStatus, roleColor
 - `progress.ts` — krProgress (direction-aware KR progress, single source of truth)
+- `goals.ts` — activeGoals (archived goals leave the operational views)
+- `liveSync.ts` — buildLiveKRQueries, mapResultsToKrIds, ExecuteBatchFn (the one execute-batch contract)
 - `queryBuilder.ts` — buildKRQuery: deterministic single-value SELECT (count / percent-where / average, optional condition + last-N-days binds) per dialect; identifiers validated, literals escaped; columnKind classifies browser types
+- `channelScope.ts` — scoped-channel helpers + assignChannelColors (palette in `constants/channels.ts`)
+- `fleetBoard.ts` — fleet board columns/rows, isStale, metricOnTarget (shared with FleetMetricsPanel)
+- `cockpitApi.ts` — operator-channel and agents calls (cockpit → tenant, and an instance's own agents)
 - `history.ts` — pruneHistory (100 cap, prune to 75)
 - `reportHelpers.ts` — computeTrend, computePeriodDelta, computeGoalProgressTimeline
-- `dates.ts` — daysUntil, getUrgencyBadge, formatTime, formatTimeAgo
+- `dates.ts` — daysUntil, getUrgencyBadge, formatTime, formatTimeAgo, formatUptime, toISODate, formatShortDate, formatDateTime
+- `periods.ts` — period labels/options (quarter, half, annual)
+- `collections.ts` — toggleInSet, toggleInArray (toggle-style component state)
 - `ids.ts` — nextGoalId, nextTaskId
 - `safeGet.ts` — safeUser, safeChannel (null-safe lookups)
-- `styles.ts` — cardStyle, selectStyle (theme-aware)
-- `importExport.ts` — JSON import/export
-- `stressTest.ts` — bulk test data generation
+- `connections.ts` — toConnectionInput (what /api/test-connection expects for a saved connection)
+- `styles.ts` — cardStyle, selectStyle, reportSelectStyle (theme-aware); form styles live in `src/styles/formStyles.ts`
+- `download.ts` — triggerDownload (dependency-free, also used by ErrorBoundary)
+- `importExport.ts` — Excel/CSV/JSON import and export
+- `updates.ts` — desktop update check against GitHub Releases
+- `logger.ts` — structured frontend logging
+- `stressTest.ts` — bulk test data generation (wired to AppShell's dev action)
 
 ## Bridge API (bridge/server.cjs)
 | Method | Path | Purpose |
@@ -136,7 +155,7 @@ components/
 All SQL execution is SELECT-only (enforced at bridge level). Check-in semantics: the bridge records history and bumps `updated_at` only — the client owns progress (`krProgress`) and PUTs the recalculated goal. Bridge timestamps are sqlite `datetime('now')` format (UTC, no 'T'); `/api/sync/changes` normalizes the ISO `since` before comparing.
 
 ## Auth & Permissions
-Frontend-only persona switching (no backend auth). Three roles:
+Desktop edition: the bridge checks a bearer API key (`BRIDGE_API_KEY`; none = dev mode) and the UI switches personas locally (PersonaPanel). Cloud editions (client, cockpit): identity comes from the bridge session (OIDC via `bridge/routes/auth.cjs`, cookie `brokr_session`) and every route is gated server-side by `middleware/rbac.cjs`; the operator token and the agent/share tokens are separate principals (see Key Patterns). Three roles:
 - **Owner**: full CRUD + assign + check-in + status + reports
 - **Manager**: create/edit (no delete) + assign + check-in + status + reports
 - **Member**: check-in + status only
@@ -162,9 +181,10 @@ Frontend-only persona switching (no backend auth). Three roles:
 - `npm run bridge` — Start Express bridge on localhost:3001
 - `node scripts/build-agent-bundle.mjs` — connector-agent tarball (`dist-agent/`, require graph checked); `node scripts/capture-protocol-fixtures.mjs` — FF-5 verify/capture; `Dockerfile` — instance image (`EDITION`, `MODE` args); `../.github/workflows/release.yml` — one `v*` tag → installers + GHCR images + agent bundle + GitHub Release (R7)
 
-## Current State (2026-09-04)
+## Current State (2026-09-07)
 
 ### What's done
+- 2026-09-07 — repository cleanup: stale docs and orphaned files removed (the March/May plan drafts, mockups, the bridge-only Dockerfile, the icon generator), line endings normalised (`.gitattributes`), dead code and copied helpers consolidated (see `chore(ui)`/`refactor(ui)` commits); the WHATS'ON Insights evaluation now lives in `../whatson-insights/`
 - Full React app with Dashboard, Goals, Tasks, Team, Reports, Clients, Compare pages
 - Bridge service with Oracle/PostgreSQL, connection CRUD, schema browser, auth/logging/rate-limit middleware, SQLite-backed CRUD routes + frontend bridgeSync
 - Live Key Results: manual/live toggle per KR, SQL editor, batch sync, auto-sync on create/edit, bridge-side sync loop (15 min default, `bridge/liveSync.cjs`; `POST /api/kpi/sync-now` to trigger; progress recomputed client-side in `_mergeChanges`), staleness banner + per-KR stale labels (60 min threshold)
@@ -190,8 +210,7 @@ Frontend-only persona switching (no backend auth). Three roles:
 
 ### Next steps
 1. Export history to file (if localStorage gets tight)
-2. TD-1: bridge writes for setMonitor/toggleSubtask/addBulkTasks (live-KR sync persistence landed 2026-09-03 via execute-batch; see docs/gpm/state/hardening-backlog-2026-08-31.md)
-3. Phase 3 offline mutation queue (deferred — server convergence; note: first-connect migration now protects local data)
-4. **Deferred to v1.1 — investigate AI assistance for KR querying** (decision 2026-09-03, `docs/gpm/state/DECISIONS-2026-09-03.md`): "model fills the builder" first, bridge-side, opt-in per instance, SELECT-only, preview-gated, scored against a golden set of real questions collected during R1 and the first demos. Design input: `docs/saas/2026-09-03-query-assist-spike.md`
-5. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights/whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights; kept in the repo-root `whatson-insights/` folder as a design asset) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype
-6. **Idea, parked — BrOKR as Mediagenix's own WHATS'ON usage monitor** (`docs/saas/2026-09-04-usage-telemetry-idea.md`): cockpit + fleet board already fit; needs stable template ids across tenants, tenant opt-in, entitlement carve-out, longer cockpit retention; spike = ten real questions checked against the PSI schema on the rig
+2. Phase 3 offline mutation queue (deferred — server convergence; note: first-connect migration now protects local data)
+3. **Deferred to v1.1 — investigate AI assistance for KR querying** (decision 2026-09-03, `docs/gpm/state/DECISIONS-2026-09-03.md`): "model fills the builder" first, bridge-side, opt-in per instance, SELECT-only, preview-gated, scored against a golden set of real questions collected during R1 and the first demos. Design input: `docs/saas/2026-09-03-query-assist-spike.md`
+4. (Longer-term, shared suite asset with WHATS'ON Insights) Adopt the ChartConfig/ChartRenderer contract from the Insights prototype (`../whatson-insights/whatson-insights.jsx` — chartType/title/insight/xKey/yKey/data/highlights; kept in the repo-root `whatson-insights/` folder as a design asset) if AI query → chart ever lands in BrOKR; rewrite to BrOKR conventions, don't merge the prototype
+5. **Idea, parked — BrOKR as Mediagenix's own WHATS'ON usage monitor** (`docs/saas/2026-09-04-usage-telemetry-idea.md`): cockpit + fleet board already fit; needs stable template ids across tenants, tenant opt-in, entitlement carve-out, longer cockpit retention; spike = ten real questions checked against the PSI schema on the rig

@@ -29,6 +29,12 @@ Broadcast Operations OKR Management Platform for VRT/Mediagenix WHATS'ON environ
          [Oracle/PostgreSQL WHATS'ON databases]
 ```
 
+The diagram is the desktop edition. The same code ships as two cloud editions built from one Dockerfile
+(`EDITION`/`MODE` args): a **client instance** per broadcaster (OIDC sign-in, licence tier, a connector
+agent that reaches its databases) and the **MGX cockpit** that registers instances, operates them over the
+operator channel and lines their shared KRs up on the fleet board. A `v*` tag makes the release
+(`.github/workflows/release.yml`): installers, GHCR images and the agent bundle. See `docs/operations.md`.
+
 - **Frontend:** React 19, TypeScript 5.9, Vite 7, Zustand 5
 - **Desktop:** Electron 41
 - **Bridge:** Express.js, SQLite (better-sqlite3), optional Oracle/PostgreSQL drivers
@@ -66,8 +72,10 @@ Copy `bridge/.env.example` to `bridge/.env` and configure:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BRIDGE_PORT` | `3001` | Server port |
-| `BRIDGE_HOST` | `0.0.0.0` | Bind address |
-| `BRIDGE_API_KEY` | (required) | Authentication token |
+| `BRIDGE_HOST` | `127.0.0.1` | Bind address (`0.0.0.0` to expose; docker-compose sets it) |
+| `BRIDGE_API_KEY` | (required) | Desktop-edition bearer token; also the key credentials are encrypted with |
+| `BRIDGE_TIER` / `BRIDGE_CAP_{CHANNELS,SEATS,AGENTS}` | enterprise / unlimited | Licence tier and caps for a client instance (R3) |
+| `BRIDGE_OPERATOR_TOKEN` | (none) | Lets the Mediagenix cockpit operate a client instance (R6-1) |
 | `BRIDGE_DB_PATH` | `./broadcastokr.db` | SQLite database path |
 | `BRIDGE_LOG_DIR` | `./logs` | Log file directory |
 | `BRIDGE_BACKUP_DIR` | `./backups` | Backup directory |
@@ -95,8 +103,10 @@ docker compose up -d
 
 ```bash
 npm test              # Frontend tests (Vitest)
-npm run test:bridge   # Bridge tests (Node test runner)
-npx tsc --noEmit      # TypeScript check
+npm run test:bridge   # Bridge tests (Node test runner; expect one 0600-permission case to fail on Windows)
+npm run lint          # ESLint — 0 errors is a CI gate
+npm run build         # tsc -b + vite build — catches unused locals that a plain tsc --noEmit misses
+npm run test:e2e      # Playwright (runs in CI)
 ```
 
 ## Building
