@@ -7,7 +7,3 @@ export const CHANNELS: Channel[] = [
   { name: 'Technical', color: '#F59E0B', type: 'Technical', icon: '\u{1F527}' },
   { name: 'Content', color: '#A78BFA', type: 'Content', icon: '\u{1F3AC}' },
 ];
-
-/** Goal categories for non-client goals */
-export const GOAL_CATEGORIES = ['General', 'Operations', 'Technical', 'Content', 'Strategic'] as const;
-export type GoalCategory = typeof GOAL_CATEGORIES[number];

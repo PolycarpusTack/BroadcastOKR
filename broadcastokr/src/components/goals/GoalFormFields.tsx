@@ -70,7 +70,6 @@ export function GoalFormFields({
       {hasClients && (
         <GoalFormChannelScope
           theme={theme}
-          selectStyle={selectStyle}
           clients={clients!}
           selectedClientIds={selectedClientIds!}
           setSelectedClientIds={setSelectedClientIds!}

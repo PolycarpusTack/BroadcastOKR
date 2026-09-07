@@ -22,10 +22,9 @@ interface TaskDetailModalProps {
   onError?: (msg: string) => void;
   permissions: RolePermissions;
   theme: Theme;
-  dark: boolean;
 }
 
-export function TaskDetailModal({ taskId, onClose, onMove, onDeleted, onUpdated, onError, permissions, theme, dark }: TaskDetailModalProps) {
+export function TaskDetailModal({ taskId, onClose, onMove, onDeleted, onUpdated, onError, permissions, theme }: TaskDetailModalProps) {
   const task = useStore((s) => taskId ? s.tasks.find((t) => t.id === taskId) ?? null : null);
   const toggleSubtask = useStore((s) => s.toggleSubtask);
   const updateTask = useStore((s) => s.updateTask);
@@ -50,14 +49,13 @@ export function TaskDetailModal({ taskId, onClose, onMove, onDeleted, onUpdated,
           onClose={onClose}
           permissions={permissions}
           theme={theme}
-          dark={dark}
         />
       )}
     </Modal>
   );
 }
 
-function TaskDetailContent({ task, clients, users, onMove, toggleSubtask, updateTask, deleteTask, onDeleted, onUpdated, onError, onClose, permissions, theme, dark }: {
+function TaskDetailContent({ task, clients, users, onMove, toggleSubtask, updateTask, deleteTask, onDeleted, onUpdated, onError, onClose, permissions, theme }: {
   task: Task;
   clients: Client[];
   users: User[];
@@ -71,7 +69,6 @@ function TaskDetailContent({ task, clients, users, onMove, toggleSubtask, update
   onClose: () => void;
   permissions: RolePermissions;
   theme: Theme;
-  dark: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -149,7 +146,7 @@ function TaskDetailContent({ task, clients, users, onMove, toggleSubtask, update
   const pri = PRIORITIES[task.priority];
   const tt = TASK_TYPES.find((t) => t.key === task.taskType);
   const days = daysUntil(task.due);
-  const badge = getUrgencyBadge(days, dark);
+  const badge = getUrgencyBadge(days);
 
   const labelStyle = { fontFamily: FONT_MONO as string, fontSize: '10.5px', fontWeight: 700 as const, color: theme.textMuted, marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
   const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };

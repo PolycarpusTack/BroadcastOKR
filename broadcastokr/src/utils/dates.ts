@@ -7,7 +7,7 @@ export function daysUntil(dateStr: string): number {
   return Math.ceil((time - Date.now()) / 864e5);
 }
 
-export function getUrgencyBadge(days: number, _dark: boolean): UrgencyBadge {
+export function getUrgencyBadge(days: number): UrgencyBadge {
   if (!Number.isFinite(days)) return { text: '--', bg: '#1C2333', fg: '#5E6F8A', pulse: false };
   if (days < 0) return { text: `${Math.abs(days)}d overdue`, bg: COLOR_DANGER, fg: '#fff', pulse: true };
   if (days === 0) return { text: 'TODAY', bg: COLOR_DANGER, fg: '#fff', pulse: true };

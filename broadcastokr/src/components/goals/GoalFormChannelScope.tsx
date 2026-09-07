@@ -5,7 +5,6 @@ import { isScopedChannelSelected, pruneScopedChannels, scopedChannelKey } from '
 
 export interface GoalFormChannelScopeProps {
   theme: Theme;
-  selectStyle: React.CSSProperties;
   clients: Client[];
   selectedClientIds: string[];
   setSelectedClientIds: (ids: string[]) => void;
@@ -17,7 +16,6 @@ export interface GoalFormChannelScopeProps {
 
 export function GoalFormChannelScope({
   theme,
-  selectStyle: _selectStyle,
   clients,
   selectedClientIds,
   setSelectedClientIds,

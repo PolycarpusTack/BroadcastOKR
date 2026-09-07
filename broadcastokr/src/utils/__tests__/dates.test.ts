@@ -23,33 +23,30 @@ describe('daysUntil', () => {
 
 describe('getUrgencyBadge', () => {
   it('returns overdue badge for negative days', () => {
-    const badge = getUrgencyBadge(-2, false);
+    const badge = getUrgencyBadge(-2);
     expect(badge.text).toBe('2d overdue');
     expect(badge.pulse).toBe(true);
   });
 
   it('returns TODAY badge for 0 days', () => {
-    const badge = getUrgencyBadge(0, false);
+    const badge = getUrgencyBadge(0);
     expect(badge.text).toBe('TODAY');
     expect(badge.pulse).toBe(true);
   });
 
   it('returns Tomorrow badge for 1 day', () => {
-    const badge = getUrgencyBadge(1, false);
+    const badge = getUrgencyBadge(1);
     expect(badge.text).toBe('Tomorrow');
     expect(badge.pulse).toBe(false);
   });
 
   it('returns day count for 2-3 days', () => {
-    const badge = getUrgencyBadge(3, false);
+    const badge = getUrgencyBadge(3);
     expect(badge.text).toBe('3d');
   });
 
-  it('returns consistent colors regardless of dark param', () => {
-    const a = getUrgencyBadge(7, false);
-    const b = getUrgencyBadge(7, true);
-    expect(a.bg).toBe(b.bg);
-    expect(a.bg).toBe('#78490A');
+  it('uses the muted amber for a week out', () => {
+    expect(getUrgencyBadge(7).bg).toBe('#78490A');
   });
 });
 

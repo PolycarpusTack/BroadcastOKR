@@ -24,7 +24,7 @@ interface TasksPageProps {
 }
 
 export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
-  const { theme, dark } = useTheme();
+  const { theme } = useTheme();
   const { currentUser, permissions } = useAuth();
   const { toast } = useToast();
   const { logAction } = useActivityLog();
@@ -145,7 +145,6 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
                 color={STATUS_COLORS[status]}
                 tasks={colTasks}
                 theme={theme}
-                dark={dark}
                 onTaskClick={setSelectedTaskId}
               />
             );
@@ -171,7 +170,7 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
               {filtered.map((task) => {
                 const user = safeUser(users, task.assignee);
                 const days = daysUntil(task.due);
-                const badge = getUrgencyBadge(days, dark);
+                const badge = getUrgencyBadge(days);
                 const pri = PRIORITIES[task.priority];
                 return (
                   <tr key={task.id} onClick={() => setSelectedTaskId(task.id)} style={{ borderBottom: `1px solid ${theme.borderLight}`, cursor: 'pointer' }}>
@@ -216,7 +215,6 @@ export function TasksPage({ createOpen, setCreateOpen }: TasksPageProps) {
         onError={(msg) => toast(msg, COLOR_DANGER, '\u26A0\uFE0F')}
         permissions={permissions}
         theme={theme}
-        dark={dark}
       />
 
       <CreateTaskModal

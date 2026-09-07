@@ -63,7 +63,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
 
   /**
    * Refuse-while-referenced (D-3 ADR): a connection a client, a live KR or a
-   * Dashboard KPI still names is not deleted � the response names them and
+   * Dashboard KPI still names is not deleted — the response names them and
    * the operator rebinds first. Returns the 409 body, or null when unreferenced.
    */
   const connectionInUse = (conn) => {

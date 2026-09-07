@@ -5,9 +5,9 @@ import type { Theme, User, Client, Team } from '../../types';
 
 const theme: Theme = {
   bg: '#fff', bgCard: '#fff', bgCardHover: '#f5f5f5', bgSidebar: '#f5f5f5',
-  bgSidebarActive: '#eee', bgInput: '#fff', bgMuted: '#f5f5f5', border: '#ddd',
+  bgInput: '#fff', bgMuted: '#f5f5f5', border: '#ddd',
   borderLight: '#eee', borderInput: '#ccc', text: '#000', textSecondary: '#666',
-  textMuted: '#999', textFaint: '#bbb', sidebarText: '#333', sidebarTextActive: '#000',
+  textMuted: '#999', textFaint: '#bbb',
   overlay: 'rgba(0,0,0,0.5)', headerBg: '#fff', compliantBg: '#e6ffed',
   compliantBorder: '#10b981', atRiskBg: '#fff3cd', atRiskBorder: '#f59e0b',
 };

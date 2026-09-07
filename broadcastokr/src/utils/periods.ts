@@ -11,8 +11,6 @@
  * goal as free text and existing goals must keep displaying correctly.
  */
 
-export type PeriodKind = 'quarter' | 'half' | 'annual';
-
 /** Options for one year, in calendar order. */
 function yearOptions(year: number): string[] {
   return [

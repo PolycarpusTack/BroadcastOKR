@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import './styles/accessibility.css';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';

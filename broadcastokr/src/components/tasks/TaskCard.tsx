@@ -12,16 +12,15 @@ import { resolveScopedChannels } from '../../utils/channelScope';
 interface TaskCardProps {
   task: Task;
   theme: Theme;
-  dark: boolean;
   onClick: () => void;
 }
 
-export const TaskCard = memo(function TaskCard({ task, theme, dark, onClick }: TaskCardProps) {
+export const TaskCard = memo(function TaskCard({ task, theme, onClick }: TaskCardProps) {
   const clients = useStore((s) => s.clients);
   const users = useStore((s) => s.users);
   const user = safeUser(users, task.assignee);
   const days = daysUntil(task.due);
-  const badge = getUrgencyBadge(days, dark);
+  const badge = getUrgencyBadge(days);
   const pri = PRIORITIES[task.priority];
   const tt = TASK_TYPES.find((t) => t.key === task.taskType);
 

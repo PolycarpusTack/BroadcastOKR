@@ -5,9 +5,9 @@ import type { Client, Goal, GoalTemplate, Theme } from '../../types';
 
 const theme: Theme = {
   bg: '#0D1B2E', bgCard: '#132035', bgCardHover: '#1A2D47', bgSidebar: '#0A1628',
-  bgSidebarActive: '#132035', bgInput: '#1A2D47', bgMuted: '#1A2D47', border: '#1F3A5A',
+  bgInput: '#1A2D47', bgMuted: '#1A2D47', border: '#1F3A5A',
   borderLight: '#1A3050', borderInput: '#2A4A70', text: '#E8F4FD', textSecondary: '#8BA5C4',
-  textMuted: '#5E7A9A', textFaint: '#3D5A7A', sidebarText: '#8BA5C4', sidebarTextActive: '#E8F4FD',
+  textMuted: '#5E7A9A', textFaint: '#3D5A7A',
   overlay: 'rgba(0,0,0,0.7)', headerBg: '#0A1628', compliantBg: '#0D2918',
   compliantBorder: '#10b981', atRiskBg: '#2D1B00', atRiskBorder: '#f59e0b',
 };

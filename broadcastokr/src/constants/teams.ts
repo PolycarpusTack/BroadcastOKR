@@ -1,6 +1,6 @@
 import type { Team } from '../types';
 
-export const TEAMS: Team[] = [
+const TEAMS: Team[] = [
   { id: 'team-scheduling', name: 'Scheduling', members: [1], color: '#059669', icon: '\u{1F4C5}' },
   { id: 'team-playout', name: 'Playout / MCR', members: [2], color: '#d97706', icon: '\u{1F3AC}' },
   { id: 'team-traffic', name: 'Traffic & Compliance', members: [3], color: '#db2777', icon: '\u2696\uFE0F' },

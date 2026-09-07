@@ -16,7 +16,7 @@ export type Measure = 'count' | 'percent' | 'average';
 export type ConditionOp = 'eq' | 'ne' | 'gt' | 'lt' | 'is_null' | 'not_null';
 export type ColumnKind = 'number' | 'text' | 'date';
 
-export interface QueryCondition {
+interface QueryCondition {
   column: string;
   op: ConditionOp;
   /** Ignored for is_null / not_null. */

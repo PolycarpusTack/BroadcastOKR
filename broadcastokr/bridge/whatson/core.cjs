@@ -284,7 +284,6 @@ module.exports = {
   coerceNumeric,
   oracledb,
   pg,
-  QUERY_TIMEOUT_MS,
   assertSelectOnly,
   buildBinds,
   getTablesQuery,

@@ -156,11 +156,6 @@ export function useBridge() {
     }
   }, []);
 
-  /** Trigger one bridge-side live-KR sync pass (the loop itself runs on the bridge). */
-  const syncLiveKRsNow = useCallback(async () => {
-    return apiFetch<{ ok: boolean; synced: number; total: number }>('/api/kpi/sync-now', { method: 'POST' });
-  }, []);
-
   // Start bridge service (Electron: via IPC, Web: just check health)
   const startBridge = useCallback(async (): Promise<{ ok: boolean; message: string }> => {
     if (isElectron()) {
@@ -350,14 +345,9 @@ export function useBridge() {
     syncing,
     drivers,
     health,
-    checkHealth,
-    pollKPIs,
-    startPolling,
-    stopPolling,
     startBridge,
     stopBridge,
     syncNow,
-    syncLiveKRsNow,
     testConnection,
     getTables,
     getColumns,

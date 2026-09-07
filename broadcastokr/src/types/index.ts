@@ -156,7 +156,6 @@ export interface Theme {
   bgCard: string;
   bgCardHover: string;
   bgSidebar: string;
-  bgSidebarActive: string;
   bgInput: string;
   bgMuted: string;
   border: string;
@@ -166,8 +165,6 @@ export interface Theme {
   textSecondary: string;
   textMuted: string;
   textFaint: string;
-  sidebarText: string;
-  sidebarTextActive: string;
   overlay: string;
   headerBg: string;
   compliantBg: string;

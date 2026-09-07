@@ -23,7 +23,7 @@ export interface StepDef {
  * be able to reach the end, and someone who abandons half way keeps whatever
  * was created up to that point.
  */
-export const WIZARD_STEPS: StepDef[] = [
+const WIZARD_STEPS: StepDef[] = [
   {
     id: 'welcome',
     title: 'Welcome',
