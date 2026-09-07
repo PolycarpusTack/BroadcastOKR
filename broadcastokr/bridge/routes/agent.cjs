@@ -3,8 +3,8 @@ const crypto = require('crypto');
 const { audit } = require('../audit.cjs');
 const { applySyncedValue } = require('../liveSync.cjs');
 const { capViolation } = require('../entitlements.cjs');
+const { sha256Hex: sha256 } = require('../utils/crypto.cjs');
 
-const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const ENROL_TTL_MS = 15 * 60 * 1000;
 const MAX_RESULTS = 500;
 

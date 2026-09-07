@@ -226,4 +226,4 @@ function createGoalsRouter(db) {
   return router;
 }
 
-module.exports = { createGoalsRouter, toGoalDTO, upsertKeyResults };
+module.exports = { createGoalsRouter };

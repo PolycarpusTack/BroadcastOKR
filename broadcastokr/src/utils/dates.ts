@@ -7,7 +7,7 @@ export function daysUntil(dateStr: string): number {
   return Math.ceil((time - Date.now()) / 864e5);
 }
 
-export function getUrgencyBadge(days: number, _dark: boolean): UrgencyBadge {
+export function getUrgencyBadge(days: number): UrgencyBadge {
   if (!Number.isFinite(days)) return { text: '--', bg: '#1C2333', fg: '#5E6F8A', pulse: false };
   if (days < 0) return { text: `${Math.abs(days)}d overdue`, bg: COLOR_DANGER, fg: '#fff', pulse: true };
   if (days === 0) return { text: 'TODAY', bg: COLOR_DANGER, fg: '#fff', pulse: true };
@@ -32,6 +32,21 @@ export function formatTimeAgo(iso: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+/** Calendar date as YYYY-MM-DD (UTC) — the shape goal and task dates are stored in. */
+export function toISODate(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** "Sep 7" — short calendar label for pills and captions. */
+export function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** "Sep 7, 09:15" — history rows and last check-in labels. */
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Human-readable uptime from a seconds count, e.g. 3725 -> "1h 2m". */

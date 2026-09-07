@@ -16,6 +16,25 @@ export function inputStyle(theme: Theme) {
   };
 }
 
+/** The roomier input used by the goal and task modal forms. */
+export function modalInputStyle(theme: Theme) {
+  return {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 8,
+    border: `1px solid ${theme.borderInput}`,
+    background: theme.bgInput,
+    color: theme.text,
+    fontSize: 13,
+    outline: 'none',
+    boxSizing: 'border-box' as const,
+  };
+}
+
+export function modalLabelStyle(theme: Theme) {
+  return { fontSize: 12, fontWeight: 600 as const, color: theme.textMuted, display: 'block' as const, marginBottom: 4 };
+}
+
 export function labelStyle(theme: Theme) {
   return {
     fontSize: 11,

@@ -1,3 +1,6 @@
+import { formatDateTime } from '../../utils/dates';
+import { toggleInSet } from '../../utils/collections';
+import { reportSelectStyle } from '../../utils/styles';
 import { useState, useMemo } from 'react';
 import { KRSparkLine } from './KRSparkLine';
 import { TrendBadge } from './TrendBadge';
@@ -18,21 +21,10 @@ interface ClientReportViewProps {
   theme: Theme;
 }
 
-/** Format an ISO timestamp into a short "last check-in" preview string */
-function formatLastCheckin(timestamp: string): string {
-  const d = new Date(timestamp);
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 /** Derive last check-in label from history (most recent entry) */
 function lastCheckinLabel(history: KRHistoryEntry[] | undefined): string {
   if (!history || history.length === 0) return '—';
-  return formatLastCheckin(history[history.length - 1].timestamp);
+  return formatDateTime(history[history.length - 1].timestamp);
 }
 
 export function ClientReportView({ goals, clients, theme }: ClientReportViewProps) {
@@ -41,12 +33,7 @@ export function ClientReportView({ goals, clients, theme }: ClientReportViewProp
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
   function toggleKR(key: string) {
-    setExpandedKRs(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    setExpandedKRs((prev) => toggleInSet(prev, key));
   }
 
   /** goals that belong to at least one client (have clientIds populated) */
@@ -94,17 +81,7 @@ export function ClientReportView({ goals, clients, theme }: ClientReportViewProp
           id="client-report-select"
           value={selectedClientId}
           onChange={e => setSelectedClientId(e.target.value)}
-          style={{
-            background: theme.bgInput,
-            color: theme.text,
-            border: `1px solid ${theme.borderInput}`,
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 13,
-            fontFamily: FONT_BODY,
-            cursor: 'pointer',
-            outline: 'none',
-          }}
+          style={reportSelectStyle(theme)}
         >
           <option value="all">All Clients</option>
           {clients.map(c => (

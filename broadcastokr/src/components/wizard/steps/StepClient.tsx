@@ -1,3 +1,4 @@
+import { paragraphStyle } from './stepStyles';
 import { useState } from 'react';
 import type { StepProps } from '../wizardTypes';
 import { useStore } from '../../../store/store';
@@ -14,7 +15,7 @@ export function StepClient({ data, patch, theme, bridge }: StepProps) {
   const [error, setError] = useState('');
   const [channelCount, setChannelCount] = useState<number | null>(null);
 
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 12px 0' };
+  const p = paragraphStyle(theme);
   const created = !!data.clientId;
 
   const create = async () => {

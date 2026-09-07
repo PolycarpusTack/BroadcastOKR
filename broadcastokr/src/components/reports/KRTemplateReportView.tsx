@@ -1,3 +1,5 @@
+import { toggleInSet } from '../../utils/collections';
+import { reportSelectStyle } from '../../utils/styles';
 import { useState, useMemo } from 'react';
 import { KRSparkLine } from './KRSparkLine';
 import { TrendBadge } from './TrendBadge';
@@ -69,12 +71,7 @@ export function KRTemplateReportView({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   function toggleRow(clientId: string) {
-    setExpandedRows(prev => {
-      const next = new Set(prev);
-      if (next.has(clientId)) next.delete(clientId);
-      else next.add(clientId);
-      return next;
-    });
+    setExpandedRows((prev) => toggleInSet(prev, clientId));
   }
 
   const flatTemplates = useMemo(() => flattenKRTemplates(goalTemplates), [goalTemplates]);
@@ -139,18 +136,7 @@ export function KRTemplateReportView({
             setSelectedKRTemplateId(e.target.value);
             setExpandedRows(new Set());
           }}
-          style={{
-            background: theme.bgInput,
-            color: theme.text,
-            border: `1px solid ${theme.borderInput}`,
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 13,
-            fontFamily: FONT_BODY,
-            cursor: 'pointer',
-            outline: 'none',
-            minWidth: 260,
-          }}
+          style={{ ...reportSelectStyle(theme), minWidth: 260 }}
         >
           <option value="">— Select a KR template —</option>
           {flatTemplates.map(ft => (

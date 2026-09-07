@@ -4,13 +4,16 @@ REST API for the BroadcastOKR bridge service. Provides database proxy, entity CR
 
 ## Authentication
 
-All endpoints except `GET /api/health` require an API key:
+Depends on the edition the bridge runs as (`MODE`, see `editions.cjs`):
 
-```
-Authorization: Bearer <BRIDGE_API_KEY>
-```
+- **desktop** — every endpoint except `GET /api/health` takes `Authorization: Bearer <BRIDGE_API_KEY>`;
+  no key = development mode. The desktop app talks to its own loopback bridge only.
+- **client / cockpit** — users sign in with OIDC (`/api/auth/login` → `/api/auth/callback`) and carry the
+  `brokr_session` cookie; roles are enforced per route by `middleware/rbac.cjs`. Three further principals
+  exist for machines: the operator token (`X-Operator-Token`, client mode, closed allowlist), the share
+  token (`/api/share`) and the agent's bearer token (`/api/agent/*`).
 
-Set `BRIDGE_API_KEY` in your `.env` file. Auth is disabled when the key is not set (development mode).
+`BRIDGE_API_KEY` is also the key credentials are encrypted with (`enc:v1:` values); rotate it via the startup rewrap.
 
 ## Rate Limiting
 

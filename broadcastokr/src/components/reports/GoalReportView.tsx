@@ -1,3 +1,5 @@
+import { toggleInSet } from '../../utils/collections';
+import { reportSelectStyle } from '../../utils/styles';
 import { useState, useMemo } from 'react';
 import { KRSparkLine } from './KRSparkLine';
 import { TrendBadge } from './TrendBadge';
@@ -30,12 +32,7 @@ export function GoalReportView({ goals, clients, theme }: GoalReportViewProps) {
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
   function toggleKR(krId: string) {
-    setExpandedKRs(prev => {
-      const next = new Set(prev);
-      if (next.has(krId)) next.delete(krId);
-      else next.add(krId);
-      return next;
-    });
+    setExpandedKRs((prev) => toggleInSet(prev, krId));
   }
 
   /** Goals grouped by client, plus an "Unassigned" group for goals with no clientIds */
@@ -98,18 +95,7 @@ export function GoalReportView({ goals, clients, theme }: GoalReportViewProps) {
             setSelectedGoalId(e.target.value);
             setExpandedKRs(new Set());
           }}
-          style={{
-            background: theme.bgInput,
-            color: theme.text,
-            border: `1px solid ${theme.borderInput}`,
-            borderRadius: 8,
-            padding: '6px 12px',
-            fontSize: 13,
-            fontFamily: FONT_BODY,
-            cursor: 'pointer',
-            outline: 'none',
-            minWidth: 220,
-          }}
+          style={{ ...reportSelectStyle(theme), minWidth: 220 }}
         >
           <option value="">— Select a goal —</option>
           {grouped.map(group => (

@@ -1,3 +1,4 @@
+import { paragraphStyle } from './stepStyles';
 import type { StepProps } from '../wizardTypes';
 import type { WizardPath } from '../wizardTypes';
 import { FONT_BODY, FONT_HEADING, PRIMARY_COLOR } from '../../../constants/config';
@@ -26,7 +27,7 @@ const OPTIONS: Array<{ id: WizardPath; title: string; blurb: string; icon: strin
 ];
 
 export function StepPath({ data, patch, theme }: StepProps) {
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 14px 0' };
+  const p = paragraphStyle(theme, 14);
 
   return (
     <div>

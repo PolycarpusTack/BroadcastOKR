@@ -1,3 +1,4 @@
+import { modalInputStyle, modalLabelStyle } from '../../styles/formStyles';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Theme, Client, ScopedChannelRef } from '../../types';
 import { PRIMARY_COLOR, COLOR_DANGER } from '../../constants/config';
@@ -5,7 +6,6 @@ import { isScopedChannelSelected, pruneScopedChannels, scopedChannelKey } from '
 
 export interface GoalFormChannelScopeProps {
   theme: Theme;
-  selectStyle: React.CSSProperties;
   clients: Client[];
   selectedClientIds: string[];
   setSelectedClientIds: (ids: string[]) => void;
@@ -17,7 +17,6 @@ export interface GoalFormChannelScopeProps {
 
 export function GoalFormChannelScope({
   theme,
-  selectStyle: _selectStyle,
   clients,
   selectedClientIds,
   setSelectedClientIds,
@@ -26,8 +25,8 @@ export function GoalFormChannelScope({
   selectedChannels,
   setSelectedChannels,
 }: GoalFormChannelScopeProps) {
-  const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
-  const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: theme.textMuted, display: 'block' as const, marginBottom: 4 };
+  const inputStyle = modalInputStyle(theme);
+  const labelStyle = modalLabelStyle(theme);
 
   const clientsSelected = selectedClientIds.length > 0;
 

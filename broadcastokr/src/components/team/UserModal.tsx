@@ -1,3 +1,4 @@
+import { toggleInArray } from '../../utils/collections';
 import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { inputStyle, labelStyle, buttonStyle } from '../../styles/formStyles';
@@ -90,9 +91,7 @@ export function UserModal({
   }
 
   function toggleClient(clientId: string) {
-    setSelectedClientIds((prev) =>
-      prev.includes(clientId) ? prev.filter((id) => id !== clientId) : [...prev, clientId],
-    );
+    setSelectedClientIds((prev) => toggleInArray(prev, clientId));
   }
 
   function handleSave() {

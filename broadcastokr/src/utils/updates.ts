@@ -4,7 +4,7 @@
  * so, passively, when a newer version exists. Nothing is downloaded.
  */
 
-export const RELEASES_REPO = 'PolycarpusTack/BroadcastOKR';
+const RELEASES_REPO = 'PolycarpusTack/BroadcastOKR';
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const LAST_CHECK_KEY = 'brokr.updateCheckedAt';
 

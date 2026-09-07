@@ -1,3 +1,4 @@
+import { paragraphStyle } from './stepStyles';
 import { useState } from 'react';
 import type { StepProps } from '../wizardTypes';
 import { FONT_BODY, COLOR_SUCCESS, COLOR_WARNING, PRIMARY_COLOR } from '../../../constants/config';
@@ -6,7 +7,7 @@ export function StepBridge({ theme, bridge }: StepProps) {
   const [starting, setStarting] = useState(false);
   const [message, setMessage] = useState('');
 
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 12px 0' };
+  const p = paragraphStyle(theme);
 
   const start = async () => {
     if (!bridge.startBridge) return;

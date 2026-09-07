@@ -2,7 +2,7 @@ import type { Goal } from '../types';
 
 /** Active = not archived. Every operational view (Dashboard, Goals, Team,
  *  Clients, Compare, sync-all) reads through this; Reports keep seeing everything. */
-export function isActiveGoal(goal: Pick<Goal, 'archived'>): boolean {
+function isActiveGoal(goal: Pick<Goal, 'archived'>): boolean {
   return !goal.archived;
 }
 

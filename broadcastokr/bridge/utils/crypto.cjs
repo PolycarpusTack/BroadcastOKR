@@ -117,4 +117,9 @@ function rewrapSecret(value, apiKey, { legacyKey } = {}) {
   return encrypt(value, apiKey);
 }
 
-module.exports = { encrypt, decrypt, isEncrypted, rewrapSecret, looksLikeCiphertext };
+/** Hex SHA-256 of a token — how bearer tokens are stored (never the token itself). */
+function sha256Hex(value) {
+  return crypto.createHash('sha256').update(String(value)).digest('hex');
+}
+
+module.exports = { encrypt, decrypt, isEncrypted, rewrapSecret, looksLikeCiphertext, sha256Hex };

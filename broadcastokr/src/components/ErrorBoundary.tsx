@@ -1,6 +1,8 @@
 import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import { PRIMARY_COLOR } from '../constants/config';
+import { triggerDownload } from '../utils/download';
+import { toISODate } from '../utils/dates';
 
 interface Props {
   children: ReactNode;
@@ -51,13 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
               onClick={() => {
                 const data = localStorage.getItem('broadcastokr-data');
                 if (!data) return;
-                const blob = new Blob([data], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `broadcastokr-backup-${new Date().toISOString().slice(0, 10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
+                triggerDownload(data, `broadcastokr-backup-${toISODate()}.json`, 'application/json');
               }}
               style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #2A3855', background: 'transparent', color: '#7A8BA5', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
             >

@@ -1,6 +1,6 @@
 const { createRouter } = require('../utils/router.cjs');
 const {
-  oracledb, pg, QUERY_TIMEOUT_MS, assertSelectOnly, buildBinds,
+  oracledb, pg, assertSelectOnly, buildBinds,
   getTablesQuery, getColumnsQuery, wrapPreviewQuery, getTestQuery,
 } = require('../whatson/core.cjs');
 const { getKpiTemplates } = require('../whatson/templates.cjs');
@@ -63,7 +63,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
 
   /**
    * Refuse-while-referenced (D-3 ADR): a connection a client, a live KR or a
-   * Dashboard KPI still names is not deleted � the response names them and
+   * Dashboard KPI still names is not deleted — the response names them and
    * the operator rebinds first. Returns the 409 body, or null when unreferenced.
    */
   const connectionInUse = (conn) => {
@@ -93,7 +93,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const config = loadConfig();
     const safe = {
       ...config,
-      connections: config.connections.map(c => ({ ...c, password: '***' })),
+      connections: config.connections.map(c => ({ ...c, password: MASKED })),
     };
     res.json(safe);
   });
@@ -107,13 +107,13 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
       // one; a new one is refused without a key and encrypted with one. This
       // used to store whatever arrived, in the clear — a second write path
       // that undid the D-2 guarantee (review 2026-09-02, F7).
-      const arrivingSecret = incoming.connections.some((c) => c.password && c.password !== '***');
+      const arrivingSecret = incoming.connections.some((c) => c.password && c.password !== MASKED);
       if (cipher.unprotected && arrivingSecret) {
         return res.status(503).json(CREDENTIALS_UNPROTECTED);
       }
       incoming.connections = incoming.connections.map((c) => ({
         ...c,
-        password: c.password === '***'
+        password: c.password === MASKED
           ? (config.connections.find(x => x.id === c.id)?.password || '')
           : (c.password ? encrypt(c.password) : ''),
       }));
@@ -183,7 +183,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const conn = req.body;
     // A masked password means "keep the existing one" — no new secret arrives,
     // so renaming or re-tagging a connection stays possible without a key.
-    if (cipher.unprotected && conn.password && conn.password !== '***') {
+    if (cipher.unprotected && conn.password && conn.password !== MASKED) {
       return res.status(503).json(CREDENTIALS_UNPROTECTED);
     }
     const config = loadConfig();
@@ -191,7 +191,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     const idx = (config.connections || []).findIndex(c => c.id === conn.id);
     if (idx >= 0) {
       // Preserve password if masked
-      conn.password = conn.password === '***' ? config.connections[idx].password : encrypt(conn.password);
+      conn.password = conn.password === MASKED ? config.connections[idx].password : encrypt(conn.password);
       config.connections[idx] = conn;
     } else {
       conn.password = encrypt(conn.password);
@@ -199,7 +199,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
     }
     saveConfig(config);
     auditSql(req, `Saved database connection '${conn.name || conn.id}'`);
-    res.json({ ok: true, connection: { ...conn, password: '***' } });
+    res.json({ ok: true, connection: { ...conn, password: MASKED } });
   });
 
   // Delete connection
@@ -217,7 +217,7 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
   // Get connections (masked)
   router.get('/connections', (req, res) => {
     const config = loadConfig();
-    res.json((config.connections || []).map(c => ({ ...c, password: '***' })));
+    res.json((config.connections || []).map(c => ({ ...c, password: MASKED })));
   });
 
   // Browse schema tables

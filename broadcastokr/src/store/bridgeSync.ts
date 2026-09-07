@@ -45,7 +45,7 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000];
 
 /** A version-checked write lost the race; `current` is the server's row. */
-export class ConflictError extends Error {
+class ConflictError extends Error {
   current: unknown;
   constructor(current: unknown) {
     super('version_conflict');
@@ -120,7 +120,7 @@ export async function bridgeFetch<T>(
 }
 
 /** GET /api/sync/state — full state snapshot */
-export function fetchState(): Promise<BridgeState> {
+function fetchState(): Promise<BridgeState> {
   return bridgeFetch<BridgeState>('/api/sync/state');
 }
 
@@ -191,7 +191,7 @@ export function bridgePutEntity(
 }
 
 /** POST /api/sync/migrate-from-local — migrate localStorage data to bridge */
-export function migrateFromLocal(data: unknown): Promise<unknown> {
+function migrateFromLocal(data: unknown): Promise<unknown> {
   return bridgePost('/api/sync/migrate-from-local', data);
 }
 

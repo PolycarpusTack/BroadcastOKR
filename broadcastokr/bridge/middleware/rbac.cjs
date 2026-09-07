@@ -152,4 +152,4 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
   };
 }
 
-module.exports = { createRbacMiddleware, POLICY, OPERATOR_ALLOW };
+module.exports = { createRbacMiddleware, POLICY };

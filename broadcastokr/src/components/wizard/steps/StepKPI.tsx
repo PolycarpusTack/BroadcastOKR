@@ -1,3 +1,4 @@
+import { paragraphStyle } from './stepStyles';
 import { useEffect, useState } from 'react';
 import type { StepProps } from '../wizardTypes';
 import type { DBConnection } from '../../../hooks/useBridge';
@@ -21,7 +22,7 @@ export function StepKPI({ data, patch, theme, bridge }: StepProps) {
     bridge.getConnections().then(setConnections).catch(() => setConnections([]));
   }, [bridge]);
 
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 12px 0' };
+  const p = paragraphStyle(theme);
   const small = { ...inputStyle(theme), fontSize: 12 };
   const smallLabel = { ...labelStyle(theme), fontSize: 11 };
   const created = !!data.kpiId;

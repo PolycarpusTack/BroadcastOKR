@@ -142,11 +142,6 @@
   to { transform: translateX(0); }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: scale(1); }
-}
-
 @keyframes pulseDot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
@@ -155,8 +150,6 @@
 .toast-enter { animation: toastIn 0.3s ease forwards; }
 .toast-exit { animation: toastOut 0.3s ease forwards; }
 .animate-slide-in-right { animation: slideInRight 0.25s ease; }
-.animate-urg-pulse { animation: urgPulse 2s infinite; }
-.animate-fade-in { animation: fadeIn 0.2s ease; }
 
 /* Responsive: hide sidebar on small screens */
 @media (max-width: 768px) {

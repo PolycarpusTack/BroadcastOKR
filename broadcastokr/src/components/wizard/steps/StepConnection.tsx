@@ -1,3 +1,4 @@
+import { paragraphStyle } from './stepStyles';
 import { useState } from 'react';
 import type { StepProps } from '../wizardTypes';
 import { ConnectionFields } from '../../clients/ConnectionFields';
@@ -11,7 +12,7 @@ export function StepConnection({ data, patch, theme, bridge }: StepProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 12px 0' };
+  const p = paragraphStyle(theme);
   const saved = !!data.connectionId;
 
   const save = async () => {

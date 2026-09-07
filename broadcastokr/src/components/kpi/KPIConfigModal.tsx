@@ -27,9 +27,6 @@ interface KPIConfigModalProps {
   deleteConnection: (id: string) => Promise<void>;
 }
 
-/** @deprecated Use buttonStyle from formStyles.ts — kept temporarily for small variant */
-const btnStyle = (bg: string) => buttonStyle(bg);
-
 const defaultConn: Omit<DBConnection, 'id'> = {
   name: '',
   type: 'oracle',
@@ -75,7 +72,6 @@ export function KPIConfigModal({
   const selStyle = makeSelectStyle(theme);
   const iStyle = inputStyle(theme);
   const lStyle = labelStyle(theme);
-  // btnStyle is now imported from formStyles via the compat wrapper above
 
   useEffect(() => {
     if (!open || !connected) return;
@@ -293,7 +289,7 @@ export function KPIConfigModal({
                         </div>
                       </div>
                       <PillBadge label={conn.type === 'postgres' ? 'PG' : 'ORA'} color={conn.type === 'postgres' ? COLOR_DB_POSTGRES : COLOR_WARNING} bold />
-                      <button onClick={() => handleDeleteConnection(conn.id)} style={{ ...btnStyle('#F87171'), padding: '4px 10px' }} aria-label={`Delete ${conn.name}`}>
+                      <button onClick={() => handleDeleteConnection(conn.id)} style={{ ...buttonStyle('#F87171'), padding: '4px 10px' }} aria-label={`Delete ${conn.name}`}>
                         Delete
                       </button>
                     </div>
@@ -348,10 +344,10 @@ export function KPIConfigModal({
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-                  <button onClick={handleTestConnection} disabled={connTesting} style={btnStyle(COLOR_INFO)}>
+                  <button onClick={handleTestConnection} disabled={connTesting} style={buttonStyle(COLOR_INFO)}>
                     {connTesting ? 'Testing...' : 'Test Connection'}
                   </button>
-                  <button onClick={handleSaveConnection} style={btnStyle(PRIMARY_COLOR)}>Save Connection</button>
+                  <button onClick={handleSaveConnection} style={buttonStyle(PRIMARY_COLOR)}>Save Connection</button>
                   {connTestResult && (
                     <PillBadge
                       label={connTestResult.ok ? 'Connected' : 'Failed'}
@@ -407,7 +403,7 @@ export function KPIConfigModal({
                     {alreadyAdded ? (
                       <PillBadge label="Added" color="#2DD4BF" bold />
                     ) : (
-                      <button onClick={() => addTemplate(t)} disabled={connections.length === 0} style={btnStyle(connections.length === 0 ? '#666' : PRIMARY_COLOR)}>Add</button>
+                      <button onClick={() => addTemplate(t)} disabled={connections.length === 0} style={buttonStyle(connections.length === 0 ? '#666' : PRIMARY_COLOR)}>Add</button>
                     )}
                   </div>
                 );
@@ -443,7 +439,7 @@ export function KPIConfigModal({
               <div style={{ padding: 12, borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>Schema Browser</span>
-                  <button onClick={loadTables} disabled={!kpiConnId} style={btnStyle(kpiConnId ? PRIMARY_COLOR : '#666')}>Load Tables</button>
+                  <button onClick={loadTables} disabled={!kpiConnId} style={buttonStyle(kpiConnId ? PRIMARY_COLOR : '#666')}>Load Tables</button>
                 </div>
                 {tables.length > 0 && (
                   <div style={{ display: 'flex', gap: 12, maxHeight: 180, overflow: 'hidden' }}>
@@ -501,7 +497,7 @@ export function KPIConfigModal({
                   style={{ ...iStyle, resize: 'vertical', fontFamily: FONT_MONO, fontSize: 11 }}
                   aria-label="SQL query"
                 />
-                <button onClick={runPreview} disabled={!kpiConnId} style={{ ...btnStyle(kpiConnId ? COLOR_INFO : '#666'), marginTop: 6 }}>Preview Query</button>
+                <button onClick={runPreview} disabled={!kpiConnId} style={{ ...buttonStyle(kpiConnId ? COLOR_INFO : '#666'), marginTop: 6 }}>Preview Query</button>
               </div>
 
               {preview.length > 0 && (
@@ -530,7 +526,7 @@ export function KPIConfigModal({
                 </div>
               </div>
 
-              <button onClick={saveCustomKPI} disabled={connections.length === 0} style={btnStyle(connections.length === 0 ? '#666' : PRIMARY_COLOR)}>Save KPI</button>
+              <button onClick={saveCustomKPI} disabled={connections.length === 0} style={buttonStyle(connections.length === 0 ? '#666' : PRIMARY_COLOR)}>Save KPI</button>
             </div>
           )}
 
@@ -565,7 +561,7 @@ export function KPIConfigModal({
                         {conn ? ` | ${conn.name}` : ''}
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteKPI(def.id)} style={{ ...btnStyle('#F87171'), padding: '4px 10px' }} aria-label={`Delete ${def.name}`}>Delete</button>
+                    <button onClick={() => handleDeleteKPI(def.id)} style={{ ...buttonStyle('#F87171'), padding: '4px 10px' }} aria-label={`Delete ${def.name}`}>Delete</button>
                   </div>
                 );
               })}

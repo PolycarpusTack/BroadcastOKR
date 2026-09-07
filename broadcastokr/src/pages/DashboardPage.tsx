@@ -45,7 +45,7 @@ export function DashboardPage({
   bridgeSyncing = false, liveKPIs = [], drivers, health = null, updateAvailable = null,
   onStartBridge = noopAsync, onStopBridge = noopAsync, onSyncNow = noopVoid,
 }: DashboardPageProps) {
-  const { theme, dark } = useTheme();
+  const { theme } = useTheme();
   const { entitled } = useDeployment();
   const navigate = useNavigate();
   const { goals: allGoals, tasks, kpis, users } = useStore(
@@ -196,7 +196,7 @@ export function DashboardPage({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {urgentTasks.map((t) => {
-                const badge = getUrgencyBadge(t.days, dark);
+                const badge = getUrgencyBadge(t.days);
                 const user = safeUser(users, t.assignee);
                 return (
                   <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>

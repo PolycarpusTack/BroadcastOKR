@@ -7,7 +7,7 @@ import { progressColor, statusIcon } from '../../utils/colors';
 import { safeUser, safeChannel } from '../../utils/safeGet';
 import { resolveScopedChannels } from '../../utils/channelScope';
 import { COLOR_INFO, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR, STALE_SYNC_THRESHOLD_MS } from '../../constants/config';
-import { formatTimeAgo } from '../../utils/dates';
+import { formatTimeAgo, formatShortDate } from '../../utils/dates';
 import type { Goal, KeyResult, Theme, User, Client, Channel, RolePermissions } from '../../types';
 
 export interface GoalCardProps {
@@ -65,8 +65,6 @@ export const GoalCard = React.memo(function GoalCard({
     .filter((c): c is NonNullable<typeof c> => !!c && !!c.monitorUntil && new Date(c.monitorUntil) > new Date());
   const clientMonitorActive = !goalMonitorActive && monitoringClients.length > 0;
 
-  const fmtDate = (d: string) =>
-    new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const resolvedGoalScopedChannels =
     goal.channelScope?.type === 'selected'
       ? resolveScopedChannels(goal.channelScope, clients)
@@ -190,7 +188,7 @@ export const GoalCard = React.memo(function GoalCard({
                 goalMonitorActive ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                     <PillBadge
-                      label={`Monitoring until ${fmtDate(goal.monitorUntil!)}`}
+                      label={`Monitoring until ${formatShortDate(goal.monitorUntil!)}`}
                       color={COLOR_WARNING}
                     />
                     <button

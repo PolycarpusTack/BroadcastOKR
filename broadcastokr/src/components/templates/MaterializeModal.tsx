@@ -1,3 +1,4 @@
+import { toggleInSet } from '../../utils/collections';
 import { useState, useMemo } from 'react';
 import { Modal } from '../ui/Modal';
 import { PillBadge } from '../ui/PillBadge';
@@ -52,12 +53,7 @@ export function MaterializeModal({
 
   const toggle = (id: string) => {
     if (existingSet.has(id) || !filtered.find((c) => c.id === id)?.connectionId) return;
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelectedIds((prev) => toggleInSet(prev, id));
   };
 
   const selectAll = () => {
