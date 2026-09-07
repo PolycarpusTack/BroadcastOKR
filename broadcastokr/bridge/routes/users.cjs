@@ -1,6 +1,7 @@
 const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
 const { capViolation, editorCountAfter } = require('../entitlements.cjs');
+const { parseNumericId } = require('../utils/ids.cjs');
 
 function toUserDTO(row) {
   return {
@@ -31,11 +32,22 @@ function createUsersRouter(db) {
     res.status(201).json({ ok: true, id: u.id });
   });
 
+  // ADR-A1 (F1): one identifier for the lookup, the authorisation and the write.
+  // The RBAC middleware makes the same decision one layer up; this is the layer
+  // that holds if a router or policy shape ever lets a request past it.
   router.put('/:id', (req, res) => {
     const u = req.body;
-    const before = db.prepare('SELECT name, role FROM users WHERE id = ?').get(req.params.id);
-    if (before && u.role && before.role !== u.role) {
-      const overCap = capViolation('seats', editorCountAfter(db, { id: req.params.id, role: u.role }));
+    if (!u || typeof u !== 'object') return res.status(400).json({ error: 'invalid_body' });
+    const id = parseNumericId(req.params.id);
+    if (id === null) return res.status(400).json({ error: 'invalid_user_id' });
+    const before = db.prepare('SELECT name, role FROM users WHERE id = ?').get(id);
+    if (!before) return res.status(404).json({ error: 'User not found' });
+    if (u.role && before.role !== u.role) {
+      // Cloud sessions carry a role; the desktop API key does not (single-user trust model).
+      if (req.user?.role && req.user.role !== 'owner') {
+        return res.status(403).json({ error: 'Only owners can change roles' });
+      }
+      const overCap = capViolation('seats', editorCountAfter(db, { id, role: u.role }));
       if (overCap) return res.status(403).json(overCap);
       audit(db, req, `Changed role of ${before.name}: ${before.role} → ${u.role}`);
     }
@@ -43,12 +55,14 @@ function createUsersRouter(db) {
       avatar_url=?, client_ids=?, skills=?, updated_at=datetime('now') WHERE id=?`)
       .run(u.name, u.role, u.av, u.color, u.dept, u.title, u.email || null, u.phone || null,
         u.avatarUrl || null, u.clientIds ? JSON.stringify(u.clientIds) : null, u.skills ? JSON.stringify(u.skills) : null,
-        req.params.id);
+        id);
     res.json({ ok: true });
   });
 
   router.delete('/:id', (req, res) => {
-    db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+    const id = parseNumericId(req.params.id);
+    if (id === null) return res.status(400).json({ error: 'invalid_user_id' });
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
     res.json({ ok: true });
   });
 
