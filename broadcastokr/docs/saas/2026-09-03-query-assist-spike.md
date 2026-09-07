@@ -83,7 +83,7 @@ piece that is common — question + schema metadata → vetted SELECT, with a
 confirm-with-preview gate — is exactly this spike. Building it once, bridge-side,
 behind one endpoint, serves both products; the difference is what happens after the
 SELECT (Insights renders a chart, BrOKR stores a KR). The Insights prototype's
-ChartConfig contract (`../whatson-insights.jsx`) stays the design asset for the
+ChartConfig contract (`../whatson-insights/whatson-insights.jsx`) stays the design asset for the
 rendering half.
 
 ## Recommendation
