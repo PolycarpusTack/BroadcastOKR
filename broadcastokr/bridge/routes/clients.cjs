@@ -1,5 +1,6 @@
 const { createRouter } = require('../utils/router.cjs');
 const { isFleetAllowed } = require('../editions.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 const { capViolation } = require('../entitlements.cjs');
 
 /** Channels licensed across the instance's clients, after this client's write. */
@@ -67,7 +68,7 @@ function createClientsRouter(db) {
       const count = db.prepare('SELECT COUNT(*) AS c FROM clients').get().c;
       if (count <= 1) return res.status(403).json({ error: 'single_tenant' });
     }
-    db.prepare('DELETE FROM clients WHERE id = ?').run(req.params.id);
+    deleteWithMarker(db, 'clients', req.params.id);
     res.json({ ok: true });
   });
 

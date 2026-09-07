@@ -4,12 +4,17 @@
  * query runner, dialect helpers, and bind building. No Express, no SQLite.
  */
 
-// Optional drivers — load what's available
-let oracledb;
-try { oracledb = require('oracledb'); } catch { oracledb = null; }
+const { assertReadOnlySelect } = require('./sqlEnvelope.cjs');
 
-let pg;
-try { pg = require('pg'); } catch { pg = null; }
+// Optional drivers — load what's available
+let loadedOracledb;
+try { loadedOracledb = require('oracledb'); } catch { loadedOracledb = null; }
+
+let loadedPg;
+try { loadedPg = require('pg'); } catch { loadedPg = null; }
+// Exported for the callers that only need to know whether a driver is present.
+const oracledb = loadedOracledb;
+const pg = loadedPg;
 
 // One ceiling for a KR/KPI query, enforced DB-side (callTimeout /
 // statement_timeout) so the database cancels runaway queries instead of the
@@ -18,19 +23,11 @@ const QUERY_TIMEOUT_MS = 15000;
 
 // ── SQL Safety ──
 
+// ADR-A2 (F2): the scanner in sqlEnvelope.cjs is the validator. This name is
+// kept because every caller and test knows it; the SQL that passes here is the
+// SQL the driver receives, unchanged.
 function assertSelectOnly(sql) {
-  // Strip block comments /* ... */ and line comments -- ...
-  const stripped = sql
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/--[^\n]*/g, '');
-  if (!stripped.trim().toUpperCase().startsWith('SELECT')) {
-    throw new Error('Only SELECT queries are allowed');
-  }
-  // Block stacked statements (semicolons outside of string literals)
-  const noStrings = stripped.replace(/'[^']*'/g, '');
-  if (/;/.test(noStrings)) {
-    throw new Error('Multiple statements are not allowed');
-  }
+  assertReadOnlySelect(sql);
 }
 
 /**
@@ -109,11 +106,13 @@ function getColumnsQuery(connConfig, tableName) {
   };
 }
 
+// The newline before the closing parenthesis keeps a trailing line comment in
+// the user's SQL from swallowing the wrapper.
 function wrapPreviewQuery(connConfig, sql) {
   if (connConfig.type === 'postgres') {
-    return `SELECT * FROM (${sql}) AS _preview LIMIT 20`;
+    return `SELECT * FROM (${sql}\n) AS _preview LIMIT 20`;
   }
-  return `SELECT * FROM (${sql}) WHERE ROWNUM <= 20`;
+  return `SELECT * FROM (${sql}\n) WHERE ROWNUM <= 20`;
 }
 
 function getTestQuery(connConfig) {
@@ -149,8 +148,12 @@ function normalizePgRows(rows) {
 /**
  * Pools + query runner. `decryptPassword` maps a stored (possibly encrypted)
  * password to plaintext — injected so the core stays free of key handling.
+ * `drivers` lets a test hand in a fake pg/oracledb and observe the exact
+ * statements the lifecycle sends (ADR-A2); production uses the real modules.
  */
-function createWhatsonCore({ decryptPassword }) {
+function createWhatsonCore({ decryptPassword, drivers = {} }) {
+  const oracledb = Object.hasOwn(drivers, 'oracledb') ? drivers.oracledb : loadedOracledb;
+  const pg = Object.hasOwn(drivers, 'pg') ? drivers.pg : loadedPg;
   const oraclePools = new Map();
   const pgPools = new Map();
 
@@ -196,24 +199,49 @@ function createWhatsonCore({ decryptPassword }) {
     return pool;
   }
 
+  // ADR-A2: the database enforces read-only on the same checked-out
+  // connection the query runs on. Oracle: SET TRANSACTION READ ONLY is the
+  // first statement of the transaction, ROLLBACK ends it before the connection
+  // goes back to the pool. A connection that errored is dropped, not reused.
   async function runOracleQuery(connConfig, sql, binds = {}) {
     const pool = await getOraclePool(connConfig);
     const conn = await pool.getConnection();
     conn.callTimeout = QUERY_TIMEOUT_MS;
+    let failed = false;
     try {
+      await conn.execute('SET TRANSACTION READ ONLY');
       const result = await conn.execute(sql, binds, { outFormat: oracledb.OUT_FORMAT_OBJECT });
       return result.rows;
+    } catch (err) {
+      failed = true;
+      throw err;
     } finally {
-      await conn.close();
+      try { await conn.rollback(); } catch { /* the transaction may already be gone */ }
+      await conn.close(failed ? { drop: true } : undefined);
     }
   }
 
+  // PostgreSQL: BEGIN READ ONLY … ROLLBACK on one client from the pool. A
+  // failed or cancelled query releases the client with the error so pg
+  // destroys it instead of handing a dirty session to the next caller.
   async function runPgQuery(connConfig, sql, binds = {}) {
     const pool = getPgPool(connConfig);
     // Convert Oracle-style :bind_name to PostgreSQL $1, $2, ... placeholders
     const { text, values } = convertBinds(sql, binds);
-    const result = await pool.query(text, values);
-    return normalizePgRows(result.rows);
+    const client = await pool.connect();
+    let failed = null;
+    try {
+      await client.query('BEGIN READ ONLY');
+      const result = await client.query(text, values);
+      await client.query('ROLLBACK');
+      return normalizePgRows(result.rows);
+    } catch (err) {
+      failed = err;
+      try { await client.query('ROLLBACK'); } catch { /* connection may be gone */ }
+      throw err;
+    } finally {
+      client.release(failed || undefined);
+    }
   }
 
   async function runQuery(connConfig, sql, binds = {}) {
@@ -260,6 +288,8 @@ function createWhatsonCore({ decryptPassword }) {
       return { status: 'ok', current: value };
     } catch (err) {
       if (err.message === 'Query timed out') return { status: 'timeout', error: m.timeout };
+      // A query the envelope refused is a definition problem the operator can fix — say why.
+      if (err.name === 'SqlEnvelopeError') return { status: 'error', error: err.message };
       return { status: 'error', error: m.failed(err) };
     }
   }

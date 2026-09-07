@@ -1,5 +1,7 @@
 const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
+const { sha256Hex } = require('../utils/crypto.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 /**
  * Convert a goal DB row + its key_results rows into the frontend Goal shape.
@@ -36,6 +38,55 @@ function toGoalDTO(goalRow, krs, historyMap) {
       history: historyMap.get(kr.id) || undefined,
     })),
   };
+}
+
+// ── ADR-B1 (F7): validate before mutating, mutate inside one transaction ──
+
+const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
+const isOptionalString = (v) => v === undefined || v === null || typeof v === 'string';
+
+/** 400 reason for a goal body the route cannot store, or null. `create` also demands an id. */
+function goalBodyProblem(g, { create = false } = {}) {
+  if (!g || typeof g !== 'object' || Array.isArray(g)) return 'body must be an object';
+  if (create && (typeof g.id !== 'string' || !g.id)) return 'id must be a non-empty string';
+  if (typeof g.title !== 'string' || !g.title.trim()) return 'title must be a non-empty string';
+  if (typeof g.status !== 'string' || !g.status) return 'status must be a non-empty string';
+  if (!isFiniteNumber(g.progress)) return 'progress must be a finite number';
+  if (g.version !== undefined && typeof g.version !== 'number') return 'version must be a number';
+  if (g.keyResults !== undefined) {
+    if (!Array.isArray(g.keyResults)) return 'keyResults must be an array';
+    const ids = new Set();
+    for (let i = 0; i < g.keyResults.length; i++) {
+      const kr = g.keyResults[i];
+      const at = `keyResults[${i}]`;
+      if (!kr || typeof kr !== 'object' || Array.isArray(kr)) return `${at} must be an object`;
+      if (typeof kr.id !== 'string' || !kr.id) return `${at}.id must be a non-empty string`;
+      if (ids.has(kr.id)) return `${at}.id '${kr.id}' appears twice`;
+      ids.add(kr.id);
+      if (typeof kr.title !== 'string') return `${at}.title must be a string`;
+      for (const f of ['start', 'target', 'current', 'progress']) {
+        if (!isFiniteNumber(kr[f])) return `${at}.${f} must be a finite number`;
+      }
+      if (typeof kr.status !== 'string' || !kr.status) return `${at}.status must be a non-empty string`;
+      for (const f of ['syncStatus', 'syncError', 'lastSyncAt', 'krTemplateId']) {
+        if (!isOptionalString(kr[f])) return `${at}.${f} must be a string`;
+      }
+      if (kr.liveConfig !== undefined && kr.liveConfig !== null && (typeof kr.liveConfig !== 'object' || Array.isArray(kr.liveConfig))) {
+        return `${at}.liveConfig must be an object`;
+      }
+    }
+  }
+  return null;
+}
+
+/** The first incoming KR id that already belongs to a different goal, or null. */
+function foreignKeyResult(db, goalId, keyResults) {
+  const owned = db.prepare('SELECT goal_id FROM key_results WHERE id = ?');
+  for (const kr of keyResults || []) {
+    const row = owned.get(kr.id);
+    if (row && row.goal_id !== goalId) return kr.id;
+  }
+  return null;
 }
 
 /**
@@ -77,6 +128,15 @@ function upsertKeyResults(db, goalId, keyResults) {
   }
 }
 
+function pruneHistory(db, krId) {
+  const count = db.prepare('SELECT COUNT(*) as c FROM kr_history WHERE kr_id = ?').get(krId).c;
+  if (count > 100) {
+    db.prepare(`DELETE FROM kr_history WHERE id IN (
+      SELECT id FROM kr_history WHERE kr_id = ? ORDER BY timestamp ASC LIMIT ?
+    )`).run(krId, count - 75);
+  }
+}
+
 /** Full DTO for one goal (KRs + history), or null when it doesn't exist. */
 function getGoalDTO(db, id) {
   const goal = db.prepare('SELECT * FROM goals WHERE id = ?').get(id);
@@ -93,6 +153,39 @@ function getGoalDTO(db, id) {
     }
   }
   return toGoalDTO(goal, krs, historyByKR);
+}
+
+// ── ADR-B3 (F4): the check-in command ──
+
+const OPERATION_RETENTION_HOURS = 24;
+const OPERATION_ID_MAX = 128;
+
+/** 400 reason for a check-in body, or null. */
+function checkInBodyProblem(b) {
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return 'body must be an object';
+  if (typeof b.krId !== 'string' || !b.krId) return 'krId must be a non-empty string';
+  if (!isFiniteNumber(b.value)) return 'value must be a finite number';
+  if (!isOptionalString(b.confidence)) return 'confidence must be a string';
+  if (!isOptionalString(b.note)) return 'note must be a string';
+  if (b.operationId !== undefined && b.operationId !== null
+    && (typeof b.operationId !== 'string' || !b.operationId || b.operationId.length > OPERATION_ID_MAX)) {
+    return `operationId must be a string of at most ${OPERATION_ID_MAX} characters`;
+  }
+  return null;
+}
+
+/**
+ * Who a check-in is attributed to. Cloud sessions are trusted (the name on the
+ * user row); the desktop API key has no session, so the persona in the body
+ * stands, as before.
+ */
+function checkInActor(db, req, body) {
+  if (req.user?.id) {
+    const u = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
+    return { principal: `user:${req.user.id}`, actor: u?.name || `user#${req.user.id}` };
+  }
+  const actor = typeof body.actor === 'string' && body.actor.trim() ? body.actor.trim() : 'desktop';
+  return { principal: 'desktop', actor };
 }
 
 function createGoalsRouter(db) {
@@ -134,9 +227,16 @@ function createGoalsRouter(db) {
     res.json(dto);
   });
 
-  // POST /api/goals — create
-  router.post('/', (req, res) => {
-    const g = req.body;
+  // POST /api/goals — create. The whole aggregate lands or nothing does; a
+  // retry with the same client-generated id gets 409 duplicate with the row.
+  const createGoal = db.transaction((g) => {
+    const problem = goalBodyProblem(g, { create: true });
+    if (problem) return { status: 400, body: { error: 'invalid_goal', detail: problem } };
+    const current = getGoalDTO(db, g.id);
+    if (current) return { status: 409, body: { error: 'duplicate', current } };
+    const foreign = foreignKeyResult(db, g.id, g.keyResults);
+    if (foreign) return { status: 409, body: { error: 'kr_owned_by_other_goal', krId: foreign } };
+
     db.prepare(`INSERT INTO goals (id, title, status, progress, owner, channel, period, client_ids, channel_scope, template_id, monitor_until, archived)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(g.id, g.title, g.status, g.progress, g.owner, g.channel, g.period,
@@ -147,17 +247,25 @@ function createGoalsRouter(db) {
     if (g.keyResults?.length) {
       upsertKeyResults(db, g.id, g.keyResults);
     }
+    return { status: 201, body: { ok: true, id: g.id } };
+  });
 
-    res.status(201).json({ ok: true, id: g.id });
+  router.post('/', (req, res) => {
+    const out = createGoal(req.body);
+    res.status(out.status).json(out.body);
   });
 
   // PUT /api/goals/:id — update. When the body carries `version`, the write is
   // compare-and-swap: stale versions 409 with the current row. Bodies without
-  // a version keep last-write-wins (older clients).
-  router.put('/:id', (req, res) => {
-    const g = req.body;
-    const existing = db.prepare('SELECT id FROM goals WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Goal not found' });
+  // a version keep last-write-wins (older clients). Parent, KRs and the audit
+  // rows commit together or not at all.
+  const updateGoal = db.transaction((id, g, req) => {
+    const existing = db.prepare('SELECT id FROM goals WHERE id = ?').get(id);
+    if (!existing) return { status: 404, body: { error: 'Goal not found' } };
+    const problem = goalBodyProblem(g);
+    if (problem) return { status: 400, body: { error: 'invalid_goal', detail: problem } };
+    const foreign = foreignKeyResult(db, id, g.keyResults);
+    if (foreign) return { status: 409, body: { error: 'kr_owned_by_other_goal', krId: foreign } };
 
     const checked = typeof g.version === 'number';
     const result = db.prepare(`UPDATE goals SET title=?, status=?, progress=?, owner=?, channel=?, period=?,
@@ -167,16 +275,16 @@ function createGoalsRouter(db) {
         g.clientIds ? JSON.stringify(g.clientIds) : null,
         g.channelScope ? JSON.stringify(g.channelScope) : null,
         g.templateId || null, g.monitorUntil || null, g.archived ? 1 : 0,
-        ...(checked ? [req.params.id, g.version] : [req.params.id]));
+        ...(checked ? [id, g.version] : [id]));
 
     if (result.changes === 0) {
-      return res.status(409).json({ error: 'version_conflict', current: getGoalDTO(db, req.params.id) });
+      return { status: 409, body: { error: 'version_conflict', current: getGoalDTO(db, id) } };
     }
 
     if (g.keyResults) {
       const beforeShared = new Map(db.prepare('SELECT id, shared_with_mediagenix AS s FROM key_results WHERE goal_id = ?')
-        .all(req.params.id).map(r => [r.id, !!r.s]));
-      upsertKeyResults(db, req.params.id, g.keyResults);
+        .all(id).map(r => [r.id, !!r.s]));
+      upsertKeyResults(db, id, g.keyResults);
       for (const kr of g.keyResults) {
         const was = beforeShared.get(kr.id);
         if (was !== undefined && was !== !!kr.sharedWithMediagenix) {
@@ -185,42 +293,84 @@ function createGoalsRouter(db) {
       }
     }
 
-    const row = db.prepare('SELECT version FROM goals WHERE id = ?').get(req.params.id);
-    res.json({ ok: true, version: row.version });
+    const row = db.prepare('SELECT version FROM goals WHERE id = ?').get(id);
+    return { status: 200, body: { ok: true, version: row.version } };
+  });
+
+  router.put('/:id', (req, res) => {
+    const out = updateGoal(req.params.id, req.body, req);
+    res.status(out.status).json(out.body);
   });
 
   // DELETE /api/goals/:id
+  // DELETE /api/goals/:id — the marker for the change poll and the tasks whose
+  // goal link the schema sets to NULL travel with the delete (ADR-B4).
   router.delete('/:id', (req, res) => {
-    const result = db.prepare('DELETE FROM goals WHERE id = ?').run(req.params.id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Goal not found' });
+    const deleted = deleteWithMarker(db, 'goals', req.params.id, {
+      invalidate: [{ table: 'tasks', where: 'goal_id = ?', params: [req.params.id] }],
+    });
+    if (deleted === 0) return res.status(404).json({ error: 'Goal not found' });
     res.json({ ok: true });
   });
 
-  // POST /api/goals/:id/check-in — record a KR check-in
-  router.post('/:id/check-in', (req, res) => {
-    const { krId, value, confidence, note, actor } = req.body;
-    const kr = db.prepare('SELECT * FROM key_results WHERE id = ? AND goal_id = ?').get(krId, req.params.id);
-    if (!kr) return res.status(404).json({ error: 'Key result not found' });
+  // POST /api/goals/:id/check-in — one authorised command (ADR-B3, F4).
+  //
+  // A manual KR takes the measured value: history row, current_val, the
+  // parent's version and updated_at — all in one transaction. A live KR keeps
+  // its externally synced value and only records the annotation. The response
+  // carries the authoritative goal, so the client refreshes from it and no
+  // longer needs a structural PUT it may not be allowed to make. Progress and
+  // status stay client-computed (krProgress) and are refreshed on the next
+  // structural write; every client recomputes them on merge.
+  //
+  // `operationId` (new clients) makes a retry after a lost response return the
+  // same answer instead of a second history row; a different body under the
+  // same id is refused. Requests without it are not deduplicated — documented.
+  const checkIn = db.transaction((goalId, body, who) => {
+    const problem = checkInBodyProblem(body);
+    if (problem) return { status: 400, body: { error: 'invalid_checkin', detail: problem } };
 
-    // Insert history entry. Values and progress are NOT computed here: the
-    // client owns progress semantics (direction-aware krProgress) and PUTs the
-    // recalculated goal alongside this call.
-    db.prepare('INSERT INTO kr_history (kr_id, timestamp, value, confidence, note, actor, source) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(krId, new Date().toISOString(), value, confidence || null, note || null, actor, 'check-in');
+    db.prepare(`DELETE FROM checkin_operations WHERE created_at < datetime('now', ?)`)
+      .run(`-${OPERATION_RETENTION_HOURS} hours`);
 
-    // Bump the goal so /api/sync/changes propagates this check-in even if the
-    // client's follow-up PUT is lost.
-    db.prepare("UPDATE goals SET updated_at=datetime('now') WHERE id=?").run(req.params.id);
-
-    // Prune history to 100 entries
-    const count = db.prepare('SELECT COUNT(*) as c FROM kr_history WHERE kr_id = ?').get(krId).c;
-    if (count > 100) {
-      db.prepare(`DELETE FROM kr_history WHERE id IN (
-        SELECT id FROM kr_history WHERE kr_id = ? ORDER BY timestamp ASC LIMIT ?
-      )`).run(krId, count - 75);
+    const operationId = body.operationId || null;
+    const digest = sha256Hex(JSON.stringify([goalId, body.krId, body.value, body.confidence ?? null, body.note ?? null]));
+    if (operationId) {
+      const seen = db.prepare('SELECT digest, response FROM checkin_operations WHERE principal = ? AND operation_id = ?')
+        .get(who.principal, operationId);
+      if (seen) {
+        if (seen.digest !== digest) return { status: 409, body: { error: 'operation_conflict', detail: 'operationId was already used for a different check-in' } };
+        return { status: 200, body: { ...JSON.parse(seen.response), replayed: true } };
+      }
     }
 
-    res.json({ ok: true });
+    const kr = db.prepare('SELECT * FROM key_results WHERE id = ? AND goal_id = ?').get(body.krId, goalId);
+    if (!kr) return { status: 404, body: { error: 'Key result not found' } };
+
+    const timestamp = new Date().toISOString();
+    db.prepare('INSERT INTO kr_history (kr_id, timestamp, value, confidence, note, actor, source) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(body.krId, timestamp, body.value, body.confidence || null, body.note || null, who.actor, 'check-in');
+    pruneHistory(db, body.krId);
+
+    const manual = !kr.live_config;
+    if (manual) {
+      db.prepare('UPDATE key_results SET current_val = ? WHERE id = ?').run(body.value, body.krId);
+    }
+    db.prepare("UPDATE goals SET version = version + 1, updated_at = datetime('now') WHERE id = ?").run(goalId);
+
+    const goal = getGoalDTO(db, goalId);
+    const response = { ok: true, applied: manual ? 'value' : 'history', goal, version: goal.version, timestamp };
+    if (operationId) {
+      db.prepare('INSERT INTO checkin_operations (principal, operation_id, goal_id, kr_id, digest, response) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(who.principal, operationId, goalId, body.krId, digest, JSON.stringify(response));
+    }
+    return { status: 200, body: response };
+  });
+
+  router.post('/:id/check-in', (req, res) => {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const out = checkIn(req.params.id, body, checkInActor(db, req, body));
+    res.status(out.status).json(out.body);
   });
 
   return router;

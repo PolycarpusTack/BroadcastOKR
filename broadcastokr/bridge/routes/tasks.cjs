@@ -1,4 +1,5 @@
 const { createRouter } = require('../utils/router.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 function toTaskDTO(row, subtasks) {
   return {
@@ -21,6 +22,57 @@ function getTaskDTO(db, id) {
   return toTaskDTO(task, subs);
 }
 
+/**
+ * ADR-A1 field extension (F5): what a member may change on a task.
+ *
+ * Members move tasks across the board and tick existing subtasks. Everything
+ * else on the DTO is structural (title, description, priority, assignee,
+ * channel, due, type, scope, goal link) or is an edit of the subtask list
+ * itself (text, order, add, remove). The comparison runs against the stored
+ * row inside the same transaction as the write, so the state that was
+ * authorised is the state that is replaced.
+ */
+const STRUCTURAL_FIELDS = ['title', 'description', 'priority', 'assignee', 'channel', 'due', 'taskType', 'clientIds', 'channelScope', 'goalId'];
+
+// undefined / null / '' / [] all mean "nothing here" — a DTO round-tripped
+// through JSON or the client store loses the distinction.
+function normalizeField(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (Array.isArray(value) && value.length === 0) return null;
+  return JSON.stringify(value);
+}
+
+/** The first field a member is not allowed to change, or null when the write is within policy. */
+function memberFieldViolation(stored, next) {
+  for (const field of STRUCTURAL_FIELDS) {
+    if (normalizeField(stored[field]) !== normalizeField(next[field])) return field;
+  }
+  const a = stored.subtasks || [];
+  const b = next.subtasks || [];
+  if (a.length !== b.length) return 'subtasks';
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].text !== b[i]?.text) return 'subtasks';
+  }
+  return null;
+}
+
+/** 400 reason for a body the route cannot store, or null when it is well-formed. `create` also demands id and title. */
+function taskBodyProblem(t, { create = false } = {}) {
+  if (!t || typeof t !== 'object' || Array.isArray(t)) return 'body must be an object';
+  if (create && (typeof t.id !== 'string' || !t.id)) return 'id must be a non-empty string';
+  if (create && (typeof t.title !== 'string' || !t.title.trim())) return 'title must be a non-empty string';
+  if (t.title !== undefined && typeof t.title !== 'string') return 'title must be a string';
+  if (typeof t.status !== 'string' || !t.status) return 'status must be a non-empty string';
+  if (t.subtasks !== undefined) {
+    if (!Array.isArray(t.subtasks)) return 'subtasks must be an array';
+    for (const s of t.subtasks) {
+      if (!s || typeof s !== 'object' || typeof s.text !== 'string') return 'each subtask needs a text';
+    }
+  }
+  if (t.version !== undefined && typeof t.version !== 'number') return 'version must be a number';
+  return null;
+}
+
 function upsertSubtasks(db, taskId, subtasks) {
   db.prepare('DELETE FROM subtasks WHERE task_id = ?').run(taskId);
   const insert = db.prepare('INSERT INTO subtasks (task_id, text, done, sort_order) VALUES (?, ?, ?, ?)');
@@ -41,8 +93,13 @@ function createTasksRouter(db) {
     res.json(tasks.map(t => toTaskDTO(t, subsByTask.get(t.id) || [])));
   });
 
-  router.post('/', (req, res) => {
-    const t = req.body;
+  // ADR-B1 (F7): the task and its subtasks land together or not at all; a
+  // retry with the same client-generated id gets 409 duplicate with the row.
+  const createTask = db.transaction((t) => {
+    const problem = taskBodyProblem(t, { create: true });
+    if (problem) return { status: 400, body: { error: 'invalid_task', detail: problem } };
+    const current = getTaskDTO(db, t.id);
+    if (current) return { status: 409, body: { error: 'duplicate', current } };
     db.prepare(`INSERT INTO tasks (id, title, description, status, priority, assignee, channel, due, task_type, client_ids, channel_scope, goal_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(t.id, t.title, t.description || null, t.status, t.priority, t.assignee, t.channel, t.due, t.taskType,
@@ -50,15 +107,33 @@ function createTasksRouter(db) {
         t.channelScope ? JSON.stringify(t.channelScope) : null,
         t.goalId || null);
     if (t.subtasks?.length) upsertSubtasks(db, t.id, t.subtasks);
-    res.status(201).json({ ok: true, id: t.id });
+    return { status: 201, body: { ok: true, id: t.id } };
+  });
+
+  router.post('/', (req, res) => {
+    const out = createTask(req.body);
+    res.status(out.status).json(out.body);
   });
 
   // Version-carrying bodies are compare-and-swap (stale → 409 with current row);
   // versionless bodies keep last-write-wins for older clients.
-  router.put('/:id', (req, res) => {
-    const t = req.body;
-    const existing = db.prepare('SELECT id FROM tasks WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Task not found' });
+  //
+  // Members (cloud sessions with role 'member') get the field policy above: a
+  // full DTO passes when only status / subtask done flags differ, a restricted
+  // body ({ status, version } or { subtasks, version }) keeps every omitted
+  // field. Owners and managers keep the full-DTO contract unchanged.
+  const updateTask = db.transaction((id, body, restricted) => {
+    const stored = getTaskDTO(db, id);
+    if (!stored) return { status: 404, body: { error: 'Task not found' } };
+
+    const t = restricted ? { ...stored, ...body } : body;
+    const problem = taskBodyProblem(t);
+    if (problem) return { status: 400, body: { error: 'invalid_task', detail: problem } };
+
+    if (restricted) {
+      const field = memberFieldViolation(stored, t);
+      if (field) return { status: 403, body: { error: 'Insufficient permissions', field } };
+    }
 
     const checked = typeof t.version === 'number';
     const result = db.prepare(`UPDATE tasks SET title=?, description=?, status=?, priority=?, assignee=?, channel=?, due=?, task_type=?,
@@ -68,19 +143,25 @@ function createTasksRouter(db) {
         t.clientIds ? JSON.stringify(t.clientIds) : null,
         t.channelScope ? JSON.stringify(t.channelScope) : null,
         t.goalId || null,
-        ...(checked ? [req.params.id, t.version] : [req.params.id]));
+        ...(checked ? [id, t.version] : [id]));
 
     if (result.changes === 0) {
-      return res.status(409).json({ error: 'version_conflict', current: getTaskDTO(db, req.params.id) });
+      return { status: 409, body: { error: 'version_conflict', current: stored } };
     }
 
-    if (t.subtasks) upsertSubtasks(db, req.params.id, t.subtasks);
-    const row = db.prepare('SELECT version FROM tasks WHERE id = ?').get(req.params.id);
-    res.json({ ok: true, version: row.version });
+    if (t.subtasks) upsertSubtasks(db, id, t.subtasks);
+    return { status: 200, body: { ok: true, version: stored.version + 1 } };
+  });
+
+  router.put('/:id', (req, res) => {
+    if (!req.body || typeof req.body !== 'object') return res.status(400).json({ error: 'invalid_task', detail: 'body must be an object' });
+    const restricted = req.user?.role === 'member';
+    const out = updateTask(req.params.id, req.body, restricted);
+    res.status(out.status).json(out.body);
   });
 
   router.delete('/:id', (req, res) => {
-    db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+    deleteWithMarker(db, 'tasks', req.params.id);
     res.json({ ok: true });
   });
 

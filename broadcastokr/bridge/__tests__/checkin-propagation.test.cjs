@@ -74,14 +74,15 @@ describe('check-in propagation contract', () => {
     assert.ok(ids.includes('g1'), `changes since ${since} should include g1, got [${ids}]`);
   });
 
-  it('records history but leaves value/progress to the client', async () => {
+  it('records history AND the measured value; progress stays client-computed (ADR-B3)', async () => {
     const res = await fetch(`${BASE}/api/goals/g1`);
     const goal = await res.json();
     const kr = goal.keyResults.find((k) => k.id === 'kr1');
 
     assert.equal(kr.history?.length, 1, 'check-in should be recorded in history');
     assert.equal(kr.history[0].value, 55);
-    assert.equal(kr.current, 40, 'server must not update current_val — the client PUTs the goal');
-    assert.equal(kr.progress, 0.4, 'server must not recompute progress — client semantics are authoritative');
+    assert.equal(kr.history[0].actor, 'alice', 'desktop mode keeps the persona from the body');
+    assert.equal(kr.current, 55, 'the bridge owns the measured value — no follow-up PUT is needed');
+    assert.equal(kr.progress, 0.4, 'progress is not recomputed here — every client recomputes it on merge (krProgress)');
   });
 });

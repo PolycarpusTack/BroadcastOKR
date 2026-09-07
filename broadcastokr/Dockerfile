@@ -15,8 +15,12 @@ RUN VITE_EDITION=$EDITION npx vite build
 FROM node:22-slim
 ARG MODE=client
 WORKDIR /app
-COPY bridge/package.json ./bridge/
-RUN cd bridge && npm install --omit=dev
+# Reproducible runtime install from the bridge's own lockfile (F3): a plain
+# `npm install` from the manifest alone silently dropped openid-client, the
+# SSO dependency routes/auth.cjs imports at runtime — the image built, answered
+# /api/health, and could not sign anyone in.
+COPY bridge/package.json bridge/package-lock.json ./bridge/
+RUN cd bridge && npm ci --omit=dev
 COPY bridge ./bridge
 COPY --from=app /src/dist ./dist
 RUN mkdir -p /app/data /app/logs /app/backups \

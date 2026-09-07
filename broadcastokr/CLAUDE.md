@@ -143,7 +143,7 @@ components/
 | POST | `/api/kpi/execute-batch` | Batch KR queries |
 | GET | `/api/kpi/history/:id` | KPI history |
 | GET | `/api/kpi/templates` | KPI SQL templates |
-| GET | `/api/sync/state`, `/api/sync/changes?since=` | Full/incremental state for the 5s change poll |
+| GET | `/api/sync/state`, `/api/sync/changes?since=` | Full/incremental state for the 5s change poll; `changes` also carries `deletions` per slice (markers from `sync_deletions`, migration 012, 30-day retention — ADR-B4) and `resetRequired` when `since` is older than that, which makes the client reload the snapshot |
 | POST | `/api/sync/migrate-from-local` | Upload local state (auto-run on first connect to an empty bridge) |
 | CRUD | `/api/goals` (+`/:id/check-in`), `/api/tasks`, `/api/clients`, `/api/users`, `/api/teams`, `/api/goal-templates` | SQLite-backed entity CRUD (bridge/routes/*.cjs) |
 | GET/PUT | `/api/cockpit/tenants` (+`/:clientId`, `/:clientId/status`) | Cockpit tenant registry: instance URL + operator token (encrypted), reachability probe |
@@ -152,7 +152,7 @@ components/
 | GET/POST/DELETE | `/api/agents` (+`/enrol-token`, `/:id`) | Connector-agent ops surface (owner); `/api/agent/*` is the machine surface |
 | GET | `/api/usage`, `/api/cockpit/usage`, `/api/cockpit/tenants/:clientId/usage` | Licence tier, caps and what the instance holds (R3); the cockpit aggregate is the invoicing input |
 
-All SQL execution is SELECT-only (enforced at bridge level). Check-in semantics: the bridge records history and bumps `updated_at` only — the client owns progress (`krProgress`) and PUTs the recalculated goal. Bridge timestamps are sqlite `datetime('now')` format (UTC, no 'T'); `/api/sync/changes` normalizes the ISO `since` before comparing.
+All SQL execution is SELECT-only (enforced at bridge level: `bridge/whatson/sqlEnvelope.cjs` scanner + driver-side read-only transactions, ADR-A2). Check-in semantics (ADR-B3, F4): `POST /api/goals/:id/check-in` is one command — history row + `current_val` (manual KR; a live KR keeps its synced value) + goal `version`/`updated_at` in one transaction, attributed to the session in cloud modes, idempotent per `operationId` (24 h). It answers with the authoritative goal; the client merges it and sends **no** structural PUT. Progress/status stay client-computed (`krProgress`) and every client recomputes them on merge. Goal and task writes are validated first and commit as one aggregate (ADR-B1, F7): `400 invalid_goal|invalid_task`, `409 duplicate|kr_owned_by_other_goal|version_conflict`. Bridge timestamps are sqlite `datetime('now')` format (UTC, no 'T'); `/api/sync/changes` normalizes the ISO `since` before comparing.
 
 ## Auth & Permissions
 Desktop edition: the bridge checks a bearer API key (`BRIDGE_API_KEY`; none = dev mode) and the UI switches personas locally (PersonaPanel). Cloud editions (client, cockpit): identity comes from the bridge session (OIDC via `bridge/routes/auth.cjs`, cookie `brokr_session`) and every route is gated server-side by `middleware/rbac.cjs`; the operator token and the agent/share tokens are separate principals (see Key Patterns). Three roles:

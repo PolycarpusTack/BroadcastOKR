@@ -1,4 +1,5 @@
 const { createRouter } = require('../utils/router.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 function toTeamDTO(row, members) {
   return {
@@ -47,7 +48,7 @@ function createTeamsRouter(db) {
   });
 
   router.delete('/:id', (req, res) => {
-    db.prepare('DELETE FROM teams WHERE id = ?').run(req.params.id);
+    deleteWithMarker(db, 'teams', req.params.id);
     res.json({ ok: true });
   });
 

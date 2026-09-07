@@ -1,5 +1,6 @@
 const { ROLE_PERMS } = require('../permissions.cjs');
 const { isSessionExempt, canonicalPath } = require('./auth.cjs');
+const { parseNumericId } = require('../utils/ids.cjs');
 
 /**
  * Server-enforced RBAC for cloud modes. One declarative policy table maps
@@ -133,10 +134,15 @@ function createRbacMiddleware({ mode = 'desktop', insecureNoAuth = false, db } =
     if (req.method === 'POST' && path === '/api/users' && req.body?.role === 'owner' && role !== 'owner') {
       return res.status(403).json({ error: 'Only owners can create owners' });
     }
+    // ADR-A1 (F1): the target is the DECODED id the handler will load — the raw
+    // path segment let `%32` slip past this check while the route wrote user 2.
+    // Anything that is not a valid id, or names no user, fails closed here.
     if (req.method === 'PUT' && /^\/api\/users\/[^/]+$/.test(path) && req.body?.role) {
-      const targetId = Number(path.split('/').pop());
+      const targetId = parseNumericId(path.split('/').pop());
+      if (targetId === null) return res.status(400).json({ error: 'invalid_user_id' });
       const existing = db.prepare('SELECT role FROM users WHERE id = ?').get(targetId);
-      if (existing && existing.role !== req.body.role && role !== 'owner') {
+      if (!existing) return res.status(404).json({ error: 'User not found' });
+      if (existing.role !== req.body.role && role !== 'owner') {
         return res.status(403).json({ error: 'Only owners can change roles' });
       }
     }
