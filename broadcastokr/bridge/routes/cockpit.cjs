@@ -4,8 +4,8 @@ const { MODE } = require('../editions.cjs');
 const { audit } = require('../audit.cjs');
 const { SHARE_FIELDS } = require('../cockpit/sharePayload.cjs');
 const { callTenant, normalizeInstanceUrl } = require('../cockpit/tenantClient.cjs');
+const { sha256Hex: sha256 } = require('../utils/crypto.cjs');
 
-const sha256 = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
 const MAX_METRICS = 500;
 const MASKED = '***';
 // Pre-R6-2 tenants push without krTemplateId; the cockpit must keep accepting them (FF-6).

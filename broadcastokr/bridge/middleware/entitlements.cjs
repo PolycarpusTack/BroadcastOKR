@@ -54,4 +54,4 @@ function createEntitlementMiddleware({ hasEntitlement, tier }) {
   };
 }
 
-module.exports = { createEntitlementMiddleware, GATES, goalBodyFeature };
+module.exports = { createEntitlementMiddleware };

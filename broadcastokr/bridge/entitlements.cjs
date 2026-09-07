@@ -60,4 +60,4 @@ function editorCountAfter(db, { id, role }) {
   return editors;
 }
 
-module.exports = { SEAT_ROLES, computeUsage, capViolation, editorCountAfter };
+module.exports = { computeUsage, capViolation, editorCountAfter };

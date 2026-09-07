@@ -118,4 +118,4 @@ function createAuthRouter(db, oidcEnv) {
   return router;
 }
 
-module.exports = { createAuthRouter, SESSION_COOKIE };
+module.exports = { createAuthRouter };

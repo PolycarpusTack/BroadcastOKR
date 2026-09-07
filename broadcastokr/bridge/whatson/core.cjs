@@ -286,7 +286,6 @@ module.exports = {
   pg,
   QUERY_TIMEOUT_MS,
   assertSelectOnly,
-  convertBinds,
   buildBinds,
   getTablesQuery,
   getColumnsQuery,
