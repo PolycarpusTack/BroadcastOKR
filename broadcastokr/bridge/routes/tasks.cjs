@@ -55,9 +55,12 @@ function memberFieldViolation(stored, next) {
   return null;
 }
 
-/** 400 reason for a body the route cannot store, or null when it is well-formed. */
-function taskBodyProblem(t) {
+/** 400 reason for a body the route cannot store, or null when it is well-formed. `create` also demands id and title. */
+function taskBodyProblem(t, { create = false } = {}) {
   if (!t || typeof t !== 'object' || Array.isArray(t)) return 'body must be an object';
+  if (create && (typeof t.id !== 'string' || !t.id)) return 'id must be a non-empty string';
+  if (create && (typeof t.title !== 'string' || !t.title.trim())) return 'title must be a non-empty string';
+  if (t.title !== undefined && typeof t.title !== 'string') return 'title must be a string';
   if (typeof t.status !== 'string' || !t.status) return 'status must be a non-empty string';
   if (t.subtasks !== undefined) {
     if (!Array.isArray(t.subtasks)) return 'subtasks must be an array';
@@ -89,8 +92,13 @@ function createTasksRouter(db) {
     res.json(tasks.map(t => toTaskDTO(t, subsByTask.get(t.id) || [])));
   });
 
-  router.post('/', (req, res) => {
-    const t = req.body;
+  // ADR-B1 (F7): the task and its subtasks land together or not at all; a
+  // retry with the same client-generated id gets 409 duplicate with the row.
+  const createTask = db.transaction((t) => {
+    const problem = taskBodyProblem(t, { create: true });
+    if (problem) return { status: 400, body: { error: 'invalid_task', detail: problem } };
+    const current = getTaskDTO(db, t.id);
+    if (current) return { status: 409, body: { error: 'duplicate', current } };
     db.prepare(`INSERT INTO tasks (id, title, description, status, priority, assignee, channel, due, task_type, client_ids, channel_scope, goal_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(t.id, t.title, t.description || null, t.status, t.priority, t.assignee, t.channel, t.due, t.taskType,
@@ -98,7 +106,12 @@ function createTasksRouter(db) {
         t.channelScope ? JSON.stringify(t.channelScope) : null,
         t.goalId || null);
     if (t.subtasks?.length) upsertSubtasks(db, t.id, t.subtasks);
-    res.status(201).json({ ok: true, id: t.id });
+    return { status: 201, body: { ok: true, id: t.id } };
+  });
+
+  router.post('/', (req, res) => {
+    const out = createTask(req.body);
+    res.status(out.status).json(out.body);
   });
 
   // Version-carrying bodies are compare-and-swap (stale → 409 with current row);

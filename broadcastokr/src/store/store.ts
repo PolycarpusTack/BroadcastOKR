@@ -8,7 +8,7 @@ import { goalStatus } from '../utils/colors';
 import { krProgress } from '../utils/progress';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
-import { bridgePost, bridgePut, bridgePutEntity, bridgeDelete, bridgeWriteFailed } from './bridgeSync';
+import { bridgePost, bridgePut, bridgePutEntity, bridgeDelete, bridgeWriteFailed, bridgeCheckIn, newOperationId } from './bridgeSync';
 import { hasFeature, getRuntimeMode } from '../editions/entitlements';
 
 /** Recalculate goal progress and status from its KRs */
@@ -168,10 +168,17 @@ export const useStore = create<AppStore>()(
         });
         const updated = get().goals.find((g) => g.id === goalId);
         if (!updated?.keyResults.some((k) => k.id === krId)) return;
-        bridgePost(`/api/goals/${goalId}/check-in`, { krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor }).catch(bridgeWriteFailed);
-        // The client owns progress semantics (krProgress); the PUT persists the
-        // recalculated goal and bumps updated_at so other clients' polls see it.
-        putVersioned('goals', goalId);
+        // One command (ADR-B3, F4): the bridge owns the measured value and the
+        // history row and answers with the authoritative goal, which replaces
+        // the optimistic copy above (progress is recomputed on merge). No
+        // structural PUT follows — a member may not make one, and the value
+        // must not depend on it. The operation id makes a retry replay-safe.
+        bridgeCheckIn(goalId, {
+          krId, value: entry.value, confidence: entry.confidence, note: entry.note, actor: entry.actor,
+          operationId: newOperationId(),
+        }, {
+          onGoal: (goal) => get()._mergeChanges({ goals: [goal as Goal] }),
+        });
       },
 
       setMonitor: (type, id, days) => {

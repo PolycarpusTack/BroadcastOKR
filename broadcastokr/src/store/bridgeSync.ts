@@ -190,6 +190,52 @@ export function bridgePutEntity(
   return next;
 }
 
+export interface CheckInBody {
+  krId: string;
+  value: number;
+  confidence?: string;
+  note?: string;
+  actor: string;
+  /** Stable across transport retries: the bridge replays the same answer instead of recording twice. */
+  operationId: string;
+}
+
+/** An id for one check-in; the same id is sent again if the request is retried. */
+export function newOperationId(): string {
+  const c = typeof globalThis.crypto !== 'undefined' ? globalThis.crypto : undefined;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * POST /api/goals/:id/check-in as one command (ADR-B3). It shares the goal's
+ * write queue with bridgePutEntity, so a check-in and a structural edit to the
+ * same goal reach the bridge in the order the user made them, and the
+ * authoritative goal in the response is handed back through `onGoal` before
+ * the next queued write reads the version.
+ */
+export function bridgeCheckIn(
+  goalId: string,
+  body: CheckInBody,
+  hooks: { onGoal: (goal: unknown) => void },
+): Promise<void> {
+  const key = `goals:${goalId}`;
+  const task = async () => {
+    try {
+      const res = await bridgeFetch<{ ok: boolean; goal?: unknown }>(`/api/goals/${goalId}/check-in`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (res.goal) hooks.onGoal(res.goal);
+    } catch (err) {
+      bridgeWriteFailed(err);
+    }
+  };
+  const next = (entityWriteQueues.get(key) ?? Promise.resolve()).then(task);
+  entityWriteQueues.set(key, next);
+  return next;
+}
+
 /** POST /api/sync/migrate-from-local — migrate localStorage data to bridge */
 function migrateFromLocal(data: unknown): Promise<unknown> {
   return bridgePost('/api/sync/migrate-from-local', data);
