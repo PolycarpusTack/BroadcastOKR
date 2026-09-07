@@ -100,3 +100,31 @@ jobs:
         working-directory: broadcastokr
         # playwright.config starts the bridge + vite dev server automatically.
         run: npx playwright test
+
+  bridge-runtime:
+    # F3 (review 2026-09-07): the instance image installs bridge/package.json +
+    # its lockfile with no application node_modules around. Prove that graph
+    # resolves every runtime module on its own — including the lazily imported
+    # SSO client — before an image that only "builds and answers /api/health"
+    # gets published.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Isolated bridge install (lockfile only)
+        run: |
+          set -e
+          mkdir -p /tmp/bridge-runtime
+          cp broadcastokr/bridge/package.json broadcastokr/bridge/package-lock.json /tmp/bridge-runtime/
+          cd /tmp/bridge-runtime
+          npm ci --omit=dev
+
+      - name: Runtime import contract
+        working-directory: /tmp/bridge-runtime
+        run: |
+          node -e "for (const m of [\"express\",\"better-sqlite3\",\"cors\",\"dotenv\",\"express-rate-limit\",\"morgan\",\"rotating-file-stream\"]) require(m); import(\"openid-client\").then((o) => { if (typeof o.discovery !== \"function\") throw new Error(\"openid-client v6 API missing\"); console.log(\"bridge runtime graph OK\"); })"
