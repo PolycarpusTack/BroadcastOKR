@@ -20,6 +20,9 @@ export interface LiveKRBatchResult {
   error?: string;
 }
 
+/** The bridge call every page syncs through (useBridge.executeBatch). */
+export type ExecuteBatchFn = (queries: LiveKRQuery[]) => Promise<{ results: LiveKRBatchResult[] }>;
+
 /** Collect one execute-batch query per live KR (single source of the batch
  *  contract — previously copied at four call sites, with a drifting krIndex). */
 export function buildLiveKRQueries(goals: Array<Pick<Goal, 'id' | 'keyResults'>>): LiveKRQuery[] {

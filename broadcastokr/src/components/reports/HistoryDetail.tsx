@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/dates';
 import { useState } from 'react';
 import { SparkLine } from '../ui/SparkLine';
 import { ConfidenceBadge } from './ConfidenceBadge';
@@ -9,11 +10,6 @@ interface HistoryDetailProps {
   history: KRHistoryEntry[];
   color: string;
   theme: Theme;
-}
-
-function formatDate(ts: string): string {
-  const d = new Date(ts);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function truncate(s: string, max: number): string {
@@ -105,7 +101,7 @@ export function HistoryDetail({ history, color, theme }: HistoryDetailProps) {
               <tbody>
                 {[...history].reverse().map((entry, i) => (
                   <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : theme.bgMuted }}>
-                    <td style={tdStyle}>{formatDate(entry.timestamp)}</td>
+                    <td style={tdStyle}>{formatDateTime(entry.timestamp)}</td>
                     <td style={tdStyle}>{entry.value}</td>
                     <td style={tdStyle}>
                       {entry.confidence

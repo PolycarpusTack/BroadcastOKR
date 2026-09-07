@@ -4,28 +4,9 @@ import { useDeployment } from '../../context/DeploymentContext';
 import { FLEET_IN_BUILD } from '../../editions/entitlements';
 import { bridgeFetch } from '../../store/bridgeSync';
 import { formatTimeAgo } from '../../utils/dates';
+import { isStale, metricOnTarget } from '../../utils/fleetBoard';
+import type { FleetTenant } from '../../utils/fleetBoard';
 import { COLOR_SUCCESS, COLOR_WARNING, COLOR_DANGER, FONT_HEADING, FONT_MONO, PRIMARY_COLOR } from '../../constants/config';
-
-interface TenantMetrics {
-  tenantId: string;
-  tenantName: string;
-  color: string;
-  metrics: Array<{
-    krId: string;
-    value: number;
-    target: number;
-    direction: 'hi' | 'lo';
-    timestamp: string;
-    receivedAt: string;
-  }>;
-}
-
-const STALE_MS = 60 * 60 * 1000;
-
-function metricColor(m: TenantMetrics['metrics'][number]): string {
-  const good = m.direction === 'hi' ? m.value >= m.target : m.value <= m.target;
-  return good ? COLOR_SUCCESS : COLOR_DANGER;
-}
 
 /**
  * Cockpit-only: the fleet board's first surface — every tenant's opted-in
@@ -35,12 +16,12 @@ function metricColor(m: TenantMetrics['metrics'][number]): string {
 export function FleetMetricsPanel({ connected = false }: { connected?: boolean }) {
   const { theme } = useTheme();
   const { mode } = useDeployment();
-  const [fleet, setFleet] = useState<TenantMetrics[]>([]);
+  const [fleet, setFleet] = useState<FleetTenant[]>([]);
 
   useEffect(() => {
     if (mode !== 'cockpit' || !connected) return;
     let cancelled = false;
-    const load = () => bridgeFetch<TenantMetrics[]>('/api/cockpit/metrics', undefined, { retries: 0 })
+    const load = () => bridgeFetch<FleetTenant[]>('/api/cockpit/metrics', undefined, { retries: 0 })
       .then((data) => { if (!cancelled) setFleet(data); })
       .catch(() => {});
     load();
@@ -81,7 +62,7 @@ export function FleetMetricsPanel({ connected = false }: { connected?: boolean }
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {tenant.metrics.map((m) => {
-                  const stale = Date.now() - new Date(m.timestamp).getTime() > STALE_MS;
+                  const stale = isStale(m);
                   return (
                     <div
                       key={m.krId}
@@ -92,7 +73,7 @@ export function FleetMetricsPanel({ connected = false }: { connected?: boolean }
                         fontFamily: FONT_MONO, fontSize: 12,
                       }}
                     >
-                      <span style={{ color: metricColor(m), fontWeight: 700 }}>{m.value}</span>
+                      <span style={{ color: metricOnTarget(m) ? COLOR_SUCCESS : COLOR_DANGER, fontWeight: 700 }}>{m.value}</span>
                       <span style={{ color: theme.textMuted }}> / {m.target} {m.direction === 'lo' ? '↓' : '↑'}</span>
                       {stale && <span style={{ color: COLOR_WARNING }}> · stale</span>}
                     </div>

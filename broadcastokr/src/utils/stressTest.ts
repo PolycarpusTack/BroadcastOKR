@@ -1,3 +1,4 @@
+import { toISODate } from './dates';
 import type { Task, Priority } from '../types';
 import { STATUS_FLOW } from '../constants/statuses';
 import { TASK_TYPES } from '../constants/taskTypes';
@@ -48,7 +49,7 @@ export function generateStressTasks(count: number): Task[] {
       priority: randEl(priorities),
       assignee: randEl(useStore.getState().users).id,
       channel: randInt(0, CHANNELS.length - 1),
-      due: d.toISOString().slice(0, 10),
+      due: toISODate(d),
       taskType: randEl(TASK_TYPES).key,
       subtasks: Array.from({ length: randInt(0, 4) }, (_, j) => ({
         text: `Subtask ${j + 1}`,

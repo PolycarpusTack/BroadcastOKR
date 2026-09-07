@@ -1,3 +1,4 @@
+import { formatShortDate } from '../../utils/dates';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PillBadge } from '../ui/PillBadge';
@@ -162,12 +163,7 @@ export function MemberInlineDetail({
               .filter(Boolean) as Client[];
             const isOverdue =
               task.status !== 'done' && new Date(task.due) < now;
-            const dueDate = task.due
-              ? new Date(task.due).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })
-              : null;
+            const dueDate = task.due ? formatShortDate(task.due) : null;
             return (
               <div
                 key={task.id}

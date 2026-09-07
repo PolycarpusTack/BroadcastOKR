@@ -1,3 +1,5 @@
+import { toISODate } from '../../utils/dates';
+import { modalInputStyle, modalLabelStyle } from '../../styles/formStyles';
 import { useState, useMemo, useRef, useEffect, type CSSProperties } from 'react';
 import { CHANNELS, PRIORITIES, TASK_TYPES } from '../../constants';
 import { Modal } from '../ui/Modal';
@@ -30,7 +32,7 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
   const [due, setDue] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
+    return toISODate(d);
   });
   const [subtasks, setSubtasks] = useState<string[]>([]);
   const [subtaskText, setSubtaskText] = useState('');
@@ -144,8 +146,8 @@ export function CreateTaskModal({ open, onClose, onCreated, onError, theme, sele
     resetClientState();
   };
 
-  const inputStyle: CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' };
-  const labelStyle: CSSProperties = { fontSize: 12, fontWeight: 600, color: theme.textMuted, display: 'block', marginBottom: 4 };
+  const inputStyle: CSSProperties = modalInputStyle(theme);
+  const labelStyle: CSSProperties = modalLabelStyle(theme);
 
   return (
     <Modal open={open} onClose={() => { onClose(); resetClientState(); }} title={'\u2705 New Task'} theme={theme} width={520}>

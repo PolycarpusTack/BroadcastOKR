@@ -12,6 +12,8 @@ import { PillBadge } from '../components/ui/PillBadge';
 import { goalStatus, progressColor } from '../utils/colors';
 import { krProgress } from '../utils/progress';
 import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
+import type { ExecuteBatchFn } from '../utils/liveSync';
+import { toggleInSet } from '../utils/collections';
 import {
   PRIMARY_COLOR,
   COLOR_WARNING,
@@ -21,28 +23,9 @@ import {
 } from '../constants/config';
 import type { Goal, KeyResult, KRTemplate } from '../types';
 
-interface ExecuteBatchQuery {
-  goalId: string;
-  krIndex: number;
-  connectionId: string;
-  sql: string;
-  binds?: Record<string, unknown>;
-  timeframeDays?: number;
-}
-
-interface ExecuteBatchResult {
-  goalId: string;
-  krIndex: number;
-  status: 'ok' | 'error' | 'timeout' | 'no_data';
-  current?: number;
-  error?: string;
-}
-
 interface ComparePageProps {
   bridgeConnected?: boolean;
-  executeBatch?: (
-    queries: ExecuteBatchQuery[]
-  ) => Promise<{ results: ExecuteBatchResult[] }>;
+  executeBatch?: ExecuteBatchFn;
 }
 
 interface GridRow {
@@ -194,12 +177,7 @@ export function ComparePage({ bridgeConnected = false, executeBatch }: ComparePa
   );
 
   const toggleTag = useCallback((tag: string) => {
-    setActiveTags((prev) => {
-      const next = new Set(prev);
-      if (next.has(tag)) next.delete(tag);
-      else next.add(tag);
-      return next;
-    });
+    setActiveTags((prev) => toggleInSet(prev, tag));
   }, []);
 
   const handleSyncAll = useCallback(async () => {

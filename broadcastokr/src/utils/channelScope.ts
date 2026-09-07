@@ -1,4 +1,10 @@
+import { CHANNEL_PALETTE } from '../constants/channels';
 import type { ChannelScope, Client, ScopedChannelRef } from '../types';
+
+/** Channels as the bridge returns them get a palette colour by position. */
+export function assignChannelColors<T extends object>(channels: T[]): Array<T & { color: string }> {
+  return channels.map((ch, i) => ({ ...ch, color: CHANNEL_PALETTE[i % CHANNEL_PALETTE.length] }));
+}
 
 export function scopedChannelKey(channel: ScopedChannelRef) {
   return `${channel.clientId}::${channel.channelId}`;

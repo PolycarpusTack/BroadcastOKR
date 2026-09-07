@@ -1,8 +1,8 @@
+import { paragraphStyle } from './stepStyles';
 import type { StepProps } from '../wizardTypes';
-import { FONT_BODY } from '../../../constants/config';
 
 export function StepWelcome({ theme, context }: StepProps) {
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 12px 0' };
+  const p = paragraphStyle(theme);
 
   return (
     <div>

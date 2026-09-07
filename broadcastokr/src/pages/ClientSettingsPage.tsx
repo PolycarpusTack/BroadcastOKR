@@ -1,3 +1,4 @@
+import { assignChannelColors } from '../utils/channelScope';
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -58,7 +59,7 @@ export function ClientSettingsPage({ bridgeConnected = false, testConnection, ge
   const handleRefreshChannels = async () => {
     if (!getChannels || !client?.connectionId) return;
     try {
-      const channels = await getChannels(client.connectionId);
+      const channels = assignChannelColors(await getChannels(client.connectionId));
       updateClient(client.id, { channels });
       toast(`Pulled ${channels.length} channels`, COLOR_SUCCESS, '\u{1F4E1}');
     } catch {

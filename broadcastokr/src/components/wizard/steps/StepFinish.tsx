@@ -1,3 +1,4 @@
+import { paragraphStyle } from './stepStyles';
 import type { StepProps } from '../wizardTypes';
 import { FONT_BODY, FONT_HEADING, COLOR_SUCCESS, PRIMARY_COLOR } from '../../../constants/config';
 
@@ -11,7 +12,7 @@ const PAGES: Array<[string, string, string]> = [
 ];
 
 export function StepFinish({ data, theme, context }: StepProps) {
-  const p = { fontSize: 13, fontFamily: FONT_BODY, color: theme.textSecondary, lineHeight: 1.6, margin: '0 0 12px 0' };
+  const p = paragraphStyle(theme);
 
   const built = [
     data.connectionId && `the “${data.connectionName}” database connection`,

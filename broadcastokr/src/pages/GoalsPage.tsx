@@ -22,6 +22,7 @@ import { nextGoalId } from '../utils/ids';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_DANGER, COLOR_INFO, COLOR_WARNING, STALE_SYNC_THRESHOLD_MS } from '../constants/config';
 import { formatTimeAgo } from '../utils/dates';
 import { buildLiveKRQueries, mapResultsToKrIds } from '../utils/liveSync';
+import type { ExecuteBatchFn } from '../utils/liveSync';
 import type { Goal, KeyResult, GoalTemplate, ScopedChannelRef } from '../types';
 import type { DBConnection, TableInfo, ColumnInfo, KPITemplate } from '../hooks/useBridge';
 import { currentPeriod } from '../utils/periods';
@@ -40,22 +41,7 @@ interface GoalsPageProps {
   previewQuery?: (connectionId: string, sql: string) => Promise<Record<string, unknown>[]>;
   getTemplates?: () => Promise<KPITemplate[]>;
   /** Execute batch of KR queries */
-  executeBatch?: (queries: Array<{
-    goalId: string;
-    krIndex: number;
-    connectionId: string;
-    sql: string;
-    binds?: Record<string, unknown>;
-    timeframeDays?: number;
-  }>) => Promise<{
-    results: Array<{
-      goalId: string;
-      krIndex: number;
-      status: 'ok' | 'error' | 'timeout' | 'no_data';
-      current?: number;
-      error?: string;
-    }>;
-  }>;
+  executeBatch?: ExecuteBatchFn;
 }
 
 export function GoalsPage({

@@ -1,3 +1,4 @@
+import { modalInputStyle, modalLabelStyle } from '../../styles/formStyles';
 import { type CSSProperties } from 'react';
 import { CHANNELS } from '../../constants';
 import { useStore } from '../../store/store';
@@ -54,8 +55,8 @@ export function GoalFormFields({
   selectedChannels = [], setSelectedChannels,
 }: GoalFormFieldsProps) {
   const users = useStore((s) => s.users);
-  const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
-  const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: theme.textMuted, display: 'block' as const, marginBottom: 4 };
+  const inputStyle = modalInputStyle(theme);
+  const labelStyle = modalLabelStyle(theme);
 
   const hasClients = clients.length > 0;
   const clientsSelected = selectedClientIds.length > 0;

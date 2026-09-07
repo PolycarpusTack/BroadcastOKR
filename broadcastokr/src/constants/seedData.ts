@@ -1,9 +1,10 @@
+import { toISODate } from '../utils/dates';
 import type { Goal, Task, KPI } from '../types';
 
 function futureDate(daysFromNow: number): string {
   const d = new Date();
   d.setDate(d.getDate() + daysFromNow);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
 }
 
 export function createInitialGoals(): Goal[] {

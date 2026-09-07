@@ -1,3 +1,6 @@
+import { formatShortDate } from '../../utils/dates';
+import { assignChannelColors } from '../../utils/channelScope';
+import { CHANNEL_PALETTE } from '../../constants/channels';
 import { useState, memo } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
@@ -16,19 +19,6 @@ import {
 import { buttonStyle } from '../../styles/formStyles';
 import type { Client } from '../../types';
 import type { DBConnection } from '../../hooks/useBridge';
-
-const CHANNEL_PALETTE = [
-  '#3805E3',
-  '#2DD4BF',
-  '#F59E0B',
-  '#F87171',
-  '#60A5FA',
-  '#A78BFA',
-  '#FB923C',
-  '#34D399',
-  '#F472B6',
-  '#818CF8',
-];
 
 
 export interface ClientRowProps {
@@ -83,11 +73,7 @@ export const ClientRow = memo(function ClientRow({
     setChannelLoading(true);
     try {
       const raw = await getChannels(client.connectionId);
-      const withColors = raw.map((ch, i) => ({
-        ...ch,
-        color: CHANNEL_PALETTE[i % CHANNEL_PALETTE.length],
-      }));
-      onUpdateClient(client.id, { channels: withColors });
+      onUpdateClient(client.id, { channels: assignChannelColors(raw) });
     } catch (err) {
       const error = err as Error | null;
       toast('Failed to pull channels: ' + (error?.message || 'Unknown error'), COLOR_DANGER, '❌');
@@ -347,8 +333,6 @@ export const ClientRow = memo(function ClientRow({
           {/* Monitoring subsection */}
           {canCheckIn && (() => {
             const monitorActive = !!client.monitorUntil && new Date(client.monitorUntil) > new Date();
-            const fmtDate = (d: string) =>
-              new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{
@@ -360,7 +344,7 @@ export const ClientRow = memo(function ClientRow({
                 {monitorActive ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <PillBadge
-                      label={`Monitoring all goals until ${fmtDate(client.monitorUntil!)}`}
+                      label={`Monitoring all goals until ${formatShortDate(client.monitorUntil!)}`}
                       color={COLOR_WARNING}
                     />
                     <button

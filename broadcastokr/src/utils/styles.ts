@@ -14,6 +14,21 @@ export function selectStyle(theme: Theme) {
   } as const;
 }
 
+/** The filter <select> at the top of each report view. */
+export function reportSelectStyle(theme: Theme) {
+  return {
+    background: theme.bgInput,
+    color: theme.text,
+    border: `1px solid ${theme.borderInput}`,
+    borderRadius: 8,
+    padding: '6px 12px',
+    fontSize: 13,
+    fontFamily: FONT_BODY,
+    cursor: 'pointer',
+    outline: 'none',
+  } as const;
+}
+
 export function cardStyle(theme: Theme) {
   return {
     background: theme.bgCard,

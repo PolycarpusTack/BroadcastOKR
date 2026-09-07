@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BRIDGE_POLL_INTERVAL_MS } from '../constants/config';
-import type { DBConnection } from '../types';
+import type { DBConnection, KPI } from '../types';
+import type { LiveKRQuery, LiveKRBatchResult } from '../utils/liveSync';
 import { bridgeFetch } from '../store/bridgeSync';
 
 // Electron API type (available when running in Electron)
@@ -19,14 +20,8 @@ declare global {
   }
 }
 
-export interface LiveKPI {
+export interface LiveKPI extends KPI {
   id: string;
-  name: string;
-  unit: string;
-  direction: 'hi' | 'lo';
-  target: number;
-  current: number;
-  trend: number[];
   lastUpdated: string;
   error?: string;
 }
@@ -316,23 +311,8 @@ export function useBridge() {
   }, []);
 
   /** Execute batch of KR queries for live goal syncing */
-  const executeBatch = useCallback(async (queries: Array<{
-    goalId: string;
-    krIndex: number;
-    connectionId: string;
-    sql: string;
-    binds?: Record<string, unknown>;
-    timeframeDays?: number;
-  }>) => {
-    return apiFetch<{
-      results: Array<{
-        goalId: string;
-        krIndex: number;
-        status: 'ok' | 'error' | 'timeout' | 'no_data';
-        current?: number;
-        error?: string;
-      }>;
-    }>('/api/kpi/execute-batch', {
+  const executeBatch = useCallback(async (queries: LiveKRQuery[]) => {
+    return apiFetch<{ results: LiveKRBatchResult[] }>('/api/kpi/execute-batch', {
       method: 'POST',
       body: JSON.stringify({ queries }),
     });

@@ -34,6 +34,21 @@ export function formatTimeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+/** Calendar date as YYYY-MM-DD (UTC) — the shape goal and task dates are stored in. */
+export function toISODate(date: Date = new Date()): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** "Sep 7" — short calendar label for pills and captions. */
+export function formatShortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** "Sep 7, 09:15" — history rows and last check-in labels. */
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 /** Human-readable uptime from a seconds count, e.g. 3725 -> "1h 2m". */
 export function formatUptime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '--';

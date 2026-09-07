@@ -1,3 +1,4 @@
+import { modalInputStyle, modalLabelStyle } from '../../styles/formStyles';
 import type { CSSProperties } from 'react';
 import { useDeployment } from '../../context/DeploymentContext';
 import type { Theme, LiveKRConfig } from '../../types';
@@ -34,9 +35,9 @@ export function GoalFormKRList({
   theme, krs, setKRs, selectStyle, showSharing,
   connections = [], getTables, getColumns, previewQuery, getTemplates,
 }: GoalFormKRListProps) {
-  const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: `1px solid ${theme.borderInput}`, background: theme.bgInput, color: theme.text, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const };
+  const inputStyle = modalInputStyle(theme);
   const krInputStyle = { ...inputStyle, padding: '8px 10px', borderRadius: 6, fontSize: 12 };
-  const labelStyle = { fontSize: 12, fontWeight: 600 as const, color: theme.textMuted, display: 'block' as const, marginBottom: 4 };
+  const labelStyle = modalLabelStyle(theme);
 
   const { entitled } = useDeployment();
   // A live KR needs the licence as well as a connection (R3): without it the toggle is not offered

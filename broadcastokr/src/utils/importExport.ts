@@ -6,6 +6,8 @@ import type { Goal, Task, KPI, KeyResult, TaskStatus, Priority, Client, GoalTemp
 import { goalStatus } from './colors';
 import { krProgress } from './progress';
 import { migrateKRIds } from '../store/migration';
+import { triggerDownload } from './download';
+import { toISODate } from './dates';
 
 /* ─── Helpers ─── */
 
@@ -48,18 +50,6 @@ function parseNumber(val: unknown, fallback: number = 0): number {
 
 function str(val: unknown): string {
   return val == null ? '' : String(val).trim();
-}
-
-/* ─── Download trigger ─── */
-
-function triggerDownload(data: BlobPart, filename: string, mimeType: string): void {
-  const blob = new Blob([data], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 /* ─── Sheet → row objects helper ─── */
@@ -426,7 +416,7 @@ function parseTaskRows(rows: Record<string, unknown>[], warnings: string[]): Tas
     if (due) {
       const d = new Date(due);
       if (!isNaN(d.getTime())) {
-        dueStr = d.toISOString().slice(0, 10);
+        dueStr = toISODate(d);
       } else {
         dueStr = due;
       }
@@ -434,7 +424,7 @@ function parseTaskRows(rows: Record<string, unknown>[], warnings: string[]): Tas
     if (!dueStr) {
       const d = new Date();
       d.setDate(d.getDate() + 14);
-      dueStr = d.toISOString().slice(0, 10);
+      dueStr = toISODate(d);
     }
 
     // Subtasks
@@ -551,7 +541,7 @@ export async function exportToExcel(goals: Goal[], tasks: Task[], kpis: KPI[], c
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  triggerDownload(buffer, `BroadcastOKR_Export_${new Date().toISOString().slice(0, 10)}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  triggerDownload(buffer, `BroadcastOKR_Export_${toISODate()}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 
 /** Escape a CSV field, quoting if necessary */
@@ -588,7 +578,7 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
         return kr.liveConfig ? `${base} | LIVE:${kr.liveConfig.connectionId}` : base;
       }).join('; '),
     }));
-    triggerDownload(buildCSV(rows), `BroadcastOKR_Goals_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+    triggerDownload(buildCSV(rows), `BroadcastOKR_Goals_${toISODate()}.csv`, 'text/csv;charset=utf-8');
   } else if (type === 'tasks') {
     const rows = tasks.map((t) => ({
       Title: t.title,
@@ -601,7 +591,7 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
       Type: t.taskType,
       Subtasks: t.subtasks.map((s) => s.text).join('; '),
     }));
-    triggerDownload(buildCSV(rows), `BroadcastOKR_Tasks_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+    triggerDownload(buildCSV(rows), `BroadcastOKR_Tasks_${toISODate()}.csv`, 'text/csv;charset=utf-8');
   } else {
     const rows = kpis.map((k) => ({
       Name: k.name,
@@ -611,14 +601,14 @@ export function exportToCSV(goals: Goal[], tasks: Task[], kpis: KPI[], type: 'go
       Current: k.current,
       Trend: k.trend.join('; '),
     }));
-    triggerDownload(buildCSV(rows), `BroadcastOKR_KPIs_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+    triggerDownload(buildCSV(rows), `BroadcastOKR_KPIs_${toISODate()}.csv`, 'text/csv;charset=utf-8');
   }
 }
 
 export function exportToJSON(goals: Goal[], tasks: Task[], kpis: KPI[], clients: Client[] = [], goalTemplates: GoalTemplate[] = []): void {
   const { users, teams } = useStore.getState();
   const data = { goals, tasks, kpis, clients, goalTemplates, users, teams };
-  triggerDownload(JSON.stringify(data, null, 2), `BroadcastOKR_Export_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+  triggerDownload(JSON.stringify(data, null, 2), `BroadcastOKR_Export_${toISODate()}.json`, 'application/json');
 }
 
 /* ─── Template Generator ─── */
