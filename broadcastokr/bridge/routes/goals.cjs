@@ -1,6 +1,7 @@
 const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
 const { sha256Hex } = require('../utils/crypto.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 /**
  * Convert a goal DB row + its key_results rows into the frontend Goal shape.
@@ -302,9 +303,13 @@ function createGoalsRouter(db) {
   });
 
   // DELETE /api/goals/:id
+  // DELETE /api/goals/:id — the marker for the change poll and the tasks whose
+  // goal link the schema sets to NULL travel with the delete (ADR-B4).
   router.delete('/:id', (req, res) => {
-    const result = db.prepare('DELETE FROM goals WHERE id = ?').run(req.params.id);
-    if (result.changes === 0) return res.status(404).json({ error: 'Goal not found' });
+    const deleted = deleteWithMarker(db, 'goals', req.params.id, {
+      invalidate: [{ table: 'tasks', where: 'goal_id = ?', params: [req.params.id] }],
+    });
+    if (deleted === 0) return res.status(404).json({ error: 'Goal not found' });
     res.json({ ok: true });
   });
 

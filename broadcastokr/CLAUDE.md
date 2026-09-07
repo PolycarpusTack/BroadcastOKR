@@ -143,7 +143,7 @@ components/
 | POST | `/api/kpi/execute-batch` | Batch KR queries |
 | GET | `/api/kpi/history/:id` | KPI history |
 | GET | `/api/kpi/templates` | KPI SQL templates |
-| GET | `/api/sync/state`, `/api/sync/changes?since=` | Full/incremental state for the 5s change poll |
+| GET | `/api/sync/state`, `/api/sync/changes?since=` | Full/incremental state for the 5s change poll; `changes` also carries `deletions` per slice (markers from `sync_deletions`, migration 012, 30-day retention — ADR-B4) and `resetRequired` when `since` is older than that, which makes the client reload the snapshot |
 | POST | `/api/sync/migrate-from-local` | Upload local state (auto-run on first connect to an empty bridge) |
 | CRUD | `/api/goals` (+`/:id/check-in`), `/api/tasks`, `/api/clients`, `/api/users`, `/api/teams`, `/api/goal-templates` | SQLite-backed entity CRUD (bridge/routes/*.cjs) |
 | GET/PUT | `/api/cockpit/tenants` (+`/:clientId`, `/:clientId/status`) | Cockpit tenant registry: instance URL + operator token (encrypted), reachability probe |

@@ -1,4 +1,5 @@
 const { createRouter } = require('../utils/router.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 function toTemplateDTO(row, krTemplates) {
   return {
@@ -62,7 +63,10 @@ function createTemplatesRouter(db) {
   });
 
   router.delete('/:id', (req, res) => {
-    db.prepare('DELETE FROM goal_templates WHERE id = ?').run(req.params.id);
+    // Goals materialised from it keep existing with template_id set to NULL
+    deleteWithMarker(db, 'goalTemplates', req.params.id, {
+      invalidate: [{ table: 'goals', where: 'template_id = ?', params: [req.params.id] }],
+    });
     res.json({ ok: true });
   });
 

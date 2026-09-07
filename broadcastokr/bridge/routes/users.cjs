@@ -2,6 +2,7 @@ const { createRouter } = require('../utils/router.cjs');
 const { audit } = require('../audit.cjs');
 const { capViolation, editorCountAfter } = require('../entitlements.cjs');
 const { parseNumericId } = require('../utils/ids.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 function toUserDTO(row) {
   return {
@@ -62,7 +63,10 @@ function createUsersRouter(db) {
   router.delete('/:id', (req, res) => {
     const id = parseNumericId(req.params.id);
     if (id === null) return res.status(400).json({ error: 'invalid_user_id' });
-    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    // Teams that lose this lead (SET NULL) or member (CASCADE) change shape too
+    deleteWithMarker(db, 'users', id, {
+      invalidate: [{ table: 'teams', where: 'lead_id = ? OR id IN (SELECT team_id FROM team_members WHERE user_id = ?)', params: [id, id] }],
+    });
     res.json({ ok: true });
   });
 

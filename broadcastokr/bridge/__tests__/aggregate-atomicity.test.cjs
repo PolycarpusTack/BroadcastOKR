@@ -43,7 +43,6 @@ describe('aggregate writes are atomic (F7, injected late failure)', () => {
     app.use(express.json());
     app.use('/api/goals', createGoalsRouter(proxied));
     app.use('/api/tasks', createTasksRouter(proxied));
-    // eslint-disable-next-line no-unused-vars
     app.use((err, req, res, _next) => res.status(500).json({ error: String(err.message) }));
     await new Promise((resolve) => { server = app.listen(0, '127.0.0.1', resolve); });
     base = `http://127.0.0.1:${server.address().port}`;

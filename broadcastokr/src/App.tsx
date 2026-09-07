@@ -25,7 +25,7 @@ import { useToast } from './context/ToastContext';
 import { checkForNewerRelease, type LatestRelease } from './utils/updates';
 import { useStore } from './store/store';
 import { COLOR_DANGER, COLOR_WARNING, PRIMARY_COLOR, FONT_MONO } from './constants/config';
-import { performInitialSync, fetchChanges, bridgeFetch } from './store/bridgeSync';
+import { performInitialSync, fetchChanges, fetchState, bridgeFetch } from './store/bridgeSync';
 import { useActivityLog } from './context/ActivityLogContext';
 import { DeploymentProvider } from './context/DeploymentContext';
 import { editionLabel, editionTitle } from './editions/editionLabel';
@@ -129,13 +129,26 @@ export default function App() {
         toast('Bridge sync failed — keeping local data', COLOR_WARNING, '⚠️');
       });
 
+    // One poll in flight at a time, applied in order: a slow response must not
+    // land after a newer one and drag the cursor back (ADR-B4).
+    let polling = false;
     const pollInterval = setInterval(() => {
+      if (polling) return;
+      polling = true;
       fetchChanges(lastSync)
-        .then((changes) => {
+        .then(async (changes) => {
+          if (changes.resetRequired) {
+            // The bridge cannot say what this client missed — take the snapshot whole
+            const state = await fetchState();
+            useStore.getState()._initFromBridge(state);
+            lastSync = state.timestamp || new Date().toISOString();
+            return;
+          }
           useStore.getState()._mergeChanges(changes);
           if (changes.timestamp) lastSync = changes.timestamp;
         })
-        .catch(() => {}); // silent — bridge might be down
+        .catch(() => {}) // silent — bridge might be down
+        .finally(() => { polling = false; });
     }, 5000);
 
     return () => clearInterval(pollInterval);

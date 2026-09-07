@@ -30,6 +30,16 @@ export interface BridgeState {
   timestamp?: string;
 }
 
+/** Ids removed on the bridge since `since`, per slice (ADR-B4). Applied before the upserts. */
+export interface BridgeDeletions {
+  goals?: string[];
+  tasks?: string[];
+  clients?: string[];
+  users?: string[];
+  teams?: string[];
+  goalTemplates?: string[];
+}
+
 export interface BridgeChanges {
   goals?: Goal[];
   tasks?: Task[];
@@ -38,6 +48,9 @@ export interface BridgeChanges {
   users?: User[];
   teams?: Team[];
   kpis?: KPI[];
+  deletions?: BridgeDeletions;
+  /** The bridge can no longer account for what this client missed: reload the full snapshot. */
+  resetRequired?: boolean;
   timestamp?: string;
 }
 
@@ -120,7 +133,7 @@ export async function bridgeFetch<T>(
 }
 
 /** GET /api/sync/state — full state snapshot */
-function fetchState(): Promise<BridgeState> {
+export function fetchState(): Promise<BridgeState> {
   return bridgeFetch<BridgeState>('/api/sync/state');
 }
 

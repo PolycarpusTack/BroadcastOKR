@@ -1,4 +1,5 @@
 const { createRouter } = require('../utils/router.cjs');
+const { deleteWithMarker } = require('../syncDeletions.cjs');
 
 function toTaskDTO(row, subtasks) {
   return {
@@ -160,7 +161,7 @@ function createTasksRouter(db) {
   });
 
   router.delete('/:id', (req, res) => {
-    db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
+    deleteWithMarker(db, 'tasks', req.params.id);
     res.json({ ok: true });
   });
 

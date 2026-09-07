@@ -1,5 +1,50 @@
 # Pickup Prompt — Next Session
 
+## 2026-09-07 (evening) — review remediation shipped; three external gates + the R4 decisions (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order: this block,
+`docs/gpm/plans/2026-09-07-review-remediation/evidence.md` (what closed, what is pending),
+the four ADRs next to it (A1 permission identities, A2 SQL envelope, B1-B3 aggregates + check-in
+command, B4 deletion markers), then the "2026-09-04 (later today)" block below for the R4
+decisions and rig facts (still true). `CLAUDE.md` is current.
+
+**What happened today:** (1) repository cleanup merged to main (`458a413`): stale docs/orphans
+removed, line endings normalised (`.gitattributes`), dead code and copied helpers consolidated,
+CLAUDE.md/README/CHANGELOG corrected, WHATS'ON Insights assets gathered under `../whatson-insights/`.
+(2) A parallel session produced a seven-finding review (`docs/gpm/plans/2026-09-07-review-remediation/`)
+and this session implemented Epic A and Epic B on `fix/review-remediation-a`, merged to main:
+F1 role change via `%32`, F5 member task fields, F2 SQL guard bypass, F3 image without
+openid-client, F7 partial aggregate writes, F4 lost member check-in, F6 deletions never reaching
+clients. Migrations 011 (`checkin_operations`) and 012 (`sync_deletions`) are additive.
+
+**Contracts that changed (do not regress):** check-in is one command (`POST …/check-in` →
+authoritative goal, `operationId` replay; the client sends **no** goal PUT after it); goal/task
+writes are validated and transactional (`400 invalid_*`, `409 duplicate|kr_owned_by_other_goal`);
+`/api/sync/changes` carries `deletions` + `resetRequired`; members may change only task status and
+subtask done flags; `parseNumericId` is the one id parser; `sqlEnvelope.cjs` is the SQL validator
+and both drivers run read-only transactions; the bridge has its own lockfile and the image uses it.
+
+**Pending, needs infrastructure (record the gate, do not waive):**
+1. A-2-T3/T4 — real PostgreSQL 17 + Oracle 19c read-only acceptance on the R1 rig (disposable schema,
+   write-capable test account, a granted write function the scanner cannot see). Log in `r1-findings.md`.
+2. A-4-T2/T3 — fresh client/cockpit image OIDC journey against a test IdP, then gate publication.
+   Needs a Docker host — the same blocker as R2 and the pen test.
+3. B-6 — two authenticated browser sessions: member check-in and a deletion converge ≤ 10 s.
+4. Rig: restart on the new main (`scripts/local-rig/start-rig.ps1`), hand-walk a member check-in
+   on tenant0 and watch the cockpit's fleet board; watch the change poll for `deletions`.
+
+**Model routing:** unchanged from the block below (Fable 5.1 for security boundaries and review,
+Opus 5 for specified implementation, Sonnet/Haiku for rig walks and transcription).
+
+**Decisions still to ask Yannick:** the three R4 decisions in the block below (agent revoke default,
+certificate pinning, where a Docker host comes from) — the Docker host now also unblocks A-4 and B-6.
+
+**Working discipline:** unchanged. GPM backlog per EPIC, branch per EPIC, commit per story,
+suites + lint + build green before each commit, merge `--no-ff`, push, watch CI. The bridge suite is
+~240 cases; spawn-heavy files can show `cancelled` under load and pass alone — rerun before believing it.
+
+---
+
 ## 2026-09-04 (later today) — R4 residual decisions, then R5; R2 waits for a Docker host (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). Read, in order: this block, then the

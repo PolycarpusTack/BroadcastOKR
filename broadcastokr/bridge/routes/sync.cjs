@@ -1,5 +1,6 @@
 const { createRouter } = require('../utils/router.cjs');
 const fs = require('fs');
+const { deletionsSince, pruneDeletions, isBeyondRetention } = require('../syncDeletions.cjs');
 
 /**
  * Rows store updated_at as sqlite "YYYY-MM-DD HH:MM:SS" (UTC) while the
@@ -91,9 +92,17 @@ function createSyncRouter(db, dbPath) {
 
     const kpis = db.prepare('SELECT * FROM kpis WHERE updated_at > ?').all(since);
 
+    // ADR-B4 (F6): removals travel with the changes. Apply them first — an id
+    // present in both was deleted and recreated, and the row wins.
+    pruneDeletions(db);
+    const deletions = deletionsSince(db, since);
+    const resetRequired = isBeyondRetention(since);
+
     const { assembleState } = require('./sync-helpers.cjs');
     res.json({
       ...assembleState({ goals, keyResults, krHistory, tasks, subtasks, clients, goalTemplates, krTemplates, users, teams, teamMembers, kpis }),
+      deletions,
+      ...(resetRequired ? { resetRequired: true } : {}),
       since,
       timestamp: new Date().toISOString(),
     });

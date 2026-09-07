@@ -92,7 +92,7 @@ interface AppStore {
 
   // Bridge sync
   _initFromBridge: (state: { goals: Goal[]; tasks: Task[]; clients: Client[]; goalTemplates: GoalTemplate[]; users: User[]; teams: Team[]; kpis: KPI[] }) => void;
-  _mergeChanges: (changes: { goals?: Goal[]; tasks?: Task[]; clients?: Client[]; goalTemplates?: GoalTemplate[]; users?: User[]; teams?: Team[]; kpis?: KPI[] }) => void;
+  _mergeChanges: (changes: { goals?: Goal[]; tasks?: Task[]; clients?: Client[]; goalTemplates?: GoalTemplate[]; users?: User[]; teams?: Team[]; kpis?: KPI[]; deletions?: { goals?: string[]; tasks?: string[]; clients?: string[]; users?: string[]; teams?: string[]; goalTemplates?: string[] } }) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -633,8 +633,35 @@ export const useStore = create<AppStore>()(
         goalTemplates: state.goalTemplates ?? [],
       })),
 
-      _mergeChanges: (changes) => set((s) => {
+      _mergeChanges: (changes) => set((state) => {
         const result: Partial<Pick<AppStore, 'goals' | 'tasks' | 'kpis' | 'clients' | 'users' | 'teams' | 'goalTemplates'>> = {};
+
+        // ADR-B4 (F6): removals first, then the rows — an id in both was deleted
+        // and recreated on the bridge, and the recreated row must win.
+        const d = changes.deletions;
+        const drop = <T,>(arr: T[], ids: string[] | undefined, key: (x: T) => string): T[] => {
+          if (!ids?.length) return arr;
+          const gone = new Set(ids);
+          const kept = arr.filter((x) => !gone.has(key(x)));
+          return kept.length === arr.length ? arr : kept;
+        };
+        const s = d ? {
+          ...state,
+          goals: drop(state.goals, d.goals, (g) => g.id),
+          tasks: drop(state.tasks, d.tasks, (t) => t.id),
+          clients: drop(state.clients, d.clients, (c) => c.id),
+          users: drop(state.users, d.users, (u) => String(u.id)),
+          teams: drop(state.teams, d.teams, (t) => t.id),
+          goalTemplates: drop(state.goalTemplates, d.goalTemplates, (t) => t.id),
+        } : state;
+        if (d) {
+          if (s.goals !== state.goals) result.goals = s.goals;
+          if (s.tasks !== state.tasks) result.tasks = s.tasks;
+          if (s.clients !== state.clients) result.clients = s.clients;
+          if (s.users !== state.users) result.users = s.users;
+          if (s.teams !== state.teams) result.teams = s.teams;
+          if (s.goalTemplates !== state.goalTemplates) result.goalTemplates = s.goalTemplates;
+        }
 
         if (changes.goals) {
           const changedMap = new Map(changes.goals.map((g) => [g.id, withRecomputedProgress(g)]));
