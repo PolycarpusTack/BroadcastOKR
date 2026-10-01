@@ -1,6 +1,8 @@
 # Idea — BrOKR as Mediagenix's own WHATS'ON usage monitor
 
-**Status:** idea, parked. Not planned, not scoped. Written 2026-09-04 after a
+**Status:** spike run 2026-10-01 on fictional lab data. The schema answers the "real unknown":
+see `usage-spike/README.md`. Parked until the remote check runs on real clients.
+Originally: idea, parked. Not planned, not scoped. Written 2026-09-04 after a
 corridor conversation with a colleague. **Owner:** Yannick.
 **Question:** could the cockpit + tenant framework be used internally by Mediagenix
 to run live usage metrics across every client's WHATS'ON database, so we learn how
