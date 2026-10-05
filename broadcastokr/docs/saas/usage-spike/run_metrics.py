@@ -11,7 +11,7 @@ import psycopg2
 from metrics import METRICS
 
 HERE = Path(__file__).parent
-BRIDGE = Path(r"C:\Projects\Other\BroadcastOKR\broadcastokr\bridge\whatson\sqlEnvelope.cjs")
+BRIDGE = Path(r"C:\Projects\BroadcastOKR\broadcastokr\bridge\whatson\sqlEnvelope.cjs")
 
 # 1. The bridge's own read-only gate must accept every text, both dialects.
 texts = [s for m in METRICS for s in (m["pg"], m["ora"])]
