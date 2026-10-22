@@ -5,6 +5,8 @@
 function actorName(db, req) {
   // The cockpit acting over the operator channel (R6-1) — a principal, not a user row
   if (req.user?.operator) return 'Mediagenix operator';
+  // Housekeeping the bridge does on its own (e.g. the agent purge sweep)
+  if (req.system) return 'system';
   if (req.user?.id) {
     const u = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
     return u?.name || `user#${req.user.id}`;

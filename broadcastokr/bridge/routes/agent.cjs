@@ -7,6 +7,23 @@ const { sha256Hex: sha256 } = require('../utils/crypto.cjs');
 
 const ENROL_TTL_MS = 15 * 60 * 1000;
 const MAX_RESULTS = 500;
+const PURGE_AFTER_DAYS = 30;
+
+/**
+ * Revoked agents are kept as the audit trail, then purged after 30 days
+ * (ADR 2026-10-22). Runs at startup and whenever the agent list is read.
+ * Returns how many rows it removed.
+ */
+function purgeExpiredAgents(db) {
+  const expired = db.prepare(
+    `SELECT id, name FROM agents WHERE revoked_at IS NOT NULL AND revoked_at < datetime('now', '-${PURGE_AFTER_DAYS} days')`,
+  ).all();
+  for (const agent of expired) {
+    db.prepare('DELETE FROM agents WHERE id = ?').run(agent.id);
+    audit(db, { system: true }, `Purged agent '${agent.name}' (revoked more than ${PURGE_AFTER_DAYS} days ago)`);
+  }
+  return expired.length;
+}
 
 /**
  * Connector-agent identity and ingest (v1 trust model, recorded in the Tier 2
@@ -36,6 +53,7 @@ function createAgentRouters(db) {
   });
 
   ops.get('/', (req, res) => {
+    purgeExpiredAgents(db);
     const rows = db.prepare('SELECT id, name, created_at, revoked_at, last_seen_at FROM agents ORDER BY created_at').all();
     res.json(rows.map((r) => ({
       id: r.id, name: r.name, createdAt: r.created_at,
@@ -48,6 +66,16 @@ function createAgentRouters(db) {
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     db.prepare("UPDATE agents SET revoked_at = datetime('now') WHERE id = ?").run(req.params.id);
     audit(db, req, `Revoked agent '${agent.name}'`);
+    res.json({ ok: true });
+  });
+
+  // Owner only; the operator channel may revoke but never erase the trail (OPERATOR_ALLOW).
+  ops.delete('/:id/purge', (req, res) => {
+    const agent = db.prepare('SELECT id, name, revoked_at FROM agents WHERE id = ?').get(req.params.id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+    if (!agent.revoked_at) return res.status(409).json({ error: 'not_revoked', detail: 'Revoke the agent before purging it' });
+    db.prepare('DELETE FROM agents WHERE id = ?').run(agent.id);
+    audit(db, req, `Purged agent '${agent.name}'`);
     res.json({ ok: true });
   });
 
@@ -129,4 +157,4 @@ function createAgentRouters(db) {
   return { ops, machine };
 }
 
-module.exports = { createAgentRouters };
+module.exports = { createAgentRouters, purgeExpiredAgents };
