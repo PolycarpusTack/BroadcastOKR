@@ -1,5 +1,9 @@
 # BroadcastOKR — Production Readiness Report
 
+> Historical desktop assessment only. This June report is not acceptance of the client/cockpit cloud editions.
+> Current persistence work and outstanding release gates: [2026-10-21 evidence](gpm/plans/2026-10-21-persistence-correctness/evidence.md).
+> In particular, fresh-image SSO, real-driver read-only enforcement and operational recovery still require staging evidence.
+
 **Date:** 2026-06-01
 **Assessed against:** `main` (post production-readiness phases 1–7 + hardening pass)
 **Deployment model:** Internal broadcast-operations OKR tool — Electron desktop app + local read-only bridge service, on a trusted network.

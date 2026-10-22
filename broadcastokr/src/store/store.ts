@@ -8,7 +8,8 @@ import { goalStatus } from '../utils/colors';
 import { krProgress } from '../utils/progress';
 import { migrateClientChannelScopes, migrateKRIds } from './migration';
 import { pruneHistory } from '../utils/history';
-import { bridgePost, bridgePut, bridgePutEntity, bridgeDelete, bridgeWriteFailed, bridgeCheckIn, newOperationId } from './bridgeSync';
+import { bridgePost, bridgePut, bridgePutEntity, bridgeDelete, bridgeWriteFailed, bridgeCheckIn, newOperationId, writeError } from './bridgeSync';
+import type { WriteResult } from './bridgeSync';
 import { hasFeature, getRuntimeMode } from '../editions/entitlements';
 
 /** Recalculate goal progress and status from its KRs */
@@ -20,6 +21,16 @@ function recalcGoal(goal: Goal): Goal {
 
 function isMonitorActive(until?: string): boolean {
   return !!until && new Date(until) > new Date();
+}
+
+/** Other store actions may clone untouched goals while a save is in flight. */
+function sameSnapshot(a: Goal, b: Goal | undefined): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Same content regardless of version: an earlier write's version bump is not a newer edit. */
+function sameContent(a: Goal, b: Goal | undefined): boolean {
+  return !!b && sameSnapshot({ ...a, version: undefined }, { ...b, version: undefined });
 }
 
 /**
@@ -41,13 +52,12 @@ interface AppStore {
   kpis: KPI[];
 
   // Goals
-  /** Resolves once the bridge write has settled (success or reported failure),
-   *  so a caller that syncs the goal next is not racing its own create. */
-  addGoal: (goal: Goal) => Promise<void>;
+  /** Success means the bridge accepted the write; failures remain retryable in the form. */
+  addGoal: (goal: Goal) => Promise<WriteResult>;
   setGoals: (goals: Goal[]) => void;
   checkInKR: (goalId: string, krId: string, entry: { value: number; confidence?: Confidence; note?: string; actor: string }) => void;
   setMonitor: (type: 'goal' | 'client', id: string, days: number | null) => void;
-  updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => Promise<void>;
+  updateGoal: (id: string, updates: Partial<Omit<Goal, 'id'>>) => Promise<WriteResult>;
   /** Archive (or restore) every goal of one period — R6-5. Returns the ids touched. */
   setPeriodArchived: (period: string, archived: boolean) => string[];
   deleteGoal: (id: string) => void;
@@ -92,7 +102,7 @@ interface AppStore {
 
   // Bridge sync
   _initFromBridge: (state: { goals: Goal[]; tasks: Task[]; clients: Client[]; goalTemplates: GoalTemplate[]; users: User[]; teams: Team[]; kpis: KPI[] }) => void;
-  _mergeChanges: (changes: { goals?: Goal[]; tasks?: Task[]; clients?: Client[]; goalTemplates?: GoalTemplate[]; users?: User[]; teams?: Team[]; kpis?: KPI[]; deletions?: { goals?: string[]; tasks?: string[]; clients?: string[]; users?: string[]; teams?: string[]; goalTemplates?: string[] } }) => void;
+  _mergeChanges: (changes: { goals?: Goal[]; tasks?: Task[]; clients?: Client[]; goalTemplates?: GoalTemplate[]; users?: User[]; teams?: Team[]; kpis?: KPI[]; deletions?: { goals?: string[]; tasks?: string[]; clients?: string[]; users?: string[]; teams?: string[]; goalTemplates?: string[]; kpis?: string[] } }) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -105,7 +115,7 @@ export const useStore = create<AppStore>()(
           ? get().goals.find((g) => g.id === id)
           : get().tasks.find((t) => t.id === id));
         const full = find();
-        if (!full) return Promise.resolve();
+        if (!full) return Promise.resolve<WriteResult>({ ok: false, error: 'Item no longer exists' });
         return bridgePutEntity(kind, full as unknown as Record<string, unknown> & { id: string }, {
           getVersion: () => find()?.version,
           onVersion: (version) => set((s) => (kind === 'goals'
@@ -131,9 +141,16 @@ export const useStore = create<AppStore>()(
       teams: createInitialTeams(),
       goalTemplates: [],
 
-      addGoal: (goal) => {
+      addGoal: async (goal) => {
         set((s) => ({ goals: [goal, ...s.goals] }));
-        return bridgePost('/api/goals', goal).then(() => undefined, bridgeWriteFailed);
+        try {
+          await bridgePost('/api/goals', goal);
+          return { ok: true };
+        } catch (err) {
+          set((s) => ({ goals: s.goals.filter((g) => g.id !== goal.id || !sameSnapshot(g, goal)) }));
+          bridgeWriteFailed(err);
+          return writeError(err);
+        }
       },
       setGoals: (goals) => set({ goals }),
 
@@ -301,7 +318,8 @@ export const useStore = create<AppStore>()(
         bridgeDelete(`/api/tasks/${id}`).catch(bridgeWriteFailed);
       },
 
-      updateGoal: (id, updates) => {
+      updateGoal: async (id, updates) => {
+        const previous = get().goals.find((g) => g.id === id);
         set((s) => {
           const goals = structuredClone(s.goals);
           const idx = goals.findIndex((g) => g.id === id);
@@ -309,7 +327,13 @@ export const useStore = create<AppStore>()(
           goals[idx] = recalcGoal({ ...goals[idx], ...updates });
           return { goals };
         });
-        return putVersioned('goals', id);
+        const optimistic = get().goals.find((g) => g.id === id);
+        const result = await putVersioned('goals', id);
+        if (!result.ok && previous) {
+          // A poll, conflict response or newer edit may already have replaced it.
+          set((s) => ({ goals: s.goals.map((g) => g.id === id && sameContent(g, optimistic) ? { ...previous, version: g.version } : g) }));
+        }
+        return result;
       },
 
       setPeriodArchived: (period, archived) => {
@@ -653,6 +677,7 @@ export const useStore = create<AppStore>()(
           users: drop(state.users, d.users, (u) => String(u.id)),
           teams: drop(state.teams, d.teams, (t) => t.id),
           goalTemplates: drop(state.goalTemplates, d.goalTemplates, (t) => t.id),
+          kpis: drop(state.kpis, d.kpis, (k) => k.name),
         } : state;
         if (d) {
           if (s.goals !== state.goals) result.goals = s.goals;
@@ -661,6 +686,7 @@ export const useStore = create<AppStore>()(
           if (s.users !== state.users) result.users = s.users;
           if (s.teams !== state.teams) result.teams = s.teams;
           if (s.goalTemplates !== state.goalTemplates) result.goalTemplates = s.goalTemplates;
+          if (s.kpis !== state.kpis) result.kpis = s.kpis;
         }
 
         if (changes.goals) {

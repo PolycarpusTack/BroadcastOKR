@@ -60,10 +60,16 @@ class SqlEnvelopeError extends Error {
  * that only code remains. Throws on an unterminated construct — an open quote
  * is not "probably fine", it is a statement we cannot reason about.
  */
-function scanCode(sql) {
+function scanSql(sql) {
   const src = String(sql);
   let out = '';
   let i = 0;
+  const protectedRanges = [];
+  const hide = (end, placeholder) => {
+    protectedRanges.push([i, end]);
+    out += placeholder;
+    i = end;
+  };
   const n = src.length;
   const prev = () => (out.length ? out[out.length - 1] : ' ');
 
@@ -75,15 +81,13 @@ function scanCode(sql) {
     if (c === '/' && next === '*') {
       const end = src.indexOf('*/', i + 2);
       if (end < 0) throw new SqlEnvelopeError('Unterminated block comment', 'unterminated_comment');
-      out += ' ';
-      i = end + 2;
+      hide(end + 2, ' ');
       continue;
     }
     // Line comment
     if (c === '-' && next === '-') {
       const end = src.indexOf('\n', i + 2);
-      out += ' ';
-      i = end < 0 ? n : end + 1;
+      hide(end < 0 ? n : end + 1, ' ');
       continue;
     }
     // Quoted identifier
@@ -96,8 +100,7 @@ function scanCode(sql) {
         j = k + 1;
         break;
       }
-      out += '"?"';
-      i = j;
+      hide(j, '"?"');
       continue;
     }
     // Oracle alternative quoting: q'<delim>…<delim>' / nq'…' (only where a literal may start)
@@ -109,8 +112,7 @@ function scanCode(sql) {
         if (!/\s/.test(open)) {
           const end = src.indexOf(close + "'", qIdx + 3);
           if (end < 0) throw new SqlEnvelopeError('Unterminated alternative-quoted string', 'unterminated_string');
-          out += "'?'";
-          i = end + 2;
+          hide(end + 2, "'?'");
           continue;
         }
       }
@@ -129,8 +131,7 @@ function scanCode(sql) {
         }
         j += 1;
       }
-      out += "'?'";
-      i = j;
+      hide(j, "'?'");
       continue;
     }
     // Plain string literal, '' is the only escape
@@ -143,8 +144,7 @@ function scanCode(sql) {
         j = k + 1;
         break;
       }
-      out += "'?'";
-      i = j;
+      hide(j, "'?'");
       continue;
     }
     // PostgreSQL dollar quoting: $$…$$ or $tag$…$tag$ (a bare $1 bind is not a tag)
@@ -154,15 +154,18 @@ function scanCode(sql) {
         const tag = m[0];
         const end = src.indexOf(tag, i + tag.length);
         if (end < 0) throw new SqlEnvelopeError('Unterminated dollar-quoted string', 'unterminated_string');
-        out += "'?'";
-        i = end + tag.length;
+        hide(end + tag.length, "'?'");
         continue;
       }
     }
     out += c;
     i += 1;
   }
-  return out;
+  return { code: out, protectedRanges };
+}
+
+function scanCode(sql) {
+  return scanSql(sql).code;
 }
 
 /**
@@ -209,4 +212,4 @@ function assertReadOnlySelect(sql) {
   return code;
 }
 
-module.exports = { assertReadOnlySelect, scanCode, SqlEnvelopeError };
+module.exports = { assertReadOnlySelect, scanCode, scanSql, SqlEnvelopeError };

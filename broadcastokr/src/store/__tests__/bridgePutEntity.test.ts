@@ -46,14 +46,28 @@ describe('bridgePutEntity', () => {
     vi.stubGlobal('fetch', fetchMock);
     const onConflict = vi.fn();
 
-    await bridgePutEntity('goals', { id: 'g1', title: 'Mine' }, {
+    const result = await bridgePutEntity('goals', { id: 'g1', title: 'Mine' }, {
       getVersion: () => 1,
       onVersion: vi.fn(),
       onConflict,
     });
 
     expect(onConflict).toHaveBeenCalledWith(current);
+    expect(result.ok).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a refused write as failure and allows the next queued write to succeed', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ error: 'Forbidden' }) })
+      .mockResolvedValueOnce(okResponse(1));
+    vi.stubGlobal('fetch', fetchMock);
+    const hooks = { getVersion: () => 0, onVersion: () => {}, onConflict: () => {} };
+
+    const first = await bridgePutEntity('goals', { id: 'g-retry', title: 'First' }, hooks);
+    const retry = await bridgePutEntity('goals', { id: 'g-retry', title: 'Retry' }, hooks);
+
+    expect(first).toEqual({ ok: false, error: 'Forbidden' });
+    expect(retry).toEqual({ ok: true });
   });
 
   it('serializes writes to the same entity so the second sends the bumped version', async () => {

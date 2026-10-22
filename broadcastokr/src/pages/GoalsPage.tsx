@@ -122,6 +122,8 @@ export function GoalsPage({
 
   // Create modal state
   const [createOpen, setCreateOpen] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [goalSaveError, setGoalSaveError] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newChannel, setNewChannel] = useState(0);
   const [newOwner, setNewOwner] = useState(currentUser.id);
@@ -173,7 +175,8 @@ export function GoalsPage({
     sharedWithMediagenix: kr.sharedWithMediagenix,
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (savingGoal) return;
     if (!newTitle.trim() || newTitle.length > 200) { toast('Please enter a title (max 200 chars)', COLOR_DANGER, '\u26A0\uFE0F'); return; }
     const krs = newKRs.filter((kr) => kr.title.trim());
     if (krs.length === 0) { toast('Add at least one key result', COLOR_DANGER, '\u26A0\uFE0F'); return; }
@@ -208,7 +211,14 @@ export function GoalsPage({
     };
     // Hold the write: a non-owner's sync is verified against the stored KR,
     // so it must not race the create it depends on.
-    const written = addGoal(goal);
+    setSavingGoal(true);
+    setGoalSaveError('');
+    const result = await addGoal(goal);
+    setSavingGoal(false);
+    if (!result.ok) {
+      setGoalSaveError(`Goal was not saved: ${result.error}. You can retry.`);
+      return;
+    }
     toast(`Goal created: ${goal.title}`, PRIMARY_COLOR, '\u{1F3AF}');
     logAction(`Created goal: ${goal.title}`, currentUser.name, PRIMARY_COLOR);
     setCreateOpen(false);
@@ -223,11 +233,12 @@ export function GoalsPage({
       .map((kr, idx) => ({ kr, idx }))
       .filter(({ kr }) => kr.liveConfig);
     if (liveKRs.length > 0 && executeBatch) {
-      void written.then(() => syncGoal(goal.id, goal.keyResults));
+      void syncGoal(goal.id, goal.keyResults);
     }
   };
 
   const openEditModal = (goal: Goal) => {
+    setGoalSaveError('');
     setEditGoalId(goal.id);
     setEditTitle(goal.title);
     setEditChannel(goal.channel);
@@ -251,7 +262,8 @@ export function GoalsPage({
     }
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
+    if (savingGoal) return;
     if (!editGoalId || !editTitle.trim() || editTitle.length > 200) { toast('Please enter a title (max 200 chars)', COLOR_DANGER, '\u26A0\uFE0F'); return; }
     const krs = editKRs.filter((kr) => kr.title.trim());
     if (krs.length === 0) { toast('Add at least one key result', COLOR_DANGER, '\u26A0\uFE0F'); return; }
@@ -290,7 +302,9 @@ export function GoalsPage({
       };
     });
 
-    const written = updateGoal(editGoalId, {
+    setSavingGoal(true);
+    setGoalSaveError('');
+    const result = await updateGoal(editGoalId, {
       title: editTitle.trim(),
       channel: editChannel,
       owner: editOwner,
@@ -307,6 +321,11 @@ export function GoalsPage({
         channelScope: undefined,
       }),
     });
+    setSavingGoal(false);
+    if (!result.ok) {
+      setGoalSaveError(`Changes were not saved: ${result.error}. Review and retry.`);
+      return;
+    }
     toast(`Goal updated: ${editTitle.trim()}`, PRIMARY_COLOR, '\u270E');
     logAction(`Updated goal: ${editTitle.trim()}`, currentUser.name, PRIMARY_COLOR);
     setEditGoalId(null);
@@ -318,7 +337,7 @@ export function GoalsPage({
     // after the write lands, so the sync sees the new SQL as the stored one.
     const liveKRs = updatedKRs.filter((kr) => kr.liveConfig);
     if (liveKRs.length > 0 && executeBatch) {
-      void written.then(() => syncGoal(editGoalId, updatedKRs));
+      void syncGoal(editGoalId, updatedKRs);
     }
   };
 
@@ -604,7 +623,7 @@ export function GoalsPage({
         )}
         {permissions.canCreate && (
           <button
-            onClick={() => setCreateOpen(true)}
+            onClick={() => { setGoalSaveError(''); setCreateOpen(true); }}
             style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
           >
             + New Goal
@@ -643,8 +662,9 @@ export function GoalsPage({
       )}
 
       {/* Create Goal Modal */}
-      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannels([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
+      <Modal open={createOpen} onClose={() => { if (savingGoal) return; setCreateOpen(false); setNewClientIds([]); setNewChannelScopeType('all'); setNewSelectedChannels([]); }} title={'\u{1F3AF} New Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <fieldset disabled={savingGoal} style={{ display: 'contents' }}>
           <GoalFormFields
             showSharing={showSharing}
             title={newTitle} setTitle={setNewTitle}
@@ -666,13 +686,16 @@ export function GoalsPage({
             selectedChannels={newSelectedChannels}
             setSelectedChannels={setNewSelectedChannels}
           />
-          <button onClick={handleCreate} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}>Create Goal</button>
+          </fieldset>
+          {goalSaveError && <div role="alert" style={{ color: COLOR_DANGER }}>{goalSaveError}</div>}
+          <button disabled={savingGoal} onClick={handleCreate} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 6 }}>{savingGoal ? 'Saving…' : 'Create Goal'}</button>
         </div>
       </Modal>
 
       {/* Edit Goal Modal */}
-      <Modal open={!!editGoalId} onClose={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
+      <Modal open={!!editGoalId} onClose={() => { if (savingGoal) return; setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} title={'\u270E Edit Goal'} theme={theme} width={600}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <fieldset disabled={savingGoal} style={{ display: 'contents' }}>
           <GoalFormFields
             showSharing={showSharing}
             title={editTitle} setTitle={setEditTitle}
@@ -694,9 +717,11 @@ export function GoalsPage({
             selectedChannels={editSelectedChannels}
             setSelectedChannels={setEditSelectedChannels}
           />
+          </fieldset>
+          {goalSaveError && <div role="alert" style={{ color: COLOR_DANGER }}>{goalSaveError}</div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <button onClick={handleEditSave} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', flex: 1 }}>Save Changes</button>
-            <button onClick={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+            <button disabled={savingGoal} onClick={handleEditSave} style={{ padding: '10px 16px', borderRadius: 8, border: 'none', background: PRIMARY_COLOR, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', flex: 1 }}>{savingGoal ? 'Saving…' : 'Save Changes'}</button>
+            <button disabled={savingGoal} onClick={() => { setEditGoalId(null); setEditClientIds([]); setEditChannelScopeType('all'); setEditSelectedChannels([]); }} style={{ padding: '10px 16px', borderRadius: 8, border: `1px solid ${theme.border}`, background: 'transparent', color: theme.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
           </div>
         </div>
       </Modal>

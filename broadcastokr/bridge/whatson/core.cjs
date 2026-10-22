@@ -5,6 +5,7 @@
  */
 
 const { assertReadOnlySelect } = require('./sqlEnvelope.cjs');
+const { convertBinds } = require('./sqlBinds.cjs');
 
 // Optional drivers — load what's available
 let loadedOracledb;
@@ -28,24 +29,6 @@ const QUERY_TIMEOUT_MS = 15000;
 // SQL the driver receives, unchanged.
 function assertSelectOnly(sql) {
   assertReadOnlySelect(sql);
-}
-
-/**
- * Converts Oracle-style named binds (:name) to PostgreSQL positional ($1, $2, ...)
- * Returns { text, values } for pg.query()
- */
-function convertBinds(sql, binds) {
-  const values = [];
-  let idx = 0;
-  const text = sql.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, name) => {
-    if (Object.hasOwn(binds, name)) {
-      values.push(binds[name]);
-      idx++;
-      return `$${idx}`;
-    }
-    return `:${name}`;
-  });
-  return { text, values };
 }
 
 /** Standard timeframe/custom binds for a KPI or KR definition. */
@@ -143,6 +126,21 @@ function normalizePgRows(rows) {
     }
     return normalized;
   });
+}
+
+/** A missing scalar is not a measured zero; only finite numbers are measurements. */
+function scalarResult(rows, messages) {
+  if (!rows?.length) return { status: 'no_data', error: messages.noRows };
+  const raw = Object.values(rows[0])[0];
+  if (raw == null || (typeof raw === 'string' && !raw.trim())) {
+    return { status: 'no_data', error: messages.noRows };
+  }
+  if (typeof raw !== 'number' && typeof raw !== 'string') {
+    return { status: 'error', error: messages.notNumeric };
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return { status: 'error', error: messages.notNumeric };
+  return { status: 'ok', current: value };
 }
 
 /**
@@ -254,11 +252,13 @@ function createWhatsonCore({ decryptPassword, drivers = {} }) {
 
   /** runQuery under the standard ceiling; the losing query is also cancelled DB-side. */
   function runQueryWithTimeout(connConfig, sql, binds = {}) {
+    let timer;
     return Promise.race([
       runQuery(connConfig, sql, binds),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Query timed out')), QUERY_TIMEOUT_MS)),
-    ]);
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Query timed out')), QUERY_TIMEOUT_MS);
+      }),
+    ]).finally(() => clearTimeout(timer));
   }
 
   /**
@@ -280,12 +280,7 @@ function createWhatsonCore({ decryptPassword, drivers = {} }) {
 
     try {
       const rows = await runQueryWithTimeout(connConfig, sql, binds);
-      if (!rows || rows.length === 0) return { status: 'no_data', error: m.noRows };
-
-      const value = Number(Object.values(rows[0])[0]);
-      if (Number.isNaN(value)) return { status: 'error', error: m.notNumeric };
-
-      return { status: 'ok', current: value };
+      return scalarResult(rows, m);
     } catch (err) {
       if (err.message === 'Query timed out') return { status: 'timeout', error: m.timeout };
       // A query the envelope refused is a definition problem the operator can fix — say why.
@@ -312,6 +307,8 @@ const SCALAR_MESSAGES = {
 module.exports = {
   normalizePgRows,
   coerceNumeric,
+  scalarResult,
+  SCALAR_MESSAGES,
   oracledb,
   pg,
   assertSelectOnly,

@@ -24,7 +24,8 @@ const CORS_ORIGINS = (process.env.BRIDGE_CORS_ORIGINS || 'http://localhost:5173,
   .map(s => s.trim());
 // Cloud modes use cookie sessions — CORS must allow credentials
 app.use(cors({ origin: CORS_ORIGINS, credentials: MODE !== 'desktop' }));
-app.use(express.json());
+const { mountJsonParsers } = require('./middleware/bodyParsers.cjs');
+mountJsonParsers(app);
 
 // ── Identity configuration (validated before anything mounts) ──
 

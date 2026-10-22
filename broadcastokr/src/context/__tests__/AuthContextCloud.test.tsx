@@ -4,6 +4,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 // Cloud builds take identity from /api/auth/me instead of the persona switch.
 
 const mockMe = vi.fn();
+vi.mock('../../editions/entitlements', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../editions/entitlements')>(),
+  BUILD_EDITION: 'client',
+}));
 vi.mock('../../store/bridgeSync', () => ({
   bridgeFetch: (...args: unknown[]) => mockMe(...args),
   bridgePost: vi.fn().mockResolvedValue({ ok: true }),
@@ -12,21 +16,18 @@ vi.mock('../../store/bridgeSync', () => ({
   bridgeDelete: vi.fn().mockResolvedValue({ ok: true }),
   bridgeWriteFailed: vi.fn(),
 }));
+import { AuthProvider, useAuth } from '../AuthContext';
 
 afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.resetModules();
+  vi.clearAllMocks();
 });
 
 describe('AuthContext in a cloud build', () => {
   it('adopts the server identity and permissions when /me succeeds', async () => {
-    vi.stubEnv('VITE_EDITION', 'client');
-    vi.resetModules();
     mockMe.mockResolvedValue({
       user: { id: 9, name: 'Server Sam', role: 'manager', av: 'SS', color: '#000', dept: '', title: '' },
       permissions: { canCreate: true, canEdit: true, canDelete: false, canAssign: true, canCheckIn: true, canChangeStatus: true, canViewReports: true, label: 'Manager' },
     });
-    const { AuthProvider, useAuth } = await import('../AuthContext');
 
     function Shows() {
       const { currentUser, permissions, authStatus } = useAuth();
@@ -39,10 +40,7 @@ describe('AuthContext in a cloud build', () => {
   });
 
   it('flips to unauthenticated when /me is refused', async () => {
-    vi.stubEnv('VITE_EDITION', 'client');
-    vi.resetModules();
     mockMe.mockRejectedValue(new Error('401'));
-    const { AuthProvider, useAuth } = await import('../AuthContext');
 
     function Shows() {
       const { authStatus } = useAuth();

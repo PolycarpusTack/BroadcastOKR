@@ -7,6 +7,7 @@ import { useActivityLog } from '../../context/ActivityLogContext';
 import { useAuth } from '../../context/AuthContext';
 import { parseFile, exportToExcel, exportToCSV, exportToJSON, downloadTemplate } from '../../utils/importExport';
 import type { ParsedData } from '../../utils/importExport';
+import { importBridgeData, newOperationId } from '../../store/bridgeSync';
 import type { Theme } from '../../types';
 import { PRIMARY_COLOR, COLOR_SUCCESS, COLOR_WARNING, COLOR_DANGER, COLOR_COBALT_MID } from '../../constants/config';
 
@@ -26,27 +27,27 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
   const [fileName, setFileName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const operation = useRef<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
   const { logAction } = useActivityLog();
-  const { currentUser, permissions } = useAuth();
+  const { currentUser } = useAuth();
+  const canImport = currentUser.role === 'owner';
 
   const goals = useStore((s) => s.goals);
   const tasks = useStore((s) => s.tasks);
   const kpis = useStore((s) => s.kpis);
   const clients = useStore((s) => s.clients);
   const goalTemplates = useStore((s) => s.goalTemplates);
-  const setGoals = useStore((s) => s.setGoals);
-  const setTasks = useStore((s) => s.setTasks);
-  const setKPIs = useStore((s) => s.setKPIs);
-  const addBulkTasks = useStore((s) => s.addBulkTasks);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setError('');
+    operation.current = null;
     setPreview(null);
     setLoading(true);
     setFileName(file.name);
@@ -61,63 +62,28 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
     }
   };
 
-  const handleImport = () => {
-    if (!preview) return;
-    if (!permissions.canCreate) return;
-
-    let imported = 0;
-
-    if (preview.goals.length > 0) {
-      if (importMode === 'replace') {
-        setGoals(preview.goals);
-      } else {
-        setGoals([...preview.goals, ...goals]);
-      }
-      imported += preview.goals.length;
+  const handleImport = async () => {
+    if (!preview || !canImport || importing) return;
+    setImporting(true);
+    setError('');
+    operation.current ??= newOperationId();
+    try {
+      // An absent category is preserved in Replace mode; only non-empty file categories are selected.
+      const data = Object.fromEntries(Object.entries(preview).filter(([key, rows]) => key !== 'warnings' && rows.length > 0));
+      const result = await importBridgeData(importMode, data, operation.current);
+      useStore.getState()._initFromBridge(result.state);
+      const imported = Object.values(result.counts).reduce((n, count) => n + count, 0);
+      toast(`Imported ${imported} items from ${fileName}`, COLOR_SUCCESS, '\u{1F4E5}');
+      operation.current = null;
+      setPreview(null);
+      setFileName('');
+      if (fileRef.current) fileRef.current.value = '';
+      onClose();
+    } catch (err) {
+      setError(`Import was not confirmed: ${err instanceof Error ? err.message : String(err)}. You can retry.`);
+    } finally {
+      setImporting(false);
     }
-
-    if (preview.tasks.length > 0) {
-      if (importMode === 'replace') {
-        setTasks(preview.tasks);
-      } else {
-        addBulkTasks(preview.tasks);
-      }
-      imported += preview.tasks.length;
-    }
-
-    if (preview.kpis.length > 0) {
-      if (importMode === 'replace') {
-        setKPIs(preview.kpis);
-      } else {
-        setKPIs([...preview.kpis, ...kpis]);
-      }
-      imported += preview.kpis.length;
-    }
-
-    if (preview.clients.length > 0 || preview.goalTemplates.length > 0) {
-      if (importMode === 'replace') {
-        useStore.setState({ clients: preview.clients, goalTemplates: preview.goalTemplates });
-        imported += preview.clients.length + preview.goalTemplates.length;
-      } else {
-        const existingClientIds = new Set(clients.map((c) => c.id));
-        const newClients = preview.clients.filter((c) => !existingClientIds.has(c.id));
-        const existingTemplateIds = new Set(goalTemplates.map((t) => t.id));
-        const newTemplates = preview.goalTemplates.filter((t) => !existingTemplateIds.has(t.id));
-        useStore.setState({
-          clients: [...newClients, ...clients],
-          goalTemplates: [...newTemplates, ...goalTemplates],
-        });
-        imported += newClients.length + newTemplates.length;
-      }
-    }
-
-    toast(`Imported ${imported} items from ${fileName}`, COLOR_SUCCESS, '\u{1F4E5}');
-    logAction(`Imported ${imported} items from ${fileName}`, currentUser.name, COLOR_SUCCESS);
-
-    setPreview(null);
-    setFileName('');
-    if (fileRef.current) fileRef.current.value = '';
-    onClose();
   };
 
   const handleExport = async (format: 'xlsx' | 'json') => {
@@ -136,6 +102,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
   };
 
   const resetImport = () => {
+    operation.current = null;
     setPreview(null);
     setFileName('');
     setError('');
@@ -143,16 +110,18 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
   };
 
   const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: theme.textMuted, textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 6 };
+  const itemCount = preview ? preview.goals.length + preview.tasks.length + preview.kpis.length + preview.clients.length + preview.goalTemplates.length : 0;
   const btnStyle = { padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700 as const, cursor: 'pointer' };
 
   return (
-    <Modal open={open} onClose={() => { resetImport(); onClose(); }} title={'\u{1F4C1} Import / Export'} theme={theme} width={560}>
+    <Modal open={open} onClose={() => { if (!importing) { resetImport(); onClose(); } }} title={'\u{1F4C1} Import / Export'} theme={theme} width={560}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Tab Switcher */}
         <div style={{ display: 'flex', borderRadius: 8, border: `1px solid ${theme.border}`, overflow: 'hidden' }}>
           {(['import', 'export'] as Tab[]).map((t) => (
             <button
               key={t}
+              disabled={importing}
               onClick={() => { setTab(t); resetImport(); }}
               style={{
                 flex: 1,
@@ -177,7 +146,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
             <div>
               <div style={labelStyle}>Upload File</div>
               <div
-                onClick={() => fileRef.current?.click()}
+                onClick={() => { if (!importing) fileRef.current?.click(); }}
                 style={{
                   padding: 24,
                   borderRadius: 10,
@@ -191,6 +160,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
                 onDragLeave={(e) => { e.currentTarget.style.borderColor = theme.border; }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  if (importing) return;
                   e.currentTarget.style.borderColor = theme.border;
                   const file = e.dataTransfer.files[0];
                   if (file && fileRef.current) {
@@ -214,6 +184,7 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
                 type="file"
                 accept=".xlsx,.xls,.csv,.json"
                 onChange={handleFileSelect}
+                disabled={importing}
                 style={{ display: 'none' }}
                 aria-label="Upload file"
               />
@@ -249,12 +220,15 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
             {preview && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={labelStyle}>Preview</div>
+                <div style={{ fontSize: 11, color: theme.textMuted }}>Owners and assignees must already exist in this instance. User accounts and database connections are managed separately.</div>
                 <div style={{ padding: '12px 14px', borderRadius: 10, background: theme.bgMuted, border: `1px solid ${theme.borderLight}` }}>
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: preview.warnings.length > 0 ? 10 : 0 }}>
                     {preview.goals.length > 0 && <PillBadge label={`${preview.goals.length} Goals`} color={COLOR_COBALT_MID} bold />}
                     {preview.tasks.length > 0 && <PillBadge label={`${preview.tasks.length} Tasks`} color={COLOR_SUCCESS} bold />}
                     {preview.kpis.length > 0 && <PillBadge label={`${preview.kpis.length} KPIs`} color={COLOR_WARNING} bold />}
-                    {preview.goals.length === 0 && preview.tasks.length === 0 && preview.kpis.length === 0 && (
+                    {preview.clients.length > 0 && <PillBadge label={`${preview.clients.length} Clients`} color={COLOR_COBALT_MID} bold />}
+                    {preview.goalTemplates.length > 0 && <PillBadge label={`${preview.goalTemplates.length} Templates`} color={COLOR_COBALT_MID} bold />}
+                    {itemCount === 0 && (
                       <span style={{ fontSize: 12, color: COLOR_DANGER, fontWeight: 600 }}>No importable data found</span>
                     )}
                   </div>
@@ -274,7 +248,8 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
                     {(['append', 'replace'] as ImportMode[]).map((m) => (
                       <button
                         key={m}
-                        onClick={() => setImportMode(m)}
+                        disabled={importing}
+                        onClick={() => { setImportMode(m); operation.current = null; }}
                         style={{
                           flex: 1,
                           padding: '8px 12px',
@@ -297,18 +272,20 @@ export function ImportExportModal({ open, onClose, theme }: ImportExportModalPro
                   </div>
                   {importMode === 'replace' && (
                     <div style={{ fontSize: 11, color: COLOR_WARNING, marginTop: 6 }}>
-                      {'\u26A0\uFE0F'} Replace mode will overwrite all existing {[preview.goals.length > 0 && 'goals', preview.tasks.length > 0 && 'tasks', preview.kpis.length > 0 && 'KPIs'].filter(Boolean).join(', ')} data.
+                      {'\u26A0\uFE0F'} Replace mode will overwrite all existing {[preview.goals.length > 0 && 'goals', preview.tasks.length > 0 && 'tasks', preview.kpis.length > 0 && 'KPIs', preview.clients.length > 0 && 'clients', preview.goalTemplates.length > 0 && 'templates'].filter(Boolean).join(', ')} data. Other categories are preserved.
                     </div>
                   )}
                 </div>
 
                 {/* Import Button */}
-                {(preview.goals.length > 0 || preview.tasks.length > 0 || preview.kpis.length > 0) && permissions.canCreate && (
+                {!canImport && <div role="note">Only an owner can import data.</div>}
+                {itemCount > 0 && canImport && (
                   <button
+                    disabled={importing}
                     onClick={handleImport}
                     style={{ ...btnStyle, background: PRIMARY_COLOR, color: '#fff', marginTop: 4 }}
                   >
-                    {'\u{1F4E5}'} Import {preview.goals.length + preview.tasks.length + preview.kpis.length} Items
+                    {importing ? 'Importing…' : `Import ${itemCount} Items`}
                   </button>
                 )}
               </div>

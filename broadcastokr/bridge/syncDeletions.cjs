@@ -29,6 +29,7 @@ const KINDS = {
   users: 'users',
   teams: 'teams',
   goalTemplates: 'goal_templates',
+  kpis: 'kpis',
 };
 
 function recordDeletion(db, kind, id) {
@@ -50,7 +51,7 @@ function deleteWithMarker(db, kind, id, { invalidate = [] } = {}) {
       table: t,
       ids: db.prepare(`SELECT id FROM ${t} WHERE ${where}`).all(...params).map((r) => r.id),
     }));
-    const result = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+    const result = db.prepare(`DELETE FROM ${table} WHERE ${kind === 'kpis' ? 'name' : 'id'} = ?`).run(id);
     if (result.changes === 0) return 0;
     recordDeletion(db, kind, id);
     for (const { table: t, ids } of touched) {

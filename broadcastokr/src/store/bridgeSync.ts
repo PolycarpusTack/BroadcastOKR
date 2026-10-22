@@ -38,6 +38,7 @@ export interface BridgeDeletions {
   users?: string[];
   teams?: string[];
   goalTemplates?: string[];
+  kpis?: string[];
 }
 
 export interface BridgeChanges {
@@ -100,8 +101,7 @@ export async function bridgeFetch<T>(
         signal: controller.signal,
         credentials: IS_CLOUD ? 'include' : 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-BrOKR-Protocol': String(PROTOCOL_VERSION), ...authHeaders, ...options?.headers },
-      });
-      clearTimeout(timeout);
+      }).finally(() => clearTimeout(timeout));
 
       if (IS_CLOUD && res.status === 401 && !path.startsWith('/api/auth/')) {
         // Session gone — let AuthContext flip to the sign-in screen
@@ -115,6 +115,12 @@ export async function bridgeFetch<T>(
         // refused delete (connection_in_use) is a 409 with a message to show.
         if (res.status === 409 && err.error === 'version_conflict') {
           throw new ConflictError(err.current);
+        }
+        // A create retried after a lost response finds its own earlier attempt
+        // committed (ADR-B1 answers 409 duplicate with the row): that is success.
+        // On the first attempt the id genuinely belongs to something else.
+        if (res.status === 409 && err.error === 'duplicate' && attempt > 0 && err.current !== undefined) {
+          return err.current as T;
         }
         const message = err.detail || err.error || `HTTP ${res.status}`;
         throw res.status < 500 ? new NoRetryError(message) : new Error(message);
@@ -150,6 +156,17 @@ export function bridgePost(path: string, body: unknown): Promise<unknown> {
   });
 }
 
+export interface ImportResponse {
+  ok: true;
+  counts: Record<'goals' | 'tasks' | 'clients' | 'goalTemplates' | 'kpis', number>;
+  state: BridgeState;
+}
+
+/** The same operation id is retained when an uncertain import is retried. */
+export function importBridgeData(mode: 'append' | 'replace', data: Partial<Pick<BridgeState, 'goals' | 'tasks' | 'clients' | 'goalTemplates' | 'kpis'>>, operationId: string): Promise<ImportResponse> {
+  return bridgeFetch('/api/sync/import', { method: 'POST', body: JSON.stringify({ mode, data, operationId }) });
+}
+
 /** PUT to bridge */
 export function bridgePut(path: string, body: unknown): Promise<unknown> {
   return bridgeFetch(path, {
@@ -163,7 +180,13 @@ export function bridgeDelete(path: string): Promise<unknown> {
   return bridgeFetch(path, { method: 'DELETE' });
 }
 
-const entityWriteQueues = new Map<string, Promise<void>>();
+export type WriteResult = { ok: true } | { ok: false; error: string };
+
+const entityWriteQueues = new Map<string, Promise<unknown>>();
+
+export function writeError(err: unknown): WriteResult {
+  return { ok: false, error: err instanceof Error ? err.message : String(err) };
+}
 
 /**
  * Version-checked PUT for goals/tasks. Writes to the same entity are
@@ -180,7 +203,7 @@ export function bridgePutEntity(
     onVersion: (version: number) => void;
     onConflict: (current: unknown) => void;
   },
-): Promise<void> {
+): Promise<WriteResult> {
   const key = `${kind}:${body.id}`;
   const base = kind === 'goals' ? '/api/goals' : '/api/tasks';
   const task = async () => {
@@ -190,12 +213,14 @@ export function bridgePutEntity(
         body: JSON.stringify({ ...body, version: hooks.getVersion() }),
       });
       if (typeof res.version === 'number') hooks.onVersion(res.version);
+      return { ok: true } as const;
     } catch (err) {
       if (err instanceof ConflictError) {
         hooks.onConflict(err.current);
-        return;
+        return { ok: false, error: 'This item changed on the server. Review the latest version and retry.' } as const;
       }
       bridgeWriteFailed(err);
+      return writeError(err);
     }
   };
   const next = (entityWriteQueues.get(key) ?? Promise.resolve()).then(task);

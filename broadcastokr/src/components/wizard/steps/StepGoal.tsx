@@ -40,6 +40,7 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
   const create = async () => {
     setBusy(true);
     setError('');
+    let saved = false;
     try {
       const kr: KeyResult = {
         id: crypto.randomUUID(),
@@ -62,14 +63,15 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
         keyResults: [kr],
         ...(data.clientId ? { clientIds: [data.clientId], channelScope: { type: 'all' as const } } : {}),
       };
-      // The goal exists from this line on. Record that before anything that
-      // can fail, or a failed sync leaves the form up and a retry creates a
-      // second goal (review 2026-09-02, F6). Wait for the bridge write, too:
-      // a non-owner's sync is verified against the *stored* KR, so syncing
-      // before the store has it would be refused.
-      const written = addGoal(goal);
+      // Confirm persistence before marking the step complete. Once saved,
+      // record the id before querying so a query failure cannot create a second goal.
+      const result = await addGoal(goal);
+      if (!result.ok) {
+        setError(`The goal was not saved: ${result.error}. You can retry.`);
+        return;
+      }
+      saved = true;
       patch({ goalId: goal.id, goalTitle: goal.title });
-      await written;
 
       // Run it immediately — the point of the whole wizard is seeing a real
       // number, and a goal that sits at "pending" proves nothing.
@@ -84,7 +86,7 @@ export function StepGoal({ data, patch, theme, bridge }: StepProps) {
         setError(first?.error || 'The goal was created, but its query did not return a value.');
       }
     } catch (e) {
-      setError(`The goal was created, but syncing it failed: ${(e as Error).message || 'unknown error'}`);
+      setError(`${saved ? 'The goal was created, but syncing it failed' : 'The goal was not saved'}: ${(e as Error).message || 'unknown error'}`);
     } finally {
       setBusy(false);
     }

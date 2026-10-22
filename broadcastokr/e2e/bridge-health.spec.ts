@@ -15,5 +15,5 @@ test('app loads and shows dashboard', async ({ page }) => {
 
 test('connection indicator is visible', async ({ page }) => {
   await page.goto('/#/dashboard');
-  await expect(page.getByRole('status', { name: /Bridge|Reconnecting|Offline/ })).toBeVisible();
+  await expect(page.getByRole('status', { name: 'Bridge connected' })).toBeVisible();
 });

@@ -1,6 +1,8 @@
 const { createRouter } = require('../utils/router.cjs');
 const fs = require('fs');
 const { deletionsSince, pruneDeletions, isBeyondRetention } = require('../syncDeletions.cjs');
+const { readState } = require('./sync-helpers.cjs');
+const { createImporter, ImportError } = require('../importData.cjs');
 
 /**
  * Rows store updated_at as sqlite "YYYY-MM-DD HH:MM:SS" (UTC) while the
@@ -19,24 +21,21 @@ function normalizeSince(since) {
 
 function createSyncRouter(db, dbPath) {
   const router = createRouter();
+  const importData = createImporter(db);
+
+  router.post('/import', (req, res) => {
+    try {
+      const result = importData(req.body, req);
+      res.json({ ...result, state: readState(db) });
+    } catch (err) {
+      if (err instanceof ImportError) return res.status(err.status).json(err.body);
+      throw err;
+    }
+  });
 
   // GET /api/sync/state — full state snapshot
   router.get('/state', (req, res) => {
-    const goals = db.prepare('SELECT * FROM goals ORDER BY created_at DESC').all();
-    const keyResults = db.prepare('SELECT * FROM key_results ORDER BY sort_order').all();
-    const krHistory = db.prepare('SELECT * FROM kr_history ORDER BY timestamp DESC').all();
-    const tasks = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all();
-    const subtasks = db.prepare('SELECT * FROM subtasks ORDER BY sort_order').all();
-    const clients = db.prepare('SELECT * FROM clients ORDER BY name').all();
-    const goalTemplates = db.prepare('SELECT * FROM goal_templates ORDER BY title').all();
-    const krTemplates = db.prepare('SELECT * FROM kr_templates ORDER BY sort_order').all();
-    const users = db.prepare('SELECT * FROM users ORDER BY id').all();
-    const teams = db.prepare('SELECT * FROM teams ORDER BY name').all();
-    const teamMembers = db.prepare('SELECT * FROM team_members').all();
-    const kpis = db.prepare('SELECT * FROM kpis ORDER BY name').all();
-
-    const { assembleState } = require('./sync-helpers.cjs');
-    res.json(assembleState({ goals, keyResults, krHistory, tasks, subtasks, clients, goalTemplates, krTemplates, users, teams, teamMembers, kpis }));
+    res.json(readState(db));
   });
 
   // GET /api/sync/changes?since=<ISO timestamp>

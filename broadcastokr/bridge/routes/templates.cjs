@@ -73,4 +73,4 @@ function createTemplatesRouter(db) {
   return router;
 }
 
-module.exports = { createTemplatesRouter };
+module.exports = { createTemplatesRouter, upsertKRTemplates };

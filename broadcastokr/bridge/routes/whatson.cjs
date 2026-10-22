@@ -1,6 +1,6 @@
 const { createRouter } = require('../utils/router.cjs');
 const {
-  oracledb, pg, assertSelectOnly, buildBinds,
+  oracledb, pg, assertSelectOnly, buildBinds, scalarResult, SCALAR_MESSAGES,
   getTablesQuery, getColumnsQuery, wrapPreviewQuery, getTestQuery,
 } = require('../whatson/core.cjs');
 const { getKpiTemplates } = require('../whatson/templates.cjs');
@@ -376,11 +376,10 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
 
     try {
       const rows = await core.runQuery(connConfig, kpi.sql, buildBinds(kpi));
-      if (!rows || rows.length === 0) {
-        // Match the execute-batch contract: no rows is no_data, never a fabricated 0
-        return res.json({ status: 'no_data', error: 'Query returned no rows' });
-      }
-      const value = Number(Object.values(rows[0])[0]);
+      // Match the execute-batch contract: no rows or a NULL scalar is no_data, never a fabricated 0
+      const result = scalarResult(rows, SCALAR_MESSAGES);
+      if (result.status !== 'ok') return res.json(result);
+      const value = result.current;
       const history = loadHistory();
       if (!history[kpiId]) history[kpiId] = [];
       history[kpiId].push({ timestamp: new Date().toISOString(), value });
@@ -408,11 +407,12 @@ function createWhatsonRouter({ db, mode = 'desktop', core, store, cipher, syncNo
       }
       try {
         const rows = await core.runQueryWithTimeout(connConfig, kpi.sql, buildBinds(kpi));
-        if (!rows || rows.length === 0) {
-          results.push({ id: kpi.id, name: kpi.name, error: 'Query returned no rows' });
+        const result = scalarResult(rows, SCALAR_MESSAGES);
+        if (result.status !== 'ok') {
+          results.push({ id: kpi.id, name: kpi.name, status: result.status, error: result.error });
           continue;
         }
-        const value = Number(Object.values(rows[0])[0]);
+        const value = result.current;
 
         if (!history[kpi.id]) history[kpi.id] = [];
         history[kpi.id].push({ timestamp: new Date().toISOString(), value });
