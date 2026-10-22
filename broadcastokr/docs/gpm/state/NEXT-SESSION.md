@@ -1,5 +1,52 @@
 # Pickup Prompt — Next Session
 
+## 2026-10-22 — persistence merged, R4 agent hardening merged (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). **Talk to Yannick in plain Dutch.** `CLAUDE.md` is current.
+main `f593105`, CI green, no open branches with unmerged work.
+
+**Done today:**
+- Persistence correctness merged (`cbdb068`). The independent review's four fixes are in;
+  see `../plans/2026-10-21-persistence-correctness/evidence.md` § Review.
+- R4 decisions taken and built (`ADR-2026-10-22-agent-revoke-and-pinning.md`), merged `f593105`:
+  - revoke keeps the row;
+  - owner purge, not over the operator channel;
+  - a 30-day sweep;
+  - opt-in SPKI pinning with two slots (`pins`, `caFile`, `agent.cjs pin`, `enroll --pin/--ca-file`).
+- Docker host: Yannick chose the IT request. Section 5 was added to `C:\whatsOn\IT-REQUEST-2026-10-20.md`.
+  It is still a draft; Yannick sends it.
+
+**Demo databases (read-only for us):**
+- PG17 :5433 holds `wonpoc_jp` (master, Jurassic Park names), `wonpoc1..3`, `wonpoc` and
+  `wonpoc_jp_prerename`. They belong to Calcar/Experimenta: **never write to them**.
+- The r8 cluster on :5434 starts with `rig.py 2026r8 --start-cluster` and is normally down.
+- **Connect with `sslmode=disable`**: otherwise psql/psycopg2 hang in the SSL handshake (the server
+  has `ssl=off`).
+- `wonpoc_jp` is thin for the KPI templates: 2,160 transmissions on 4 channels, 0 live subtitling,
+  5 material parts.
+- Yannick received five prompts to run in separate sessions:
+  - 0: `wonpoc_brokr` as a copy, plus `docs/saas/demo-data/db.py` as the guard;
+  - 1: schedule data;
+  - 2: usage profiles a/b/c;
+  - 3: PG read-only acceptance A-2-T3 with a granted write function;
+  - 4: import fixtures.
+
+  Check `docs/saas/demo-data/` for what came back.
+
+**Next, in order:**
+1. If prompt 3 ran, record the PostgreSQL half of A-2-T3 in `docs/saas/readiness/r1-findings.md`.
+   Oracle 19c stays open.
+2. R4 remainder: agent identity key handling (0600 file plus an optional OS keystore, documented).
+   The pen test waits for the Docker host. mTLS comes later.
+3. R5 evidence pack (Sonnet-sized): extend `scripts/generate-evidence.sh` with FF-8, the release run,
+   the operator channel and now the R4 ADR.
+4. Low review items accepted, not fixed (see evidence.md): import `history[].actor` is free text;
+   a replace can rewrite the pinned client's `connection_id`; booleans and dates as KR scalars now
+   give `error`.
+
+**Gotcha learned today:** a secret-guard hook blocks committing any private key, including test
+fixtures. Generate TLS material per test run (see `agent-pinning.test.cjs`).
+
 ## 2026-10-21 — persistence correctness
 
 Branch `fix/persistence-correctness`. Read

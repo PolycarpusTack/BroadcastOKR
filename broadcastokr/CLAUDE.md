@@ -168,8 +168,8 @@ Desktop edition: the bridge checks a bearer API key (`BRIDGE_API_KEY`; none = de
 - Constants in `src/constants/config.ts`, shared form styles in `src/styles/formStyles.ts`
 
 ## Testing
-- `npm test` — 309 tests across 61 test files (vitest; not on PATH, use the npm script)
-- `npm run test:bridge` — 206 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 205/206 on Windows: `agent.test.cjs` asserts a `0600` identity file
+- `npm test` — 327 tests across 64 test files (vitest; not on PATH, use the npm script)
+- `npm run test:bridge` — 303 bridge tests (node --test via `bridge/__tests__/run.cjs`, which isolates config/history paths and blanks any dev keys), including `route-contract.test.cjs` which walks every `/api/*` literal in `src/` against the mounted bridge routes — frontend↔bridge path drift fails CI — and `ff9-policy-coverage.test.cjs` (every WHATS'ON-router route has a POLICY entry, and the entry survives the path shapes Express accepts). Expect 302/303 on Windows: `agent.test.cjs` asserts a `0600` identity file. `agent-pinning.test.cjs` makes throwaway certificates with `openssl` per run (skipped with a reason when it is absent); never commit key fixtures — a secret-guard hook blocks them
 - `npm run lint` — 0 errors, gated in CI
 - `better-sqlite3` is native and can only be built for ONE runtime at a time. `npm run rebuild:node` targets system Node (`npm run bridge`, `npm test`); `npm run rebuild:electron` targets Electron (`npm run electron:dev`, packaging). `electron:build*` now force-rebuilds for Electron itself, so packaging is safe from either state — but run `npm run rebuild:node` afterwards to get the dev bridge back. Stop any running bridge/agent first (`scripts/local-rig/start-rig.ps1 -Stop`) — a loaded `better_sqlite3.node` makes the Electron rebuild fail with EPERM. **Do not trust electron-builder's own rebuild step**: on 2026-09-02 it treated a system-Node build as up to date and shipped an installer whose bridge died on `require` (NODE_MODULE_VERSION 127 vs 145)
 - `npm run build` — must pass before committing (`tsc -b` catches noUnusedLocals errors that plain `tsc --noEmit` misses)
@@ -181,9 +181,11 @@ Desktop edition: the bridge checks a bearer API key (`BRIDGE_API_KEY`; none = de
 - `npm run bridge` — Start Express bridge on localhost:3001
 - `node scripts/build-agent-bundle.mjs` — connector-agent tarball (`dist-agent/`, require graph checked); `node scripts/capture-protocol-fixtures.mjs` — FF-5 verify/capture; `Dockerfile` — instance image (`EDITION`, `MODE` args); `../.github/workflows/release.yml` — one `v*` tag → installers + GHCR images + agent bundle + GitHub Release (R7)
 
-## Current State (2026-09-07)
+## Current State (2026-10-22)
 
 ### What's done
+- 2026-10-22 — R4 agent hardening (ADR `docs/gpm/state/ADR-2026-10-22-agent-revoke-and-pinning.md`): revoke keeps the row, owner purge `DELETE /api/agents/:id/purge` (not over the operator channel), 30-day sweep; opt-in SPKI pinning in `bridge/agentTransport.cjs` (`pins` + `caFile` in agent-config.json, `agent.cjs pin`, `enroll --pin/--ca-file`). Pinning depends on `agent: false` (Node skips the identity check on resumed TLS sessions)
+- 2026-10-21/22 — persistence correctness (`docs/gpm/plans/2026-10-21-persistence-correctness/evidence.md`): `POST /api/sync/import` owner-only, transactional, replayable (migration 013); goal forms wait for accepted saves; SQL NULL/blank scalars are `no_data` everywhere (`scalarResult`, also the dashboard KPI routes); 20 MB body limit only on import/migrate (`middleware/bodyParsers.cjs`); a retried create that meets its own `409 duplicate` is success
 - 2026-09-07 — repository cleanup: stale docs and orphaned files removed (the March/May plan drafts, mockups, the bridge-only Dockerfile, the icon generator), line endings normalised (`.gitattributes`), dead code and copied helpers consolidated (see `chore(ui)`/`refactor(ui)` commits); the WHATS'ON Insights evaluation now lives in `../whatson-insights/`
 - Full React app with Dashboard, Goals, Tasks, Team, Reports, Clients, Compare pages
 - Bridge service with Oracle/PostgreSQL, connection CRUD, schema browser, auth/logging/rate-limit middleware, SQLite-backed CRUD routes + frontend bridgeSync
