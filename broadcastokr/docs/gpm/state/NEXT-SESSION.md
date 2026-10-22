@@ -1,5 +1,17 @@
 # Pickup Prompt — Next Session
 
+## 2026-10-21 — persistence correctness
+
+Branch `fix/persistence-correctness`. Read
+`../plans/2026-10-21-persistence-correctness/evidence.md` for the implemented contracts,
+verification results and outstanding staging gates. Imports now use an owner-only,
+transactional, replay-safe bridge operation; goal forms wait for save results;
+missing scalars and quoted SQL binds are handled correctly. Browser regressions cover
+persistence, refusal/retry, imports and two-desktop-context check-in/deletion convergence.
+The June desktop readiness verdict does not establish cloud readiness. Fresh-image
+OIDC, real-driver enforcement and authenticated cloud convergence still need staging.
+The original usage-metrics and readiness tracks below remain applicable.
+
 ## 2026-10-01 — cockpit usage-metrics spike, PARKED until Yannick has remote client access (paste this block)
 
 We're continuing the **usage-metrics track**: the MGX cockpit should measure how each client

@@ -109,4 +109,16 @@ function assembleState({ goals, keyResults, krHistory, tasks, subtasks, clients,
   };
 }
 
-module.exports = { assembleState };
+/** One snapshot builder shared by initial sync and the import response. */
+function readState(db) {
+  const all = (table, order) => db.prepare(`SELECT * FROM ${table}${order ? ` ORDER BY ${order}` : ''}`).all();
+  return assembleState({
+    goals: all('goals', 'created_at DESC'), keyResults: all('key_results', 'sort_order'),
+    krHistory: all('kr_history', 'timestamp DESC'), tasks: all('tasks', 'created_at DESC'),
+    subtasks: all('subtasks', 'sort_order'), clients: all('clients', 'name'),
+    goalTemplates: all('goal_templates', 'title'), krTemplates: all('kr_templates', 'sort_order'),
+    users: all('users', 'id'), teams: all('teams', 'name'), teamMembers: all('team_members'), kpis: all('kpis', 'name'),
+  });
+}
+
+module.exports = { assembleState, readState };

@@ -16,6 +16,14 @@ carries the per-release notes. This file keeps the short version.
 
 ### Fixed
 
+- Imports now persist all selected categories in one owner-authorized transaction, with retry receipts,
+  licence/tenant checks, history preservation and deletion propagation. Replace affects only selected categories.
+- Goal create/edit and setup now wait for accepted saves; refused edits roll back and forms remain available for retry.
+- SQL NULL/blank measurements stay unavailable; nonfinite values are refused. PostgreSQL named-bind conversion preserves quoted text, comments and casts.
+  Dashboard KPIs (`/api/kpi/execute`, `/api/kpi/poll`) follow the same rule instead of recording a fabricated 0.
+- Imports and the first-connect migration accept bodies up to 20 MB (exports with KR history exceeded the 100 KB default).
+- A goal or task create retried after a lost response is accepted when the bridge already holds it, instead of failing and inviting a duplicate.
+- Browser regressions now cover reload persistence, save refusal/retry, import and two-browser check-in/deletion convergence; test ports and credentials are isolated.
 - Client edition: channels pulled from the Settings page now get palette colours like everywhere else.
 
 ## [0.9.2] - 2026-09-04

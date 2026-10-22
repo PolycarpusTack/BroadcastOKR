@@ -76,6 +76,7 @@ const POLICY = [
   { method: 'GET', path: /^\/api\/config$/, perm: 'authenticated' },
   { method: 'GET', path: /^\/api\/connections(\/|$)/, perm: 'authenticated' },
   { method: 'POST', path: /^\/api\/sync\/migrate-from-local$/, perm: 'ownerOnly' },
+  { method: 'POST', path: /^\/api\/sync\/import$/, perm: 'ownerOnly' },
   // Cockpit tenant registry and the operator channel — the cockpit's owners only
   { method: 'POST', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },
   { method: 'PUT', path: /^\/api\/cockpit\/tenants(\/|$)/, perm: 'ownerOnly' },

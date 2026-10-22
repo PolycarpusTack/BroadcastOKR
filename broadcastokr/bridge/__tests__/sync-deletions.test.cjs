@@ -61,7 +61,7 @@ describe('sync deletions (F6)', () => {
       assert.ok(res.ok, `DELETE ${url} → ${res.status}`);
     }
     const c = await changes(since);
-    assert.deepEqual(c.deletions, { goals: ['g1'], tasks: ['t1'], clients: ['c1'], users: ['2'], teams: ['tm1'], goalTemplates: ['tpl1'] });
+    assert.deepEqual(c.deletions, { goals: ['g1'], tasks: ['t1'], clients: ['c1'], users: ['2'], teams: ['tm1'], goalTemplates: ['tpl1'], kpis: [] });
     assert.equal(c.resetRequired, undefined);
     assert.ok(!c.goals.some((g) => g.id === 'g1'), 'a deleted row is not also sent as a change');
   });

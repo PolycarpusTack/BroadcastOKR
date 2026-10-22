@@ -168,4 +168,4 @@ function createTasksRouter(db) {
   return router;
 }
 
-module.exports = { createTasksRouter };
+module.exports = { createTasksRouter, taskBodyProblem, upsertSubtasks };

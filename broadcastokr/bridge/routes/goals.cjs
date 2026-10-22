@@ -376,4 +376,4 @@ function createGoalsRouter(db) {
   return router;
 }
 
-module.exports = { createGoalsRouter };
+module.exports = { createGoalsRouter, goalBodyProblem, upsertKeyResults };

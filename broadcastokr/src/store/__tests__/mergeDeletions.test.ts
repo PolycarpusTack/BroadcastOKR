@@ -51,4 +51,12 @@ describe('_mergeChanges applies deletions before upserts', () => {
     useStore.getState()._mergeChanges({ deletions: { goals: ['g1'] } });
     expect(useStore.getState().goals.map((g) => g.id)).toEqual(['g2']);
   });
+
+  it('removes replaced dashboard KPIs by name and adopts their replacements', () => {
+    useStore.setState({ kpis: [{ name: 'Old KPI', unit: '%', direction: 'hi', target: 90, current: 80, trend: [] }] });
+
+    useStore.getState()._mergeChanges({ deletions: { kpis: ['Old KPI'] }, kpis: [{ name: 'New KPI', unit: '%', direction: 'hi', target: 95, current: 90, trend: [] }] });
+
+    expect(useStore.getState().kpis.map((k) => k.name)).toEqual(['New KPI']);
+  });
 });

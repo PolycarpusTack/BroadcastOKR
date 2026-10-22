@@ -71,7 +71,7 @@ export const GoalCard = React.memo(function GoalCard({
       : [];
 
   return (
-    <div style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 10, overflow: 'hidden' }}>
+    <div role="article" aria-label={`Goal: ${goal.title}`} style={{ background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 10, overflow: 'hidden' }}>
       <div onClick={() => onToggleExpand(isExpanded ? null : goal.id)} style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 18 }}>{statusIcon(goal.status)}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
