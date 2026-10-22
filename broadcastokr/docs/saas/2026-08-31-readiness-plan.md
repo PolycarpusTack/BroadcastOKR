@@ -83,6 +83,9 @@ Close the recorded residuals; commission what needs commissioning.
   identity/key handling moved to 0600-file-plus-optional-OS-keystore, documented.
 - **Delete-on-revoke decided and implemented** (both behaviors exist; the default is a
   product/legal decision — make it, wire it, document it).
+  *2026-10-22: decided and built. Revoke keeps the row, an owner purge erases it, and
+  revoked rows go after 30 days. Opt-in SPKI pinning with two slots is in place;
+  mTLS remains later. ADR `docs/gpm/state/ADR-2026-10-22-agent-revoke-and-pinning.md`.*
 - **External penetration test** commissioned against the staging rig (needs no client),
   criticals/highs fixed, report archived in the evidence pack.
 - Dependency hygiene automation: scheduled audit gate in CI, Dependabot policy

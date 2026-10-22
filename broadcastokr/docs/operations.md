@@ -243,8 +243,28 @@ plaintext or `enc:v1:` values produced by the bridge's `encrypt()`; set
 `AGENT_DATA_KEY` in the agent's environment to unlock them. Identity lives in
 `agent-identity.json` (0600 where the filesystem honours it; a no-op on NTFS).
 Oracle uses thick mode when an Oracle client is on PATH, thin mode otherwise;
-`ORACLE_CLIENT_DIR` pins a client directory. Revoke an agent with
-`DELETE /api/agents/:id`.
+`ORACLE_CLIENT_DIR` pins a client directory.
+
+**Revoke and purge** (ADR 2026-10-22). Revoke an agent with `DELETE /api/agents/:id`, or
+**Revoke** in the agents panel. The token is refused from then on. The row stays as the audit
+trail: name, last seen, revoke time. An owner can erase a revoked agent with
+`DELETE /api/agents/:id/purge` (**Remove** in the panel); the cockpit's operator channel cannot.
+Revoked agents are purged automatically 30 days after revocation.
+
+**Pinning the instance** (optional; ADR 2026-10-22). Add `pins` to `agent-config.json`: one or
+two `sha256/<base64>` hashes of the instance certificate's public key (SPKI). The instance URL
+must then be `https://`. The CA and host-name checks still run, and the agent refuses an
+instance whose key matches no pin before it sends anything. The log names the key it got.
+- Read the current pin with `node bridge/agent.cjs pin --instance URL`. Add `--dir DIR --write`
+  to store it; the config keeps at most two pins and drops the oldest.
+- Hosted tenants get their pin at enrolment: `enroll … --pin sha256/…` pins the enrolment
+  itself and writes the pin into the new config.
+- `caFile` (a PEM path, relative to the agent directory) adds a trust anchor for instances
+  behind a private CA.
+
+**Rotating the instance key with pins set:** before the switch, run `pin --write` against the
+new key (staging, or the new certificate served on a second port) so both pins are present.
+Switch the instance, check that the agent's next push succeeds, then remove the old pin.
 
 ## Log Files
 

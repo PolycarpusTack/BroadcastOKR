@@ -31,6 +31,7 @@ const staging = join(OUT, name);
 const FILES = [
   'agent.cjs',
   'agentCore.cjs',
+  'agentTransport.cjs',
   'protocol.cjs',
   'utils/crypto.cjs',
   'utils/atomicWrite.cjs',
