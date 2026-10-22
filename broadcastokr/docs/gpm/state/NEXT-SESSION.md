@@ -33,9 +33,28 @@ main `f593105`, CI green, no open branches with unmerged work.
 
   Check `docs/saas/demo-data/` for what came back.
 
+**Agreed direction (Yannick, end of 2026-10-22): close the gates locally, without a Docker host.**
+Parked mid-question: Yannick still has to say "go" and, for A-2-T4, start Oracle in an elevated shell
+(`Start-Service OracleServiceLOCAL, OracleOraDB19Home1TNSListener`). The rig is native and needs no
+Docker: `scripts/local-rig/start-rig.ps1` brings up Keycloak 26 :8081, the cockpit :3100 and tenant0
+:3101. It was not running on 2026-10-22.
+
+| Gate | Locally | How |
+|---|---|---|
+| A-2-T3 PG read-only | fully | Disposable DB `brokr_ro_acceptance` on PG17 :5433 (sslmode=disable), never in wonpoc*. A write-capable role, plus a granted write function the scanner cannot see. The bridge's real `pg` driver runs against it. Env-gated bridge test. Drop the DB afterwards |
+| A-2-T4 Oracle read-only | fully, once Oracle runs | The same against local Oracle 19c `LOCAL`. No WHATS'ON tables needed |
+| B-6 two sessions ≤ 10 s | fully | tenant0 in client mode, real Keycloak OIDC. Playwright signs in as owner and as member; member check-in and a deletion must converge |
+| R2 upgrade/restore drill | mostly | A copy of the tenant0 .db from v0.9.2 → main (migrations 011–013), then backup and restore of the .db with measured times. Off-machine backups and key recovery stay staging |
+| A-4 fresh-image OIDC | partly | Install the bridge in an empty dir as the Dockerfile does (`npm ci --omit=dev` on its own lockfile) and walk sign-in against Keycloak. This catches F3-class missing deps. The image itself (base, entrypoint) stays open |
+| Pen test | no | External; waits for staging |
+
+Order: A-2-T3 and B-6 first (they close fully), then R2 and the A-4 part. Log every result in
+`docs/saas/readiness/r1-findings.md` marked "local, no container", so nothing staging-only is
+silently treated as closed.
+
 **Next, in order:**
-1. If prompt 3 ran, record the PostgreSQL half of A-2-T3 in `docs/saas/readiness/r1-findings.md`.
-   Oracle 19c stays open.
+1. The local gates above. If Yannick's prompt 3 already ran in another session, reuse its test
+   instead of writing a second one.
 2. R4 remainder: agent identity key handling (0600 file plus an optional OS keystore, documented).
    The pen test waits for the Docker host. mTLS comes later.
 3. R5 evidence pack (Sonnet-sized): extend `scripts/generate-evidence.sh` with FF-8, the release run,
