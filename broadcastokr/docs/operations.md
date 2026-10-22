@@ -260,7 +260,8 @@ instance whose key matches no pin before it sends anything. The log names the ke
 - Hosted tenants get their pin at enrolment: `enroll … --pin sha256/…` pins the enrolment
   itself and writes the pin into the new config.
 - `caFile` (a PEM path, relative to the agent directory) adds a trust anchor for instances
-  behind a private CA.
+  behind a private CA. `enroll` and `pin` take it as `--ca-file PEM`. Re-enrolling into an existing
+  directory keeps its connections and bindings and adds the new pin.
 
 **Rotating the instance key with pins set:** before the switch, run `pin --write` against the
 new key (staging, or the new certificate served on a second port) so both pins are present.

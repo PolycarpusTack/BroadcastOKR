@@ -108,6 +108,25 @@ describe('agent instance pinning', { skip: NO_OPENSSL }, () => {
     }
   });
 
+  it('re-enrolling into an existing config keeps the operator config and adds the pin', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brokr-reenrol-'));
+    try {
+      const caPath = path.join(dir, 'a.crt');
+      fs.writeFileSync(caPath, certA);
+      const binding = { krId: 'kr1', connectionId: 'c', sql: 'SELECT 1' };
+      fs.writeFileSync(path.join(dir, 'agent-config.json'), JSON.stringify({ instanceUrl: base, bindings: [binding] }));
+      await promisify(execFile)(process.execPath, [path.join(__dirname, '..', 'agent.cjs'), 'enroll',
+        '--instance', base, '--token', 'enrol-once', '--name', 'site', '--dir', dir, '--pin', PIN_A, '--ca-file', caPath]);
+      const config = JSON.parse(fs.readFileSync(path.join(dir, 'agent-config.json'), 'utf8'));
+      assert.deepEqual(config.pins, [PIN_A]);
+      assert.deepEqual(config.bindings, [binding]);
+      assert.equal(config.caFile, caPath);
+      assert.equal(received.at(-1).url, '/api/agent/enroll');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('the agent pass fails loudly on a pin mismatch', async () => {
     const config = { instanceUrl: base, pins: [PIN_B], ca: certA, bindings: [{ krId: 'kr1', connectionId: 'c', sql: 'x' }] };
     await assert.rejects(
@@ -127,6 +146,10 @@ describe('pin configuration', () => {
     assert.match(validatePins({ instanceUrl: 'https://x', pins: [PIN_A, PIN_B, PIN_A] }), /at most two/);
     assert.match(validatePins({ instanceUrl: 'https://x', pins: ['sha1/abc'] }), /sha256\//);
     assert.match(validatePins({ instanceUrl: 'http://x', pins: [PIN_A] }), /https/);
+    assert.match(validatePins({ instanceUrl: 'https://x', pins: 'sha256/x' }), /must be a list/);
+  });
+  it('accepts an upper-case scheme the URL parser accepts', () => {
+    assert.equal(validatePins({ instanceUrl: 'HTTPS://x', pins: [PIN_A] }), null);
   });
   it('adding a pin keeps at most two and drops the oldest', () => {
     assert.deepEqual(addPin([], PIN_A), [PIN_A]);

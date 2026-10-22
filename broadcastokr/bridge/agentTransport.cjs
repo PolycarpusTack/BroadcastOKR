@@ -33,10 +33,13 @@ function spkiPin(peerCert) {
 function validatePins(config) {
   const pins = config.pins;
   if (pins === undefined || (Array.isArray(pins) && pins.length === 0)) return null;
-  if (!Array.isArray(pins) || pins.length > MAX_PINS) return `pins: at most two entries (current and next key)`;
+  if (!Array.isArray(pins)) return 'pins: must be a list of sha256/<base64> SPKI hashes';
+  if (pins.length > MAX_PINS) return 'pins: at most two entries (current and next key)';
   const bad = pins.find((p) => typeof p !== 'string' || !PIN_RE.test(p));
   if (bad !== undefined) return `pins: '${bad}' is not a sha256/<base64> SPKI hash`;
-  if (!String(config.instanceUrl || '').startsWith('https:')) return 'pins require an https:// instanceUrl';
+  let protocol = '';
+  try { protocol = new URL(config.instanceUrl).protocol; } catch { /* reported below */ }
+  if (protocol !== 'https:') return 'pins require an https:// instanceUrl';
   return null;
 }
 
@@ -71,6 +74,8 @@ function postJson(url, body, headers = {}, { pins, ca } = {}) {
       headers: { ...allHeaders, 'Content-Length': Buffer.byteLength(payload) },
       ...(ca && { ca: [...tls.rootCertificates, ca] }),
       ...(pins?.length && { checkServerIdentity: pinnedIdentityCheck(pins) }),
+      // Load-bearing: Node skips checkServerIdentity on a resumed TLS session, so a
+      // pinned request must never reuse one. agent:false = fresh agent, no session cache.
       agent: false,
     }, (res) => {
       let text = '';
