@@ -51,6 +51,25 @@ describe('AgentsPanel', () => {
     await screen.findByText('revoked');
   });
 
+  it('purges a revoked agent on the second click when the api allows it', async () => {
+    const api = fakeApi([{ id: 'agent_a', name: 'site-a', createdAt: '2026-09-01T00:00:00Z', revoked: true }]);
+    api.purge = vi.fn(async () => ({ ok: true }));
+    render(<AgentsPanel api={api} canManage theme={theme} />);
+    await screen.findByText('site-a');
+    fireEvent.click(screen.getByText('Remove'));
+    expect(api.purge).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Confirm remove'));
+    await waitFor(() => expect(api.purge).toHaveBeenCalledWith('agent_a'));
+  });
+
+  it('offers no removal over the operator channel (no purge in the api)', async () => {
+    const api = fakeApi([{ id: 'agent_a', name: 'site-a', createdAt: '2026-09-01T00:00:00Z', revoked: true }]);
+    render(<AgentsPanel api={api} canManage theme={theme} />);
+    await screen.findByText('site-a');
+    expect(screen.queryByText('Remove')).toBeNull();
+    expect(screen.getByText(/removed automatically 30 days after revocation/)).toBeTruthy();
+  });
+
   it('hides the controls for readers', async () => {
     const api = fakeApi([{ id: 'agent_a', name: 'site-a', createdAt: '2026-09-01T00:00:00Z', revoked: false }]);
     render(<AgentsPanel api={api} canManage={false} theme={theme} />);

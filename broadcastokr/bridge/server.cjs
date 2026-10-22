@@ -110,8 +110,9 @@ app.use('/api/activity', createActivityRouter(db));
 const { createUsageRouter } = require('./routes/usage.cjs');
 app.use('/api/usage', createUsageRouter(db));
 
-const { createAgentRouters } = require('./routes/agent.cjs');
+const { createAgentRouters, purgeExpiredAgents } = require('./routes/agent.cjs');
 const agentRouters = createAgentRouters(db);
+purgeExpiredAgents(db);
 app.use('/api/agents', agentRouters.ops);
 app.use('/api/agent', agentRouters.machine);
 

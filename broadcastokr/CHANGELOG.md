@@ -8,6 +8,14 @@ carries the per-release notes. This file keeps the short version.
 
 ## [Unreleased]
 
+### Added
+
+- Connector agent: opt-in instance pinning. `pins` in `agent-config.json` takes one or two SPKI hashes;
+  `agent.cjs pin` reads and stores the instance's pin, `enroll --pin` pins a hosted tenant from the start,
+  and `caFile` adds a private CA.
+- Agents: owners can remove a revoked agent (`DELETE /api/agents/:id/purge`, **Remove** in the panel).
+  Revoked agents are purged automatically after 30 days. Revoke itself still keeps the audit trail.
+
 ### Changed
 
 - Repository cleanup (2026-09-07): stale plan drafts, mockups and orphaned files removed; line endings

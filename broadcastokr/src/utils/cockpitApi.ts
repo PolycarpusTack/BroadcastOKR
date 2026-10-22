@@ -56,6 +56,8 @@ export interface AgentsApi {
   list(): Promise<AgentInfo[]>;
   mintEnrolToken(): Promise<{ token: string; expiresInMinutes: number }>;
   revoke(id: string): Promise<unknown>;
+  /** Erase a revoked agent. Absent over the operator channel, which may revoke but not erase the trail. */
+  purge?(id: string): Promise<unknown>;
 }
 
 const call = <T,>(path: string, init?: RequestInit) => bridgeFetch<T>(path, init, { retries: 0 });
@@ -109,4 +111,5 @@ export const ownAgentsApi: AgentsApi = {
   list: () => call<AgentInfo[]>('/api/agents'),
   mintEnrolToken: () => call<{ token: string; expiresInMinutes: number }>('/api/agents/enrol-token', json('POST', {})),
   revoke: (id: string) => call(`/api/agents/${id}`, { method: 'DELETE' }),
+  purge: (id: string) => call(`/api/agents/${id}/purge`, { method: 'DELETE' }),
 };

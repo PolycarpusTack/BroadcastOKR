@@ -49,11 +49,12 @@ export function AgentsPanel({ api, canManage, instanceUrl, canEnrol = true, them
     }
   };
 
-  const revoke = async (id: string) => {
-    if (confirmId !== id) { setConfirmId(id); return; }
+  /** Destructive actions run on the second click; the key names action and agent. */
+  const confirmed = async (key: string, action: () => Promise<unknown>) => {
+    if (confirmId !== key) { setConfirmId(key); return; }
     setBusy(true);
     try {
-      await api.revoke(id);
+      await action();
       setConfirmId(null);
       load();
     } catch (e) {
@@ -68,6 +69,10 @@ export function AgentsPanel({ api, canManage, instanceUrl, canEnrol = true, them
     textTransform: 'uppercase', color: theme.textMuted,
   };
   const mono: React.CSSProperties = { fontFamily: FONT_MONO, fontSize: 12, color: theme.textSecondary };
+  const actionStyle = (armed: boolean): React.CSSProperties => ({
+    marginLeft: 'auto', padding: '4px 10px', borderRadius: 6, border: `1px solid ${armed ? COLOR_DANGER : theme.border}`,
+    background: 'transparent', color: armed ? COLOR_DANGER : theme.textSecondary, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+  });
   const site = instanceUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://<instance>');
 
   return (
@@ -111,16 +116,30 @@ export function AgentsPanel({ api, canManage, instanceUrl, canEnrol = true, them
             </span>
             {canManage && !a.revoked && (
               <button
-                onClick={() => revoke(a.id)}
+                onClick={() => confirmed(`revoke:${a.id}`, () => api.revoke(a.id))}
                 disabled={busy}
-                style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 6, border: `1px solid ${confirmId === a.id ? COLOR_DANGER : theme.border}`, background: 'transparent', color: confirmId === a.id ? COLOR_DANGER : theme.textSecondary, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                style={actionStyle(confirmId === `revoke:${a.id}`)}
               >
-                {confirmId === a.id ? 'Confirm revoke' : 'Revoke'}
+                {confirmId === `revoke:${a.id}` ? 'Confirm revoke' : 'Revoke'}
+              </button>
+            )}
+            {canManage && a.revoked && api.purge && (
+              <button
+                onClick={() => confirmed(`purge:${a.id}`, () => api.purge!(a.id))}
+                disabled={busy}
+                style={actionStyle(confirmId === `purge:${a.id}`)}
+              >
+                {confirmId === `purge:${a.id}` ? 'Confirm remove' : 'Remove'}
               </button>
             )}
           </div>
         ))}
       </div>
+      {agents.some((a) => a.revoked) && (
+        <div style={{ marginTop: 6, fontSize: 11.5, color: theme.textMuted }}>
+          Revoked agents are kept for the audit trail and removed automatically 30 days after revocation.
+        </div>
+      )}
     </div>
   );
 }
