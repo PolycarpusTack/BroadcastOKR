@@ -83,13 +83,21 @@ cp bridge/broadcastokr.db backups/broadcastokr-$(date +%Y%m%d).db
 ### Restore
 
 1. Stop the bridge
-2. Replace `broadcastokr.db` with the snapshot's `.db`. Restoring a pre-0.9.2
+2. **Delete `broadcastokr.db-wal` and `broadcastokr.db-shm`** next to the database, if they exist,
+   or move them aside. A bridge that was killed rather than stopped (a crash, `kill -9`, a Windows
+   service stop, a pre-2026-11 build) leaves its write-ahead log behind. SQLite replays that log
+   onto whatever `.db` it finds, so a restored snapshot would come back as the state you meant to
+   roll away from, with `integrity_check` still saying `ok`. The R2 drill on 2026-11-26 showed
+   exactly this (`scripts/local-rig/r2-upgrade-restore-drill.mjs`, r1-findings #42). Since then a
+   bridge stopped with SIGTERM/SIGINT, or by the desktop app, closes the database first and leaves
+   no WAL behind. Delete the files anyway: you cannot always know how the bridge stopped.
+3. Replace `broadcastokr.db` with the snapshot's `.db`. Restoring a pre-0.9.2
    pair: put its `.config.json` at `BRIDGE_CONFIG_PATH` as `config.json` too —
    the first start imports it (see Updating)
-3. Make sure the encryption key the snapshot was written under is configured
+4. Make sure the encryption key the snapshot was written under is configured
    (server: `BRIDGE_ENCRYPTION_KEY`; desktop: the same machine and account, or
    plan to re-enter passwords)
-4. Start the bridge and read its startup lines: it reports how many stored
+5. Start the bridge and read its startup lines: it reports how many stored
    passwords it re-encrypted, left unprotected, or cannot read with the key it has
 
 ## Credentials

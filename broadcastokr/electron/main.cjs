@@ -173,16 +173,23 @@ function startBridge() {
   }
 }
 
+// Ask the bridge to close its database first (IPC: on Windows a signal is a
+// hard kill that leaves the WAL behind — R2 drill, r1-findings #42); kill it
+// only if it has not gone within 6 s. Resolves when the process is gone.
 function stopBridge() {
-  if (!bridgeProcess) return { ok: true, message: 'Bridge not running' };
-
-  try {
-    bridgeProcess.kill('SIGTERM');
-    bridgeProcess = null;
-    return { ok: true, message: 'Bridge stopped' };
-  } catch (err) {
-    return { ok: false, message: err.message };
-  }
+  const child = bridgeProcess;
+  if (!child) return Promise.resolve({ ok: true, message: 'Bridge not running' });
+  bridgeProcess = null;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { try { child.kill('SIGTERM'); } catch { /* already gone */ } }, 6000);
+    child.once('exit', () => { clearTimeout(timer); resolve({ ok: true, message: 'Bridge stopped' }); });
+    try {
+      if (child.connected) child.send({ type: 'shutdown' });
+      else child.kill('SIGTERM');
+    } catch {
+      try { child.kill('SIGTERM'); } catch { /* already gone */ }
+    }
+  });
 }
 
 function getBridgeStatus() {
@@ -346,7 +353,11 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Kill bridge on quit
-app.on('before-quit', () => {
-  stopBridge();
+// Stop the bridge cleanly on quit: hold the quit until its database is closed
+let quitting = false;
+app.on('before-quit', (event) => {
+  if (quitting || !bridgeProcess) return;
+  event.preventDefault();
+  quitting = true;
+  stopBridge().finally(() => app.quit());
 });

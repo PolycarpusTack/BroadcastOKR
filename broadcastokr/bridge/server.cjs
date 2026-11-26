@@ -297,7 +297,7 @@ const PORT = process.env.BRIDGE_PORT || 3001;
 // Local-only by default; deployments that need LAN/container exposure opt in
 // explicitly via BRIDGE_HOST=0.0.0.0 (docker-compose does).
 const HOST = process.env.BRIDGE_HOST || '127.0.0.1';
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`\n  BroadcastOKR Bridge Service`);
   console.log(`  ──────────────────────────`);
   console.log(`  Running on http://${HOST}:${PORT}`);
@@ -310,3 +310,26 @@ app.listen(PORT, HOST, () => {
   console.log(`  Database: ${DB_PATH} (connections included)`);
   console.log(`  History: ${HISTORY_PATH}\n`);
 });
+
+// ── Graceful shutdown ──
+// Closing the database checkpoints the WAL into broadcastokr.db and removes
+// broadcastokr.db-wal. A bridge killed without it leaves the WAL behind, and a
+// restore that then replaces only the .db is silently undone by it (R2 drill,
+// r1-findings #42). Docker/systemd send SIGTERM; Electron's fork sends
+// { type: 'shutdown' } over IPC, because on Windows a signal is a hard kill.
+let shuttingDown = false;
+function shutdown(reason) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`  Shutting down (${reason}): closing the database…`);
+  const finish = () => {
+    try { db.close(); } catch (err) { console.error('  Database close failed:', err.message); }
+    process.exit(0);
+  };
+  server.close(finish);
+  server.closeAllConnections?.();
+  setTimeout(finish, 5000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('message', (msg) => { if (msg && msg.type === 'shutdown') shutdown('ipc'); });
