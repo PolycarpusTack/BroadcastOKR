@@ -156,7 +156,14 @@ function fakeOracle({ failOn } = {}) {
       return { rows: [{ VALUE: 42 }] };
     },
     async rollback() { rollbacks += 1; },
-    async close(opts) { closes.push(opts); },
+    // Like the real driver: close() takes no argument or an options object —
+    // close(undefined) throws NJS-005 (A-2-T4 found this on the real driver).
+    async close(...args) {
+      if (args.length && (typeof args[0] !== 'object' || args[0] === null)) {
+        throw new Error('NJS-005: invalid value for parameter 1');
+      }
+      closes.push(args[0]);
+    },
   };
   const driver = {
     OUT_FORMAT_OBJECT: 4002,
@@ -170,12 +177,13 @@ const PG_CONN = { type: 'postgres', host: 'h', port: 5432, service: 'db', user: 
 const ORA_CONN = { type: 'oracle', host: 'h', port: 1521, service: 'db', user: 'ro', password: 'x' };
 
 describe('core read-only lifecycle (fake drivers)', () => {
-  it('PostgreSQL: BEGIN READ ONLY, the exact validated SQL, ROLLBACK, clean release', async () => {
+  it('PostgreSQL: BEGIN READ ONLY, the exact validated SQL, ROLLBACK, advisory locks released, clean release', async () => {
     const pg = fakePg();
     const c = core.createWhatsonCore({ decryptPassword: (p) => p, drivers: { pg: pg.driver, oracledb: null } });
     const sql = `SELECT COUNT(*) AS value FROM psi.psitransmission WHERE tx_txdate >= :start_date`;
     const rows = await c.runQuery(PG_CONN, sql, { start_date: '2026-01-01' });
-    assert.deepEqual(pg.calls.map(([t]) => t), ['BEGIN READ ONLY', sql.replace(':start_date', '$1'), 'ROLLBACK']);
+    assert.deepEqual(pg.calls.map(([t]) => t),
+      ['BEGIN READ ONLY', sql.replace(':start_date', '$1'), 'ROLLBACK', 'SELECT pg_advisory_unlock_all()']);
     assert.deepEqual(pg.calls[1][1], ['2026-01-01']);
     assert.deepEqual(pg.releases, [undefined]);
     assert.deepEqual(rows, [{ VALUE: 42 }]);

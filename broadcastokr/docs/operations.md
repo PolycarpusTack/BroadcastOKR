@@ -387,5 +387,17 @@ in the same start when `BRIDGE_ENCRYPTION_KEY` is set (see Credentials).
 
 - `BRIDGE_API_KEY` must be set in production — without it, auth is disabled
 - Database passwords in the `connections` table are encrypted when `BRIDGE_ENCRYPTION_KEY` (or the `BRIDGE_API_KEY` fallback) is set
-- The bridge only executes SELECT queries against external databases (enforced server-side)
+- The bridge only executes SELECT queries against external databases (enforced server-side): a
+  scanner refuses anything but one SELECT, and the query runs in a database-enforced read-only
+  transaction (ADR-A2)
+- **The WHATS'ON account the bridge or agent uses must be a reader, and nothing more.** The read-only
+  transaction does not stop everything a granted object can do. On Oracle, a function with
+  `PRAGMA AUTONOMOUS_TRANSACTION` writes anyway, `NEXTVAL` advances sequences, and `DBMS_LOCK` locks
+  outlive the query. Give the account exactly this:
+  - Oracle: `CREATE SESSION` plus `SELECT` on the named tables. No `EXECUTE` on packages or
+    functions, no `SELECT` on sequences, no roles, no `ANY` privileges.
+  - PostgreSQL: `LOGIN`, `CONNECT`, schema `USAGE`, `SELECT` on the tables. No ownership, and no
+    `EXECUTE` on your own write functions.
+  - Proven on the rig 2026-11-26 with `bridge/__tests__/{pg,oracle}-readonly-acceptance.test.cjs`
+    (env-gated; see the header of each file for the disposable setup).
 - CORS origins are configurable — set `BRIDGE_CORS_ORIGINS` to match your deployment
