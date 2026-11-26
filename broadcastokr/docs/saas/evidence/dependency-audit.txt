@@ -1,0 +1,7 @@
+# Generated 2026-11-26T11:48:09Z on 2b58c4c — dependency audit (npm audit, runtime = what the instance image installs)
+  bridge runtime (bridge/package-lock.json, --omit=dev):
+    found 0 vulnerabilities
+  app + tooling (package-lock.json):
+    electron  <=42.11.15
+    minimatch  7.0.0 - 11.0.0
+    7 vulnerabilities (6 moderate, 1 high)

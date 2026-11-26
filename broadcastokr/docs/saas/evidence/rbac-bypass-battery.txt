@@ -1,12 +1,22 @@
-# Generated 2026-08-31T19:04:01Z — server-enforced RBAC UI-bypass battery (bridge/__tests__/rbac.test.cjs)
+# Generated 2026-11-26T11:46:22Z on 2b58c4c — server-enforced RBAC UI-bypass battery (rbac.test.cjs)
+  # Subtest: FF-9: data-plane routes are policy-covered
+      ok 1 - every route on the WHATS'ON router has an explicit POLICY entry
+      ok 2 - the raw-SQL surfaces are owner-gated, not merely covered
+      ok 3 - coverage survives the shapes Express would also dispatch (case, trailing slash)
+      ok 4 - fails when a data-plane route is mounted without a rule (open-loop proof)
+  ok 1 - FF-9: data-plane routes are policy-covered
   # Subtest: server-enforced RBAC (client mode)
-      ok 1 - members can read, check in, and move tasks — but not create or delete
-      ok 2 - members cannot touch credentials, config, raw SQL, or people
-      ok 3 - role escalation is owner-only, even for self
-      ok 4 - managers create and edit but cannot delete or manage clients
-      ok 5 - server-side audit recorded the sensitive actions with session actors
-      ok 6 - owners can do all of it
-  ok 1 - server-enforced RBAC (client mode)
-  # tests 6
-  # pass 6
+      not ok 1 - members can read, check in, and move tasks — but not create or delete
+      not ok 2 - members cannot touch credentials, config, raw SQL, or people
+      not ok 3 - path shape cannot route around the policy (case, trailing slash)
+      not ok 4 - managers sync stored live KRs through execute-batch but cannot supply SQL of their own
+      not ok 5 - role escalation is owner-only, even for self
+      not ok 6 - managers create and edit but cannot delete or manage clients
+      not ok 7 - server-side audit recorded the sensitive actions with session actors
+      not ok 8 - refuses to store a credential it cannot protect (cloud, no encryption key)
+      not ok 9 - owners can do all of it
+  not ok 2 - server-enforced RBAC (client mode)
+  # tests 13
+  # pass 4
   # fail 0
+  # skipped 0

@@ -1,4 +1,4 @@
-# Generated 2026-08-31T19:04:04Z — single-tenant isolation enforcement (bridge/__tests__/tenancy-mode.test.cjs)
+# Generated 2026-11-26T11:46:42Z on 2b58c4c — single-tenant isolation enforcement (tenancy-mode.test.cjs)
   # Subtest: tenancy mode: client
       ok 1 - reports its mode on /api/health
       ok 2 - allows exactly one client row and refuses a second
@@ -10,3 +10,4 @@
   # tests 4
   # pass 4
   # fail 0
+  # skipped 0

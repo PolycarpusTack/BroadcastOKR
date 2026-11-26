@@ -1,0 +1,41 @@
+# Generated 2026-11-26T11:48:01Z on 2b58c4c — data integrity: atomic aggregates, check-in command, deletion reconciliation, graceful shutdown
+  # Subtest: aggregate writes are atomic (F7, injected late failure)
+      ok 1 - goal create: a KR insert failure leaves no goal row behind
+      ok 2 - goal update: a KR upsert failure restores title, version and updated_at
+      ok 3 - check-in: a failure after the history row is written rolls back history, value, version and the operation record
+      ok 4 - task update: a subtask rewrite failure restores the parent and the old subtasks
+  ok 1 - aggregate writes are atomic (F7, injected late failure)
+  # Subtest: backup
+      ok 1 - writes a consistent snapshot that can be reopened
+      ok 2 - prunes oldest files beyond keep
+      ok 3 - a restored snapshot brings the connections back with it (D-3)
+      ok 4 - prunes a pre-D-3 snapshot pair as a unit, never orphaning its config copy
+  ok 2 - backup
+  # Subtest: graceful shutdown closes the database
+      ok 1 - on the IPC shutdown message (Electron fork): exit 0, no WAL left, the write is in the .db
+      ok 2 - on SIGTERM (Docker, systemd) # SKIP Windows delivers SIGTERM as a hard kill
+  ok 3 - graceful shutdown closes the database
+  # Subtest: review remediation B: F7 atomic aggregates, F4 check-in command
+      ok 1 - F7: invalid nested input leaves the whole goal as it was
+      ok 2 - F7: a KR id owned by another goal cannot be pulled across
+      ok 3 - F7: duplicate create is an explicit 409 with the stored row; stale version still 409s
+      ok 4 - F7: a valid update commits parent and KRs together, once
+      ok 5 - F7: task create validates, refuses duplicates, and commits subtasks with the parent
+      ok 6 - F7: an invalid task update leaves parent, subtasks and version untouched
+      ok 7 - F4: a member check-in persists the value and history in one command, attributed to the session
+      ok 8 - F4: the same operation replays the same answer; a different body under it is refused
+      ok 9 - F4: a live KR keeps its synced value; only the annotation is recorded
+      ok 10 - F4: invalid input and wrong associations fail without side effects
+      ok 11 - F4: a stale full-goal write cannot roll an accepted check-in back
+  ok 4 - review remediation B: F7 atomic aggregates, F4 check-in command
+  # Subtest: sync deletions (F6)
+      ok 1 - every synchronised collection reports its deletions
+      ok 2 - a delete re-sends the parents the schema rewrote (task ← goal, goal ← template, team ← user)
+      ok 3 - delete then recreate in one window delivers both, and the row wins on the client
+      ok 4 - a stale update cannot bring a deleted goal or task back
+      ok 5 - a client behind the retention window is told to reload; old markers are pruned
+  ok 5 - sync deletions (F6)
+  # tests 26
+  # pass 25
+  # fail 0
+  # skipped 1
