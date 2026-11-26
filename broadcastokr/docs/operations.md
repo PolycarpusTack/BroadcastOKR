@@ -246,10 +246,28 @@ node bridge/agent.cjs run --dir /etc/brokr-agent
 `agent-config.json` (operator-owned) holds `instanceUrl`, `intervalMs`,
 `connections` (same shape as the bridge's, `schema` optional) and `bindings` of
 `{ krId, connectionId, sql, timeframeDays? }`. The `krId` must exist on the instance
-first — unknown ids come back in the ingest response as `unknown`. Passwords may be
-plaintext or `enc:v1:` values produced by the bridge's `encrypt()`; set
-`AGENT_DATA_KEY` in the agent's environment to unlock them. Identity lives in
-`agent-identity.json` (0600 where the filesystem honours it; a no-op on NTFS).
+first — unknown ids come back in the ingest response as `unknown`.
+
+**Secrets at the site** (R4). The first `enroll` generates a random 256-bit data key in
+`agent-data-key`. A re-enrolment keeps it, so stored passwords stay readable. Encrypt each
+connection password with it, and put the `enc:v1:` output in `agent-config.json`:
+
+```bash
+# reads stdin, so the password does not land in shell history or the process list
+printf '%s' 'the-password' | node bridge/agent.cjs encrypt-password --dir /etc/brokr-agent
+```
+
+- `agent-identity.json` (the agent token), `agent-data-key` and `agent-config.json` are written
+  owner-only. On Linux/macOS that is mode 0600. On Windows the file's ACL is replaced: no inherited
+  entries, full control for the installing user, SYSTEM and Administrators only. `enroll` warns if it
+  could not restrict a file, and `run` warns when the key or identity file has become readable by
+  others on POSIX.
+- Run the agent as a dedicated service account that owns the directory.
+- To keep the key out of the filesystem, set `AGENT_DATA_KEY` in the service's environment from your
+  OS keystore or secret manager (systemd credentials, a Windows service secret, Vault). The variable
+  overrides the file, and with it set `enroll` writes no key file.
+- Back up the key with the agent's config. Without it, every `enc:v1:` password must be encrypted
+  again. Plaintext passwords still work, but don't use them.
 Oracle uses thick mode when an Oracle client is on PATH, thin mode otherwise;
 `ORACLE_CLIENT_DIR` pins a client directory.
 

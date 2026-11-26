@@ -14,6 +14,21 @@ const AGENT = path.join(__dirname, '..', 'agent.cjs');
 const PORT = 5400 + Math.floor(Math.random() * 90);
 const BASE = `http://127.0.0.1:${PORT}`;
 
+/** 0600 on POSIX; on Windows the ACL lists no principal but the user, SYSTEM and Administrators, and nothing is inherited. */
+function assertOwnerOnly(file) {
+  if (process.platform !== 'win32') {
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600, file);
+    return;
+  }
+  const acl = execFileSync('icacls', [file], { encoding: 'utf8' });
+  assert.doesNotMatch(acl, /\(I\)/, `inherited entries left on ${file}:
+${acl}`);
+  for (const who of ['Everyone', 'Users', 'Authenticated Users', 'Iedereen', 'Gebruikers']) {
+    assert.ok(!acl.includes(`${who}:`), `${who} can read ${file}:
+${acl}`);
+  }
+}
+
 const json = (method, body, extra = {}) => ({
   method, headers: { 'Content-Type': 'application/json', ...extra },
   body: body === undefined ? undefined : JSON.stringify(body),
@@ -56,7 +71,7 @@ describe('connector agent', () => {
     fs.rmSync(agentDir, { recursive: true, force: true });
   });
 
-  it('enrols via the CLI with a one-time token; identity file is written 0600', async () => {
+  it('enrols via the CLI with a one-time token; identity, data key and config are owner-only', async () => {
     const minted = await (await fetch(`${BASE}/api/agents/enrol-token`, json('POST', {}))).json();
     assert.ok(minted.token);
 
@@ -69,8 +84,8 @@ describe('connector agent', () => {
     agentToken = identity.agentToken;
     agentId = identity.agentId;
     assert.ok(agentToken.length >= 64);
-    const mode = fs.statSync(path.join(agentDir, 'agent-identity.json')).mode & 0o777;
-    assert.equal(mode, 0o600);
+    for (const f of ['agent-identity.json', 'agent-data-key', 'agent-config.json']) assertOwnerOnly(path.join(agentDir, f));
+    assert.match(fs.readFileSync(path.join(agentDir, 'agent-data-key'), 'utf8').trim(), /^[0-9a-f]{64}$/);
 
     // The enrolment token is single-use
     const reuse = await fetch(`${BASE}/api/agent/enroll`, json('POST', { token: minted.token, name: 'copycat' }));
@@ -117,6 +132,34 @@ describe('connector agent', () => {
     }, { 'X-Agent-Token': agentToken }))).json();
     assert.equal(res.applied, 1);
     assert.deepEqual(res.unknown, ['kr-ghost']);
+  });
+
+  it('encrypt-password reads stdin and writes a value run can decrypt with the enrolment key', () => {
+    const out = execFileSync(process.execPath, [AGENT, 'encrypt-password', '--dir', agentDir], {
+      input: 's3cret-pw\n', env: { ...process.env, AGENT_DATA_KEY: '' },
+    }).toString().trim();
+    assert.match(out, /^enc:v1:/);
+    const key = fs.readFileSync(path.join(agentDir, 'agent-data-key'), 'utf8').trim();
+    assert.equal(agentDecrypt(out, key), 's3cret-pw');
+    // AGENT_DATA_KEY still overrides the file
+    const viaEnv = execFileSync(process.execPath, [AGENT, 'encrypt-password', '--dir', agentDir], {
+      input: 'x', env: { ...process.env, AGENT_DATA_KEY: 'env-key' },
+    }).toString().trim();
+    assert.equal(agentDecrypt(viaEnv, 'env-key'), 'x');
+  });
+
+  it('a re-enrolment keeps the data key, so stored passwords stay readable', async () => {
+    const before = fs.readFileSync(path.join(agentDir, 'agent-data-key'), 'utf8');
+    const minted = await (await fetch(`${BASE}/api/agents/enrol-token`, json('POST', {}))).json();
+    const out = execFileSync(process.execPath, [
+      AGENT, 'enroll', '--instance', BASE, '--token', minted.token, '--name', 'AETN site', '--dir', agentDir,
+    ], { env: { ...process.env, AGENT_DATA_KEY: '' } }).toString();
+    assert.match(out, /data key kept/);
+    assert.equal(fs.readFileSync(path.join(agentDir, 'agent-data-key'), 'utf8'), before);
+    // run uses the new identity from here on
+    const identity = JSON.parse(fs.readFileSync(path.join(agentDir, 'agent-identity.json'), 'utf8'));
+    agentToken = identity.agentToken;
+    agentId = identity.agentId;
   });
 
   it('revocation cuts the agent off', async () => {
