@@ -11,6 +11,8 @@ const runtime = mkdtempSync(join(tmpdir(), 'brokr-e2e-'));
 
 export default defineConfig({
   testDir: './e2e',
+  // e2e/rig needs the local rig (real Keycloak); it has its own config: playwright.rig.config.ts
+  testIgnore: 'rig/**',
   timeout: 30000,
   retries: 0,
   workers: 1,
