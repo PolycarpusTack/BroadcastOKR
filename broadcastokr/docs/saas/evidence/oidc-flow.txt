@@ -1,4 +1,4 @@
-# Generated 2026-08-31T19:04:02Z — OIDC sign-in + fail-closed identity (bridge/__tests__/auth-oidc.test.cjs)
+# Generated 2026-11-26T11:46:36Z on 2b58c4c — OIDC sign-in + fail-closed identity (auth-oidc.test.cjs)
   # Subtest: OIDC sign-in (client mode)
       ok 1 - unauthenticated API calls are refused; health stays open but trimmed
       ok 2 - completes the code+PKCE flow; the first user becomes owner
@@ -12,3 +12,4 @@
   # tests 6
   # pass 6
   # fail 0
+  # skipped 0

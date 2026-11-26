@@ -1,0 +1,15 @@
+# Generated 2026-11-26T11:47:51Z on 2b58c4c — FF-8 licence tiers and caps, enforced server-side (entitlements.test.cjs)
+  # Subtest: FF-8: entitlements by tier
+      ok 1 - starter: manual OKRs only — every licensed feature is refused with the feature named
+      ok 2 - pro: live KRs, templates and agents pass; sharing is still refused
+      ok 3 - enterprise: everything passes
+      ok 4 - caps refuse past the licence: channels, seats (viewers free), agents
+      ok 5 - reports usage for the owner and over the operator channel
+  ok 1 - FF-8: entitlements by tier
+  # Subtest: desktop default gates nothing
+      ok 1 - ignores BRIDGE_TIER and caps outside client mode
+  ok 2 - desktop default gates nothing
+  # tests 6
+  # pass 6
+  # fail 0
+  # skipped 0

@@ -1,0 +1,4 @@
+# Generated 2026-11-26T11:48:21Z on 2b58c4c — release provenance: the last runs of the tag-driven release workflow (.github/workflows/release.yml)
+  2026-09-04T03:57:35Z  v0.9.2  success  https://github.com/PolycarpusTack/BroadcastOKR/actions/runs/33835056555
+  2026-09-04T03:37:32Z  v0.9.2  failure  https://github.com/PolycarpusTack/BroadcastOKR/actions/runs/33833882510
+  2026-09-04T03:28:16Z  v0.9.2  failure  https://github.com/PolycarpusTack/BroadcastOKR/actions/runs/33833316157

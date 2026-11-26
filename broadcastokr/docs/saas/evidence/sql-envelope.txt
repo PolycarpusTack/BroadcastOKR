@@ -1,0 +1,24 @@
+# Generated 2026-11-26T11:47:57Z on 2b58c4c — read-only SQL envelope (ADR-A2): scanner corpus + driver lifecycle; real-driver acceptance when configured
+  # Subtest: A-2-T4 Oracle read-only acceptance (real driver)
+  ok 1 - A-2-T4 Oracle read-only acceptance (real driver) # SKIP BRIDGE_RO_ACCEPTANCE_ORA not set (needs the disposable brokr_ro_writer account)
+  # Subtest: A-2-T3 PostgreSQL read-only acceptance (real driver)
+  ok 2 - A-2-T3 PostgreSQL read-only acceptance (real driver) # SKIP BRIDGE_RO_ACCEPTANCE_PG not set (needs a disposable PostgreSQL database)
+  # Subtest: sqlEnvelope: scanner corpus
+      ok 1 - accepts every SQL string the repository ships
+      ok 2 - accepts the builder shapes and the quoting/comment corpus
+      ok 3 - rejects every negative case with an actionable message, before any driver call
+      ok 4 - the code view never carries literal text, so it is safe to log
+      ok 5 - the wrapped preview keeps a trailing line comment from eating the wrapper
+  ok 3 - sqlEnvelope: scanner corpus
+  # Subtest: core read-only lifecycle (fake drivers)
+      ok 1 - PostgreSQL: BEGIN READ ONLY, the exact validated SQL, ROLLBACK, advisory locks released, clean release
+      ok 2 - PostgreSQL: a failed query still rolls back and the client is released with the error (destroyed)
+      ok 3 - Oracle: SET TRANSACTION READ ONLY first, rollback, close; a failure drops the connection
+      ok 4 - the reported payload never reaches a driver, on either dialect, through every entry point
+  ok 4 - core read-only lifecycle (fake drivers)
+  # tests 9
+  # pass 9
+  # fail 0
+  # skipped 0
+  (a SKIP on the acceptance suites means no disposable database was configured for this run;
+   the last real-driver run is recorded in docs/saas/readiness/r1-findings.md #38/#39)

@@ -1,0 +1,36 @@
+# Generated 2026-11-26T11:47:31Z on 2b58c4c — R4 (ADR 2026-10-22): SPKI pinning, revoke keeps the trail, owner purge, 30-day sweep
+  # Subtest: connector-agent bundle
+      ok 1 - builds a tarball whose require graph is closed and whose entrypoint runs
+  ok 1 - connector-agent bundle
+  # Subtest: agent instance pinning
+      ok 1 - without pins trusts the CA as before
+      ok 2 - with a matching pin connects
+      ok 3 - the second slot is honoured, so a key can rotate
+      ok 4 - refuses a key that matches no pin and names the key it got, before sending anything
+      ok 5 - a pin never replaces the CA and host-name check
+      ok 6 - reads the current pin of an instance
+      ok 7 - the agent pass pushes through the pinned transport
+      ok 8 - the pin command prints the pin and --write adds it to the config
+      ok 9 - re-enrolling into an existing config keeps the operator config and adds the pin
+      ok 10 - the agent pass fails loudly on a pin mismatch
+  ok 2 - agent instance pinning
+  # Subtest: pin configuration
+      ok 1 - accepts no pins, one or two well-formed pins
+      ok 2 - refuses more than two, malformed pins, and pins on plain http
+      ok 3 - accepts an upper-case scheme the URL parser accepts
+      ok 4 - adding a pin keeps at most two and drops the oldest
+  ok 3 - pin configuration
+  # Subtest: agent revoke and purge
+      ok 1 - revoke keeps the row and marks it revoked
+      ok 2 - purge removes a revoked agent and audits it
+      ok 3 - purge refuses an agent that is still active
+      ok 4 - purge answers 404 for an unknown agent
+      ok 5 - a manager cannot purge
+      ok 6 - the operator channel may revoke but not purge
+      ok 7 - reading the list purges agents revoked more than 30 days ago
+      ok 8 - the startup sweep purges the same and reports the count
+  ok 4 - agent revoke and purge
+  # tests 23
+  # pass 23
+  # fail 0
+  # skipped 0

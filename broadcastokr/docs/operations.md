@@ -83,13 +83,21 @@ cp bridge/broadcastokr.db backups/broadcastokr-$(date +%Y%m%d).db
 ### Restore
 
 1. Stop the bridge
-2. Replace `broadcastokr.db` with the snapshot's `.db`. Restoring a pre-0.9.2
+2. **Delete `broadcastokr.db-wal` and `broadcastokr.db-shm`** next to the database, if they exist,
+   or move them aside. A bridge that was killed rather than stopped (a crash, `kill -9`, a Windows
+   service stop, a pre-2026-11 build) leaves its write-ahead log behind. SQLite replays that log
+   onto whatever `.db` it finds, so a restored snapshot would come back as the state you meant to
+   roll away from, with `integrity_check` still saying `ok`. The R2 drill on 2026-11-26 showed
+   exactly this (`scripts/local-rig/r2-upgrade-restore-drill.mjs`, r1-findings #42). Since then a
+   bridge stopped with SIGTERM/SIGINT, or by the desktop app, closes the database first and leaves
+   no WAL behind. Delete the files anyway: you cannot always know how the bridge stopped.
+3. Replace `broadcastokr.db` with the snapshot's `.db`. Restoring a pre-0.9.2
    pair: put its `.config.json` at `BRIDGE_CONFIG_PATH` as `config.json` too —
    the first start imports it (see Updating)
-3. Make sure the encryption key the snapshot was written under is configured
+4. Make sure the encryption key the snapshot was written under is configured
    (server: `BRIDGE_ENCRYPTION_KEY`; desktop: the same machine and account, or
    plan to re-enter passwords)
-4. Start the bridge and read its startup lines: it reports how many stored
+5. Start the bridge and read its startup lines: it reports how many stored
    passwords it re-encrypted, left unprotected, or cannot read with the key it has
 
 ## Credentials
@@ -238,10 +246,28 @@ node bridge/agent.cjs run --dir /etc/brokr-agent
 `agent-config.json` (operator-owned) holds `instanceUrl`, `intervalMs`,
 `connections` (same shape as the bridge's, `schema` optional) and `bindings` of
 `{ krId, connectionId, sql, timeframeDays? }`. The `krId` must exist on the instance
-first — unknown ids come back in the ingest response as `unknown`. Passwords may be
-plaintext or `enc:v1:` values produced by the bridge's `encrypt()`; set
-`AGENT_DATA_KEY` in the agent's environment to unlock them. Identity lives in
-`agent-identity.json` (0600 where the filesystem honours it; a no-op on NTFS).
+first — unknown ids come back in the ingest response as `unknown`.
+
+**Secrets at the site** (R4). The first `enroll` generates a random 256-bit data key in
+`agent-data-key`. A re-enrolment keeps it, so stored passwords stay readable. Encrypt each
+connection password with it, and put the `enc:v1:` output in `agent-config.json`:
+
+```bash
+# reads stdin, so the password does not land in shell history or the process list
+printf '%s' 'the-password' | node bridge/agent.cjs encrypt-password --dir /etc/brokr-agent
+```
+
+- `agent-identity.json` (the agent token), `agent-data-key` and `agent-config.json` are written
+  owner-only. On Linux/macOS that is mode 0600. On Windows the file's ACL is replaced: no inherited
+  entries, full control for the installing user, SYSTEM and Administrators only. `enroll` warns if it
+  could not restrict a file, and `run` warns when the key or identity file has become readable by
+  others on POSIX.
+- Run the agent as a dedicated service account that owns the directory.
+- To keep the key out of the filesystem, set `AGENT_DATA_KEY` in the service's environment from your
+  OS keystore or secret manager (systemd credentials, a Windows service secret, Vault). The variable
+  overrides the file, and with it set `enroll` writes no key file.
+- Back up the key with the agent's config. Without it, every `enc:v1:` password must be encrypted
+  again. Plaintext passwords still work, but don't use them.
 Oracle uses thick mode when an Oracle client is on PATH, thin mode otherwise;
 `ORACLE_CLIENT_DIR` pins a client directory.
 
@@ -387,5 +413,17 @@ in the same start when `BRIDGE_ENCRYPTION_KEY` is set (see Credentials).
 
 - `BRIDGE_API_KEY` must be set in production — without it, auth is disabled
 - Database passwords in the `connections` table are encrypted when `BRIDGE_ENCRYPTION_KEY` (or the `BRIDGE_API_KEY` fallback) is set
-- The bridge only executes SELECT queries against external databases (enforced server-side)
+- The bridge only executes SELECT queries against external databases (enforced server-side): a
+  scanner refuses anything but one SELECT, and the query runs in a database-enforced read-only
+  transaction (ADR-A2)
+- **The WHATS'ON account the bridge or agent uses must be a reader, and nothing more.** The read-only
+  transaction does not stop everything a granted object can do. On Oracle, a function with
+  `PRAGMA AUTONOMOUS_TRANSACTION` writes anyway, `NEXTVAL` advances sequences, and `DBMS_LOCK` locks
+  outlive the query. Give the account exactly this:
+  - Oracle: `CREATE SESSION` plus `SELECT` on the named tables. No `EXECUTE` on packages or
+    functions, no `SELECT` on sequences, no roles, no `ANY` privileges.
+  - PostgreSQL: `LOGIN`, `CONNECT`, schema `USAGE`, `SELECT` on the tables. No ownership, and no
+    `EXECUTE` on your own write functions.
+  - Proven on the rig 2026-11-26 with `bridge/__tests__/{pg,oracle}-readonly-acceptance.test.cjs`
+    (env-gated; see the header of each file for the disposable setup).
 - CORS origins are configurable — set `BRIDGE_CORS_ORIGINS` to match your deployment

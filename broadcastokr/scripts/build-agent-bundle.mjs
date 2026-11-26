@@ -34,6 +34,7 @@ const FILES = [
   'agentTransport.cjs',
   'protocol.cjs',
   'utils/crypto.cjs',
+  'utils/secretFile.cjs',
   'utils/atomicWrite.cjs',
   ...readdirSync(join(BRIDGE, 'whatson')).filter((f) => f.endsWith('.cjs')).map((f) => `whatson/${f}`),
 ];

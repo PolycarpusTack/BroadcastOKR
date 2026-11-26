@@ -215,13 +215,18 @@ function createWhatsonCore({ decryptPassword, drivers = {} }) {
       throw err;
     } finally {
       try { await conn.rollback(); } catch { /* the transaction may already be gone */ }
-      await conn.close(failed ? { drop: true } : undefined);
+      // close(undefined) is NJS-005 on the real driver: pass options only when dropping
+      if (failed) await conn.close({ drop: true });
+      else await conn.close();
     }
   }
 
   // PostgreSQL: BEGIN READ ONLY … ROLLBACK on one client from the pool. A
   // failed or cancelled query releases the client with the error so pg
   // destroys it instead of handing a dirty session to the next caller.
+  // A session-level advisory lock is the one thing a read-only SELECT can leave
+  // behind that ROLLBACK does not undo (found on the real driver, A-2-T3), so a
+  // healthy client gives every such lock back before it returns to the pool.
   async function runPgQuery(connConfig, sql, binds = {}) {
     const pool = getPgPool(connConfig);
     // Convert Oracle-style :bind_name to PostgreSQL $1, $2, ... placeholders
@@ -232,6 +237,7 @@ function createWhatsonCore({ decryptPassword, drivers = {} }) {
       await client.query('BEGIN READ ONLY');
       const result = await client.query(text, values);
       await client.query('ROLLBACK');
+      await client.query('SELECT pg_advisory_unlock_all()');
       return normalizePgRows(result.rows);
     } catch (err) {
       failed = err;

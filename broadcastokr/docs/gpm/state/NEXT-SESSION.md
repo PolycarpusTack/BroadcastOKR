@@ -1,5 +1,30 @@
 # Pickup Prompt — Next Session
 
+## 2026-11-26 — local gates closed on branch `readiness/local-gates` (paste this block)
+
+We're continuing BroadcastOKR (app in `broadcastokr/`). **Talk to Yannick in plain Dutch.** `CLAUDE.md` is current.
+Work is on branch `readiness/local-gates` (not pushed, not merged; main still `65120aa`). Ask Yannick before pushing.
+
+**Done (evidence in `docs/saas/readiness/r1-findings.md` #38–#44, all marked "local, no container"):**
+- A-2-T3 PG / A-2-T4 Oracle read-only acceptance on real drivers. Two real bugs fixed: Oracle NJS-005
+  on every successful query (main since 2026-09-07, never released) and PG advisory locks surviving
+  the pool. Oracle limits (autonomous tx, NEXTVAL, DBMS_LOCK) are guarded by grants; runbook rule added.
+- B-6 two SSO sessions (`e2e/rig/two-sessions.spec.ts`, `playwright.rig.config.ts`): ≤ 5.2 s.
+- R2 upgrade/restore drill (`scripts/local-rig/r2-upgrade-restore-drill.mjs`): restores were a silent
+  no-op because of a left-over WAL → graceful shutdown (bridge + Electron) and runbook fix.
+- A-4 part: fresh runtime install walks the SSO journey. Bridge lockfile had 5 advisories → fixed.
+- R4 agent key handling (`agent-data-key`, `encrypt-password`, owner-only files on every OS).
+- R5 evidence pack regenerated (`docs/saas/evidence/`, control mapping rows 9–12).
+- test:bridge on Windows now 306/307 with 0 failures (1 Linux-only skip).
+
+**Still open (needs something outside the code):**
+1. Docker host / staging (IT request `C:whatsOnIT-REQUEST-2026-10-20.md` — did Yannick send it?):
+   A-4-T2/T3 image journey + publication gate, off-machine backups, key recovery, pen test.
+2. Electron 41 → 42 (security advisory; a major, needs a test pass of the desktop build).
+3. Usage-metrics Oracle script on a real client environment.
+4. Backlog findings: #41 (deep link lost after SSO), the low review items in
+   `plans/2026-10-21-persistence-correctness/evidence.md`.
+
 ## 2026-10-22 — persistence merged, R4 agent hardening merged (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). **Talk to Yannick in plain Dutch.** `CLAUDE.md` is current.

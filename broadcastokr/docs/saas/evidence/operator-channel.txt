@@ -1,0 +1,23 @@
+# Generated 2026-11-26T11:47:45Z on 2b58c4c — operator channel cockpit → instance: closed allow-list, audited operator principal (operator-channel.test.cjs)
+  # Subtest: operator channel: cockpit → tenant
+          ok 1 - refuses a wrong operator token outright
+          ok 2 - holds the operator to the allowlist even under the dev escape
+      ok 1 - on the tenant
+          ok 1 - lists every client as a tenant, unregistered ones included
+          ok 2 - refuses to forward for an unregistered tenant
+          ok 3 - registers the instance: token stored as ciphertext, never echoed
+          ok 4 - reports the tenant reachable with the operator token accepted and its pinned client
+          ok 5 - a masked token keeps the stored one when only the URL changes
+          ok 6 - creates a connection on the tenant, encrypted at rest there, and binds the pinned client
+          ok 7 - refuses to delete the bound connection through the channel too (D-3 holds)
+          ok 8 - mints an enrol token that enrols a real agent, lists it with last-seen, and revokes it
+          ok 9 - audits operator actions on the tenant under the operator actor
+          ok 10 - answers 502 with the reason when the tenant is unreachable
+          ok 11 - passes the tenant's 401 through when the registered token is wrong
+          ok 12 - still mints the share token and records when
+      ok 2 - on the cockpit
+  ok 1 - operator channel: cockpit → tenant
+  # tests 14
+  # pass 14
+  # fail 0
+  # skipped 0
