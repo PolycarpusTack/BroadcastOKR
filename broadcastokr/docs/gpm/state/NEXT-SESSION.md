@@ -1,29 +1,46 @@
 # Pickup Prompt — Next Session
 
-## 2026-11-26 — local gates closed on branch `readiness/local-gates` (paste this block)
+## 2026-11-26 — local gates merged (paste this block)
 
 We're continuing BroadcastOKR (app in `broadcastokr/`). **Talk to Yannick in plain Dutch.** `CLAUDE.md` is current.
-Work is on branch `readiness/local-gates` (not pushed, not merged; main still `65120aa`). Ask Yannick before pushing.
+main `a3347cd` (PR #6 merged), CI green on all five jobs, no open branches with unmerged work
+(`readiness/r1-local-rig` is old and unmerged on purpose; `release/0.9.0`, `release/0.9.1` kept).
 
-**Done (evidence in `docs/saas/readiness/r1-findings.md` #38–#44, all marked "local, no container"):**
-- A-2-T3 PG / A-2-T4 Oracle read-only acceptance on real drivers. Two real bugs fixed: Oracle NJS-005
-  on every successful query (main since 2026-09-07, never released) and PG advisory locks surviving
-  the pool. Oracle limits (autonomous tx, NEXTVAL, DBMS_LOCK) are guarded by grants; runbook rule added.
+**Done on 2026-11-26 (evidence: `docs/saas/readiness/r1-findings.md` #38–#44, all "local, no container"):**
+- A-2-T3 PG / A-2-T4 Oracle read-only acceptance on real drivers. Fixed: Oracle NJS-005 on every
+  successful query (on main since 2026-09-07, never released); PG advisory locks surviving the pool.
+  Oracle limits (autonomous tx, NEXTVAL, DBMS_LOCK) are guarded by the reader's grants; rule in
+  `docs/operations.md` Security Notes.
 - B-6 two SSO sessions (`e2e/rig/two-sessions.spec.ts`, `playwright.rig.config.ts`): ≤ 5.2 s.
-- R2 upgrade/restore drill (`scripts/local-rig/r2-upgrade-restore-drill.mjs`): restores were a silent
-  no-op because of a left-over WAL → graceful shutdown (bridge + Electron) and runbook fix.
-- A-4 part: fresh runtime install walks the SSO journey. Bridge lockfile had 5 advisories → fixed.
-- R4 agent key handling (`agent-data-key`, `encrypt-password`, owner-only files on every OS).
-- R5 evidence pack regenerated (`docs/saas/evidence/`, control mapping rows 9–12).
-- test:bridge on Windows now 306/307 with 0 failures (1 Linux-only skip).
+- R2 drill (`scripts/local-rig/r2-upgrade-restore-drill.mjs`): 0.9.2 → main upgrade and rollback fine.
+  Fixed: restores were silently undone by a left-over WAL → graceful shutdown (bridge SIGTERM/SIGINT/IPC,
+  Electron over IPC) + runbook deletes `-wal`/`-shm`.
+- A-4 part: a fresh `npm ci --omit=dev` install walks the SSO journey; bridge lockfile 5 advisories → 0.
+- R4 agent key handling (`agent-data-key`, `encrypt-password`, owner-only files incl. Windows ACL).
+- R5 evidence pack (`bash scripts/generate-evidence.sh`, control mapping rows 9–12).
+- CI: the e2e job is pinned to `ubuntu-24.04` (Playwright 1.60 has no Chromium for 26.04).
 
-**Still open (needs something outside the code):**
-1. Docker host / staging (IT request `C:whatsOnIT-REQUEST-2026-10-20.md` — did Yannick send it?):
-   A-4-T2/T3 image journey + publication gate, off-machine backups, key recovery, pen test.
-2. Electron 41 → 42 (security advisory; a major, needs a test pass of the desktop build).
-3. Usage-metrics Oracle script on a real client environment.
-4. Backlog findings: #41 (deep link lost after SSO), the low review items in
+**After the reboot:** the rig does not start by itself unless the logon task exists. Bring it up with
+`pwsh -NoProfile -File scripts/local-rig/start-rig.ps1` (run it in the background: it keeps the shell
+open). Oracle needs `Start-Service OracleOraDB19Home1TNSListener, OracleServiceLOCAL` (worked without
+elevation on 2026-11-26). The rig's tenant0/cockpit app dirs were rebuilt from main today.
+
+**Next, in order:**
+1. Docker host / staging: did Yannick send `C:whatsOnIT-REQUEST-2026-10-20.md`? It unblocks the
+   A-4-T2/T3 image journey + publication gate, off-machine backups, key recovery, the pen test.
+2. Playwright upgrade (then drop the ubuntu-24.04 pin in `.github/workflows/ci.yml`), and
+   Electron 41 → 42 (security advisory, major — needs a desktop-build test pass). Close or rebase the
+   5 open Dependabot PRs after that (TypeScript 6 is a major too).
+3. Backlog: finding #41 (deep link lost right after SSO sign-in); the low review items in
    `plans/2026-10-21-persistence-correctness/evidence.md`.
+4. Usage-metrics Oracle script on a real client environment (unchanged, waits for access).
+
+**Gotchas learned today:**
+- Port 3421 is taken on this PC ("faye"); tests that spawn a bridge should use random high ports.
+- `fork()` from inside `node --test` inherits `--test`: pass `execArgv: []`.
+- Vitest's 5 s timeouts flake under load here; rerun before suspecting a change.
+- Writing files from a Python heredoc in Git Bash mangles `
+` escapes — use the Edit tool or node.
 
 ## 2026-10-22 — persistence merged, R4 agent hardening merged (paste this block)
 
